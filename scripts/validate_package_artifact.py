@@ -57,7 +57,10 @@ def validate_wheel(path: Path, expected_version: str) -> None:
 
         if f"{IMPORT_NAME}/py.typed" not in names:
             fail(f"{path.name} does not contain {IMPORT_NAME}/py.typed")
-        if not any(name.endswith(".dist-info/licenses/LICENSE") for name in names):
+        if not any(
+            name.endswith(".dist-info/LICENSE") or name.endswith(".dist-info/licenses/LICENSE")
+            for name in names
+        ):
             fail(f"{path.name} does not contain the packaged LICENSE file")
         if any(name.startswith("tests/") or f"/{IMPORT_NAME}/tests/" in name for name in names):
             fail(f"{path.name} contains repository test files")

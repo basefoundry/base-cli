@@ -14,3 +14,5 @@ and versions are tracked in the repo-root `VERSION` file.
   TestPyPI/PyPI publication workflow.
 - Exposed `base_cli.__version__` from the repository and installed package
   version contract.
+- Pinned the build backend to metadata compatible with the bundled publication
+  action and made license-file validation portable across setuptools versions.
