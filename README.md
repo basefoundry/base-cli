@@ -8,6 +8,10 @@ Install it with:
 python -m pip install base-cli
 ```
 
+Release builds, TestPyPI rehearsals, and protected PyPI publication are
+documented in [`docs/releasing.md`](docs/releasing.md). The package exposes
+`base_cli.__version__`, which matches the distribution version.
+
 The package is distributed under the Apache License 2.0. Base itself remains
 licensed separately under AGPL-3.0-or-later.
 

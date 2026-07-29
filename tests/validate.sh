@@ -12,6 +12,9 @@ required_files=(
   .github/workflows/issue-branch-policy.yml
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
+  .github/workflows/package.yml
+  docs/releasing.md
+  scripts/validate_package_artifact.py
 )
 
 for file in "${required_files[@]}"; do
