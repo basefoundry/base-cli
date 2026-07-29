@@ -1,0 +1,9 @@
+project:
+  areas: []
+  initiatives: []
+  issue_defaults:
+    status: Backlog
+    priority: P2
+    area: Product
+    initiative: Adoption Polish
+    size: S

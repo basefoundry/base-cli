@@ -17,7 +17,7 @@ from base_cli.testing import invoke
 class PackageExportTests(unittest.TestCase):
     def test_package_exports_testing_module_for_documented_access(self) -> None:
         env = os.environ.copy()
-        pythonpath = str(Path(__file__).resolve().parents[2])
+        pythonpath = str(Path(__file__).resolve().parents[1] / "lib" / "python")
         existing_pythonpath = env.get("PYTHONPATH")
         env["PYTHONPATH"] = (
             pythonpath
