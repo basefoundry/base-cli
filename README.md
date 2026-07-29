@@ -1,4 +1,15 @@
-# `base_cli`
+# `base-cli`
+
+`base-cli` is the PyPI distribution; import it in Python as `base_cli`.
+
+Install it with:
+
+```bash
+python -m pip install base-cli
+```
+
+The package is distributed under the Apache License 2.0. Base itself remains
+licensed separately under AGPL-3.0-or-later.
 
 `base_cli` is Base's small Python framework for writing command-line tools that
 feel consistent across Base and Base-supported projects.

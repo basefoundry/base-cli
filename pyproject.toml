@@ -36,6 +36,11 @@ dev = [
   "pytest>=8.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/basefoundry/base-cli"
+Repository = "https://github.com/basefoundry/base-cli"
+Issues = "https://github.com/basefoundry/base-cli/issues"
+
 [tool.setuptools]
 package-dir = {"" = "lib/python"}
 
