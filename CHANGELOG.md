@@ -10,3 +10,7 @@ and versions are tracked in the repo-root `VERSION` file.
 ### Added
 
 - Initialized the repository with the Base-managed repo baseline.
+- Added the guarded package build, artifact validation, and protected
+  TestPyPI/PyPI publication workflow.
+- Exposed `base_cli.__version__` from the repository and installed package
+  version contract.

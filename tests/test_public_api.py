@@ -8,6 +8,12 @@ from base_cli.config import UserConfig, UserGithubConfig, UserIdeConfig, UserIde
 
 
 class PublicApiTests(unittest.TestCase):
+    def test_version_matches_repository_contract(self) -> None:
+        from pathlib import Path
+
+        version_file = Path(__file__).resolve().parents[1] / "VERSION"
+        self.assertEqual(base_cli.__version__, version_file.read_text(encoding="utf-8").splitlines()[0].strip())
+
     def test_facade_exports_supported_modules_functions_and_types(self) -> None:
         expected = {
             "CommandProtocolError",

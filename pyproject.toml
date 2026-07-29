@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "base-cli"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A small, consistent Python CLI framework for Base and Base-supported projects"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -46,6 +46,9 @@ package-dir = {"" = "lib/python"}
 
 [tool.setuptools.packages.find]
 where = ["lib/python"]
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
 
 [tool.setuptools.package-data]
 base_cli = ["py.typed"]

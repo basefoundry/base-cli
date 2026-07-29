@@ -1,5 +1,27 @@
 from __future__ import annotations
 
+from importlib.metadata import PackageNotFoundError, version as distribution_version
+from pathlib import Path
+
+
+def _resolve_version() -> str:
+    """Return the checkout version or the installed distribution version."""
+
+    for parent in Path(__file__).resolve().parents:
+        version_file = parent / "VERSION"
+        if version_file.is_file():
+            value = version_file.read_text(encoding="utf-8").splitlines()[0].strip()
+            if value:
+                return value
+
+    try:
+        return distribution_version("base-cli")
+    except PackageNotFoundError:
+        return "0.0.0"
+
+
+__version__ = _resolve_version()
+
 from . import command_filters, command_protocol, history, testing
 from .app import App, argument, command, delegated_display_command, option, run_app
 from .command_filters import command_matches, normalize_command_filter, normalize_command_filters
@@ -21,6 +43,7 @@ from .output import (
 
 __all__ = [
     "App",
+    "__version__",
     "CommandProtocolError",
     "Context",
     "ExitCode",
