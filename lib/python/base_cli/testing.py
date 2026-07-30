@@ -4,6 +4,7 @@ import inspect
 import os
 from collections.abc import Mapping
 from pathlib import Path
+from threading import RLock
 from typing import TYPE_CHECKING, Any
 
 from .paths import use_working_dir
@@ -11,6 +12,9 @@ from ._dependencies import require_yaml
 
 if TYPE_CHECKING:
     from click.testing import Result
+
+
+_INVOKE_CWD_LOCK = RLock()
 
 
 # pylint: disable=too-many-arguments
@@ -42,15 +46,18 @@ def invoke(
     if "mix_stderr" in inspect.signature(CliRunner).parameters:
         runner_kwargs["mix_stderr"] = False
     runner = CliRunner(**runner_kwargs)
-    with use_working_dir(cwd_path):
-        if cwd_path is None:
+    if cwd_path is None:
+        with use_working_dir(None):
             return runner.invoke(app.click_command, args or [], env=invoke_env)
-        original_cwd = Path.cwd()
-        os.chdir(cwd_path)
-        try:
-            return runner.invoke(app.click_command, args or [], env=invoke_env)
-        finally:
-            os.chdir(original_cwd)
+
+    with _INVOKE_CWD_LOCK:
+        with use_working_dir(cwd_path):
+            original_cwd = Path.cwd()
+            os.chdir(cwd_path)
+            try:
+                return runner.invoke(app.click_command, args or [], env=invoke_env)
+            finally:
+                os.chdir(original_cwd)
 
 
 def _write_manifest_fixture(cwd: Path, manifest: Mapping[str, Any]) -> None:

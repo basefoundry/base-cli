@@ -481,11 +481,14 @@ def test_command(tmp_path: Path) -> None:
     assert "hello Ada" in result.stdout
 ```
 
-The helper wraps Click's `CliRunner`, sets `HOME` when requested, supplies
-`cwd` to Base's context discovery without mutating process-global cwd, and keeps
-stderr separate on Click versions that support it. Use `cwd` for commands whose
-behavior depends on project discovery, including tests that intentionally run
-outside a Base project. Pass
+The helper wraps Click's `CliRunner`, sets `HOME` when requested, and supplies
+`cwd` to Base's context discovery by temporarily changing process-global cwd
+for the duration of the invocation. Calls that use `cwd` are serialized and
+the caller's cwd is restored afterward, but this remains process-global: do not
+use it concurrently with code that changes cwd outside `invoke()` or from
+threads spawned by the invoked command. Use `cwd` for commands whose behavior
+depends on project discovery, including tests that intentionally run outside a
+Base project. Pass
 `manifest={...}` with `cwd` to write a temporary `base_manifest.yaml` before
 the command runs.
 
