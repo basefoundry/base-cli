@@ -7,8 +7,16 @@ from pathlib import Path
 def _resolve_version() -> str:
     """Return the checkout version or the installed distribution version."""
 
-    for parent in Path(__file__).resolve().parents:
-        version_file = parent / "VERSION"
+    package_dir = Path(__file__).resolve().parent
+    python_dir = package_dir.parent
+    lib_dir = python_dir.parent
+    checkout_root = lib_dir.parent
+    if (
+        python_dir.name == "python"
+        and lib_dir.name == "lib"
+        and (checkout_root / "pyproject.toml").is_file()
+    ):
+        version_file = checkout_root / "VERSION"
         if version_file.is_file():
             value = version_file.read_text(encoding="utf-8").splitlines()[0].strip()
             if value:
@@ -25,7 +33,17 @@ __version__ = _resolve_version()
 from . import command_filters, command_protocol, history, testing
 from .app import App, argument, command, delegated_display_command, option, run_app
 from .command_filters import command_matches, normalize_command_filter, normalize_command_filters
-from .command_protocol import CommandProtocolError, dumps_record, dumps_records, loads_records
+from .command_protocol import (
+    BOOLEAN,
+    NULLABLE_STRING,
+    STRING,
+    CommandProtocolError,
+    FieldSpec,
+    dumps_record,
+    dumps_records,
+    loads_records,
+    register_record_schema,
+)
 from .config import UserConfig, UserGithubConfig, UserIdeConfig, UserIdePreference, UserWorkspaceConfig
 from .context import Context, get_current_context
 from .exit_codes import ExitCode
@@ -44,9 +62,13 @@ from .output import (
 __all__ = [
     "App",
     "__version__",
+    "BOOLEAN",
     "CommandProtocolError",
     "Context",
     "ExitCode",
+    "FieldSpec",
+    "NULLABLE_STRING",
+    "STRING",
     "UserConfig",
     "UserGithubConfig",
     "UserIdeConfig",
@@ -81,6 +103,7 @@ __all__ = [
     "option",
     "render_document",
     "render_records",
+    "register_record_schema",
     "resolve_output_format",
     "run_app",
 ]

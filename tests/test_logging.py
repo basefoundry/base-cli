@@ -62,7 +62,7 @@ class ConfigureLoggerTests(unittest.TestCase):
     def test_configure_logger_colors_python_user_stream_when_requested(self) -> None:
         stream = self._TtyStream()
 
-        with mock.patch.dict(os.environ, {"BASE_CLI_COLOR": "1"}, clear=True):
+        with mock.patch.dict(os.environ, {}, clear=True):
             logger = base_cli.configure_logger("color-stream", None, debug=False, stream=stream)
             logger.info("hello color")
 
@@ -95,6 +95,15 @@ class ConfigureLoggerTests(unittest.TestCase):
 
         self.assertNotIn("\033[", stream.getvalue())
         self.assertIn("hello plain", stream.getvalue())
+
+    def test_configure_logger_honors_explicit_color_disable(self) -> None:
+        stream = self._TtyStream()
+
+        with mock.patch.dict(os.environ, {"BASE_CLI_COLOR": "0"}, clear=True):
+            logger = base_cli.configure_logger("explicit-no-color-stream", None, debug=False, stream=stream)
+            logger.info("hello plain")
+
+        self.assertNotIn("\033[", stream.getvalue())
 
     def test_configure_logger_uses_custom_formatter_for_file_handler(self) -> None:
         formatter = logging.Formatter("%(levelname)s:%(message)s")

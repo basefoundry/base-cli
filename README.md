@@ -306,9 +306,15 @@ def helper() -> None:
 `--quiet` suppresses INFO output on the user-facing stream but still shows
 warnings and errors. `--debug` and `--quiet` cannot be used together. Persistent
 log files still receive DEBUG-level detail, including INFO messages suppressed
-from stderr. When `basectl --color` is used on a terminal, the user-facing
-Python logs use the same level colors as Bash logs; persistent log files remain
-plain text. `NO_COLOR` disables colors.
+from stderr. User-facing logs use colors automatically on interactive terminals;
+persistent log files remain plain text. Set `NO_COLOR=1` or
+`BASE_CLI_COLOR=0` to disable colors. The Base wrapper's `--color` option
+remains compatible with this behavior.
+
+Click also provides shell completion. For an app named `hello`, request a
+completion script with `_HELLO_COMPLETE=bash_source hello`, replacing `bash`
+with `zsh` or `fish` as needed. `base_cli` leaves installation to the caller so
+shell startup files remain under user control.
 
 Advanced tests and CI wrappers can call `base_cli.configure_logger(...,
 stream=..., formatter=...)` to capture user-facing logs or apply a custom
@@ -406,7 +412,7 @@ for those structured values.
 The user config file is machine-local by default. Base owns the semantics of
 `~/.base.d/config.yaml`, while users own backup and sync choices such as iCloud,
 chezmoi, dotfiles repositories, Time Machine, or manual copy. See
-`docs/local-config.md` for the product-level boundary.
+[`docs/local-config.md`](docs/local-config.md) for the product-level boundary.
 
 ## Project Discovery
 
@@ -426,7 +432,7 @@ actionable message.
 
 Runtime state is rooted at `~/Library/Caches/base` on macOS and `~/.cache/base`
 elsewhere. `BASE_CACHE_DIR` overrides the root. See
-[`docs/cache-ownership-and-layout.md`](../../../docs/cache-ownership-and-layout.md)
+[`docs/cache-ownership-and-layout.md`](docs/cache-ownership-and-layout.md)
 for the owner-aware layout. Base control-plane commands use `base/`; a
 Base-compliant project's own commands use `projects/<project>/<checkout-id>/`.
 Each invocation is a run bundle containing private (`0600`) `run.json`,

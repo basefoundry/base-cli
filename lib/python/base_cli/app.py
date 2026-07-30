@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import functools
-import json
 import os
 import sys
 from contextvars import ContextVar
@@ -9,6 +8,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from ._runtime import create_runtime_directory, prune_log_files, runtime_layout
+from ._private_files import write_private_json
 from .config import load_config, read_user_config
 from .context import Context, reset_current_context, set_current_context
 from .exit_codes import ExitCode
@@ -170,7 +170,10 @@ class App:
                 if context.manifest_path is not None:
                     context.log.debug("manifest_path=%s", context.manifest_path)
                 result = func(context, **kwargs)
-                exit_code = int(result or ExitCode.SUCCESS)
+                try:
+                    exit_code = _normalize_command_result(result)
+                except TypeError as exc:
+                    raise click.ClickException(str(exc)) from exc
                 return result
             except Exception:
                 exit_code = ExitCode.FAILURE
@@ -238,6 +241,7 @@ class App:
                 log_file = _default_log_file(layout, inherited_path)
             create_runtime_directory(log_file.parent, cache_root)
         if inherited_path is None and not dry_run and self.log_to_file:
+            create_runtime_directory(layout.owner_root, cache_root)
             create_runtime_directory(layout.run_root, cache_root)
             try:
                 run_metadata = {
@@ -252,11 +256,7 @@ class App:
                     "workspace_root": str(user_config.workspace.root) if user_config.workspace.root else None,
                 }
                 run_metadata_path = layout.run_root / "run.json"
-                run_metadata_path.write_text(
-                    json.dumps(run_metadata, sort_keys=True) + "\n",
-                    encoding="utf-8",
-                )
-                run_metadata_path.chmod(0o600)
+                write_private_json(run_metadata_path, run_metadata)
             except OSError:
                 pass
         if runtime_owner == "project" and selected_project_root is not None and not dry_run and self.log_to_file:
@@ -264,21 +264,16 @@ class App:
                 create_runtime_directory(layout.owner_root, cache_root)
                 identity_path = layout.owner_root / "identity.json"
                 if not identity_path.exists():
-                    identity_path.write_text(
-                        json.dumps(
-                            {
-                                "schema_version": 1,
-                                "project": selected_project_name,
-                                "project_root": str(selected_project_root),
-                                "manifest": str(manifest_path) if manifest_path is not None else None,
-                                "checkout_id": layout.owner_root.name,
-                            },
-                            sort_keys=True,
-                        )
-                        + "\n",
-                        encoding="utf-8",
+                    write_private_json(
+                        identity_path,
+                        {
+                            "schema_version": 1,
+                            "project": selected_project_name,
+                            "project_root": str(selected_project_root),
+                            "manifest": str(manifest_path) if manifest_path is not None else None,
+                            "checkout_id": layout.owner_root.name,
+                        },
                     )
-                identity_path.chmod(0o600)
             except OSError:
                 pass
         logger = configure_logger(self.name, log_file, debug, quiet=quiet)
@@ -341,7 +336,22 @@ def run_app(app: App, argv: list[str] | None = None) -> int:
     except click.ClickException as exc:
         exc.show()
         return int(exc.exit_code)
-    return int(result or 0)
+    try:
+        return _normalize_command_result(result)
+    except TypeError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return ExitCode.FAILURE
+
+
+def _normalize_command_result(result: Any) -> int:
+    if result is None:
+        return ExitCode.SUCCESS
+    if isinstance(result, int):
+        return result
+    raise TypeError(
+        "Commands must return None or an int exit code; "
+        f"got {type(result).__name__}."
+    )
 
 
 def _effective_invocation_argv(

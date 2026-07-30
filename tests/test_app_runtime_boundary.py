@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import os
+import tempfile
 from pathlib import Path
 
 import base_cli
@@ -64,3 +66,21 @@ def test_runtime_directory_helpers_are_split_from_app_module() -> None:
     assert "def runtime_layout" not in app_source
     assert "def create_runtime_directory" not in app_source
     assert "def prune_log_files" not in app_source
+
+
+def test_runtime_directories_are_owner_only_even_with_permissive_umask() -> None:
+    if os.name == "nt":
+        return
+    runtime = importlib.import_module("base_cli._runtime")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        original_umask = os.umask(0o022)
+        try:
+            path = Path(tmpdir) / "runtime" / "nested"
+            runtime.create_runtime_directory(path, Path(tmpdir))
+            path.chmod(0o755)
+            runtime.create_runtime_directory(path, Path(tmpdir))
+        finally:
+            os.umask(original_umask)
+
+        assert path.stat().st_mode & 0o777 == 0o700
+        assert path.parent.stat().st_mode & 0o777 == 0o700

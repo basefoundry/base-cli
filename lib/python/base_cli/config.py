@@ -6,6 +6,7 @@ from pathlib import Path
 import re
 from typing import Any
 
+from ._dependencies import require_yaml
 from .ide_schema import SUPPORTED_IDES
 from .ide_schema import parse_ide_extensions
 from .ide_schema import parse_ide_settings
@@ -64,10 +65,7 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {}
 
-    try:
-        import yaml
-    except ImportError as exc:
-        raise RuntimeError("PyYAML is required to load base_cli configuration.") from exc
+    yaml = require_yaml("PyYAML is required to load base_cli configuration.")
 
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
