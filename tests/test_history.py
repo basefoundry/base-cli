@@ -112,6 +112,33 @@ class BaseCliHistoryTests(unittest.TestCase):
         self.assertEqual(records, [record])
         self.assertEqual(history_mode, 0o600)
 
+    def test_windows_lock_fallback_uses_a_private_sidecar(self) -> None:
+        record = {
+            "schema_version": 1,
+            "event": "finished",
+            "run_id": "run-windows",
+            "command": "check",
+            "status": "ok",
+            "exit_code": 0,
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_root = Path(tmpdir) / "cache"
+            fake_msvcrt = mock.Mock(LK_LOCK=1, LK_UNLCK=2)
+            with mock.patch.dict(os.environ, {"BASE_CACHE_DIR": str(cache_root)}):
+                with mock.patch("base_cli.history._fcntl", None), mock.patch(
+                    "base_cli.history._msvcrt", fake_msvcrt
+                ):
+                    history_helpers.write_history_record(record)
+
+            history_path = cache_root / "base" / "history" / "runs.jsonl"
+            sidecar_path = history_path.with_name(f".{history_path.name}.lock")
+            self.assertEqual(read_history_records(cache_root), [record])
+            self.assertEqual(sidecar_path.read_text(encoding="utf-8"), "0")
+        fake_msvcrt.locking.assert_has_calls(
+            [mock.call(mock.ANY, fake_msvcrt.LK_LOCK, 1), mock.call(mock.ANY, fake_msvcrt.LK_UNLCK, 1)]
+        )
+
     def test_write_primary_record_preserves_user_command_and_project_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             cache_root = Path(tmpdir) / "cache"

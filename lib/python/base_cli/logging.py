@@ -69,7 +69,7 @@ def _handler_formatter(formatter: logging.Formatter | None, *, use_color: bool) 
 
 def _use_color(stream: TextIO) -> bool:
     return (
-        os.environ.get("BASE_CLI_COLOR") == "1"
+        os.environ.get("BASE_CLI_COLOR") != "0"
         and "NO_COLOR" not in os.environ
         and hasattr(stream, "isatty")
         and stream.isatty()

@@ -391,7 +391,7 @@ for those structured values.
 The user config file is machine-local by default. Base owns the semantics of
 `~/.base.d/config.yaml`, while users own backup and sync choices such as iCloud,
 chezmoi, dotfiles repositories, Time Machine, or manual copy. See
-`docs/local-config.md` for the product-level boundary.
+[`docs/local-config.md`](../../../docs/local-config.md) for the product-level boundary.
 
 ## Project Discovery
 

@@ -3,11 +3,15 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from base_cli.command_protocol import BOOLEAN
 from base_cli.command_protocol import CommandProtocolError
+from base_cli.command_protocol import NULLABLE_STRING
+from base_cli.command_protocol import STRING
 from base_cli.command_protocol import dumps_record
 from base_cli.command_protocol import dumps_records
 from base_cli.command_protocol import loads_records
 from base_cli.command_protocol import RECORD_SCHEMAS
+from base_cli.command_protocol import register_record_schema
 
 
 def project_command_record(**overrides: object) -> dict[str, object]:
@@ -26,6 +30,33 @@ def project_command_record(**overrides: object) -> dict[str, object]:
 
 
 class CommandProtocolTests(unittest.TestCase):
+    def test_downstream_code_can_register_a_framing_safe_record_schema(self) -> None:
+        record_type = "test-record"
+        self.addCleanup(RECORD_SCHEMAS.pop, record_type, None)
+        register_record_schema(
+            record_type,
+            {
+                "name": STRING,
+                "enabled": BOOLEAN,
+                "note": NULLABLE_STRING,
+            },
+        )
+
+        payload = dumps_record(record_type, {"name": "demo", "enabled": True, "note": None})
+
+        self.assertEqual(
+            loads_records(payload, expected_record_type=record_type),
+            (record_type, ({"name": "demo", "enabled": True, "note": None},)),
+        )
+
+    def test_record_schema_registration_rejects_invalid_or_duplicate_schemas(self) -> None:
+        with self.assertRaisesRegex(CommandProtocolError, "already registered"):
+            register_record_schema("demo", {"name": STRING})
+        with self.assertRaisesRegex(CommandProtocolError, "non-empty mapping"):
+            register_record_schema("custom", {})
+        with self.assertRaisesRegex(CommandProtocolError, "field name"):
+            register_record_schema("custom", {"bad-name": STRING})
+
     def test_project_python_requirement_is_scoped_to_project_setup_route_records(self) -> None:
         self.assertIn("requires_project_python", RECORD_SCHEMAS["project-setup-route"])
         for record_type in ("project-route", "project-command", "build-target", "demo"):

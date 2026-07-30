@@ -66,6 +66,30 @@ class RunAppTests(unittest.TestCase):
                     base_cli.run_app(app, [])
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_run_app_reports_invalid_command_return_values(self) -> None:
+        app = base_cli.App(name="invalid-return", log_to_file=False)
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> dict[str, str]:
+            del ctx
+            return {"status": "bad"}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            stderr = io.StringIO()
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "HOME": str(home),
+                    "BASE_CACHE_DIR": str(home / ".cache" / "base"),
+                },
+            ), redirect_stderr(stderr):
+                status = base_cli.run_app(app, [])
+
+        self.assertEqual(status, 1)
+        self.assertIn("Commands must return None or an int exit code", stderr.getvalue())
+
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_rejects_equals_form_long_option_values(self) -> None:
         app = base_cli.App(name="space-options", log_to_file=False)
         seen = {}

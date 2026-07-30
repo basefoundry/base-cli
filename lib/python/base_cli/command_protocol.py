@@ -6,10 +6,15 @@ from dataclasses import dataclass
 
 
 __all__ = [
+    "BOOLEAN",
     "CommandProtocolError",
+    "FieldSpec",
+    "NULLABLE_STRING",
+    "STRING",
     "dumps_record",
     "dumps_records",
     "loads_records",
+    "register_record_schema",
 ]
 
 
@@ -86,6 +91,38 @@ RECORD_SCHEMAS: dict[str, dict[str, FieldSpec]] = {
 
 RecordValue = str | bool | None
 Record = Mapping[str, RecordValue]
+
+
+def register_record_schema(record_type: str, fields: Mapping[str, FieldSpec]) -> None:
+    """Register an application-specific record schema for the wire protocol.
+
+    Schema names and field names are intentionally constrained to the same
+    framing-safe characters used by the built-in protocol. Registration is
+    additive and rejects replacement of an existing schema so that a process
+    cannot silently change the meaning of an established record type.
+    """
+
+    if not isinstance(record_type, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", record_type) is None:
+        raise CommandProtocolError(
+            "record_type must start with a letter and contain only letters, digits, and hyphens"
+        )
+    if record_type in RECORD_SCHEMAS:
+        raise CommandProtocolError(f"record_type '{record_type}' is already registered")
+    if not isinstance(fields, Mapping) or not fields:
+        raise CommandProtocolError("record schema fields must be a non-empty mapping")
+
+    normalized: dict[str, FieldSpec] = {}
+    for field_name, spec in fields.items():
+        if not isinstance(field_name, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", field_name) is None:
+            raise CommandProtocolError(
+                f"field name '{field_name}' must start with a letter and contain only letters, digits, and underscores"
+            )
+        if not isinstance(spec, FieldSpec) or spec.value_type not in {"string", "boolean"}:
+            raise CommandProtocolError(
+                f"field '{field_name}' must use a FieldSpec with value_type 'string' or 'boolean'"
+            )
+        normalized[field_name] = spec
+    RECORD_SCHEMAS[record_type] = normalized
 
 
 def dumps_record(record_type: str, record: Record) -> str:

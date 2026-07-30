@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import inspect
+import os
 from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .paths import use_working_dir
+from ._dependencies import require_yaml
 
 if TYPE_CHECKING:
     from click.testing import Result
@@ -41,17 +43,21 @@ def invoke(
         runner_kwargs["mix_stderr"] = False
     runner = CliRunner(**runner_kwargs)
     with use_working_dir(cwd_path):
-        return runner.invoke(app.click_command, args or [], env=invoke_env)
+        if cwd_path is None:
+            return runner.invoke(app.click_command, args or [], env=invoke_env)
+        original_cwd = Path.cwd()
+        os.chdir(cwd_path)
+        try:
+            return runner.invoke(app.click_command, args or [], env=invoke_env)
+        finally:
+            os.chdir(original_cwd)
 
 
 def _write_manifest_fixture(cwd: Path, manifest: Mapping[str, Any]) -> None:
-    try:
-        import yaml
-    except ImportError as exc:
-        raise RuntimeError(
-            "PyYAML is required to write base_cli.testing manifest fixtures. "
-            "Install it with 'pip install PyYAML'."
-        ) from exc
+    yaml = require_yaml(
+        "PyYAML is required to write base_cli.testing manifest fixtures. "
+        "Install it with 'pip install PyYAML'."
+    )
 
     (cwd / "base_manifest.yaml").write_text(
         yaml.safe_dump(dict(manifest), sort_keys=False),

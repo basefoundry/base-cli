@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import base_cli
 from base_cli.testing import invoke
@@ -17,6 +18,27 @@ def write_log_file(path: Path, mtime: int) -> None:
 
 
 class AppLogRetentionTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_uses_retention_index_after_initial_discovery(self) -> None:
+        app = base_cli.App(name="retention-index", max_log_files=2)
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            ctx.log.info("indexed retention")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            first = invoke(app, home=home)
+            self.assertEqual(first.exit_code, 0, first.output)
+
+            with mock.patch(
+                "base_cli._runtime.Path.glob",
+                side_effect=AssertionError("retention should use its index after initial discovery"),
+            ):
+                second = invoke(app, home=home)
+
+        self.assertEqual(second.exit_code, 0, second.output)
+
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_prunes_oldest_default_logs(self) -> None:
         app = base_cli.App(name="retention-demo", max_log_files=2)

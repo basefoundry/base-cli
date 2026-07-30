@@ -12,6 +12,12 @@ try:
 except ImportError:  # pragma: no cover - fcntl is unavailable on Windows.
     _fcntl = None  # type: ignore[assignment]
 
+try:
+    import msvcrt as _msvcrt
+except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
+    _msvcrt = None  # type: ignore[assignment]
+
+from ._private_files import restrict_file, write_private_json
 from .config import load_yaml_file
 from .context import Context
 from .paths import base_cache_root
@@ -211,7 +217,7 @@ def write_history_record(record: dict[str, Any]) -> None:
     path = base_cache_root() / HISTORY_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     append_history_line(path, f"{json.dumps(record, sort_keys=True)}\n")
-    path.chmod(0o600)
+    restrict_file(path)
 
 
 def runtime_bundle_path() -> Path | None:
@@ -251,33 +257,48 @@ def update_run_metadata(run_root: Path, record: dict[str, Any]) -> None:
         ):
             if key in record and record[key] is not None:
                 metadata[key] = record[key]
-        metadata_path.parent.mkdir(parents=True, exist_ok=True)
-        metadata_path.write_text(json.dumps(metadata, sort_keys=True) + "\n", encoding="utf-8")
-        metadata_path.chmod(0o600)
+        write_private_json(metadata_path, metadata)
     except (OSError, TypeError, ValueError):
         pass
 
 
 def append_history_line(path: Path, line: str) -> None:
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    lock_fd = fd
+    sidecar_fd: int | None = None
     try:
-        lock_history_file(fd)
+        if _fcntl is None and _msvcrt is not None:
+            sidecar_path = path.with_name(f".{path.name}.lock")
+            sidecar_fd = os.open(sidecar_path, os.O_RDWR | os.O_CREAT, 0o600)
+            if os.fstat(sidecar_fd).st_size == 0:
+                os.write(sidecar_fd, b"0")
+            restrict_file(sidecar_path)
+            lock_fd = sidecar_fd
+        lock_history_file(lock_fd)
         try:
             write_all(fd, line.encode("utf-8"))
         finally:
-            unlock_history_file(fd)
+            unlock_history_file(lock_fd)
     finally:
+        if sidecar_fd is not None:
+            os.close(sidecar_fd)
         os.close(fd)
 
 
 def lock_history_file(fd: int) -> None:
     if _fcntl is not None:
         _fcntl.flock(fd, _fcntl.LOCK_EX)
+    elif _msvcrt is not None:
+        os.lseek(fd, 0, os.SEEK_SET)
+        _msvcrt.locking(fd, _msvcrt.LK_LOCK, 1)
 
 
 def unlock_history_file(fd: int) -> None:
     if _fcntl is not None:
         _fcntl.flock(fd, _fcntl.LOCK_UN)
+    elif _msvcrt is not None:
+        os.lseek(fd, 0, os.SEEK_SET)
+        _msvcrt.locking(fd, _msvcrt.LK_UNLCK, 1)
 
 
 def write_all(fd: int, data: bytes) -> None:

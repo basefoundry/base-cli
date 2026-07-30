@@ -8,6 +8,8 @@ import sys
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, TextIO
 
+from ._dependencies import require_yaml
+
 
 PUBLIC_OUTPUT_FORMATS = ("text", "csv", "tsv", "yaml", "json")
 
@@ -90,10 +92,7 @@ def render_records(
         return resolved
 
     if resolved == "yaml":
-        try:
-            import yaml
-        except ImportError as exc:  # pragma: no cover - environment guard
-            raise RuntimeError("PyYAML is required for YAML output.") from exc
+        yaml = require_yaml("PyYAML is required for YAML output.")
         target.write(yaml.safe_dump(record_list, sort_keys=False, allow_unicode=True))
         return resolved
 
@@ -126,10 +125,7 @@ def render_document(
         target.write("\n")
         return resolved
     if resolved == "yaml":
-        try:
-            import yaml
-        except ImportError as exc:  # pragma: no cover - environment guard
-            raise RuntimeError("PyYAML is required for YAML output.") from exc
+        yaml = require_yaml("PyYAML is required for YAML output.")
         target.write(yaml.safe_dump(dict(document), sort_keys=False, allow_unicode=True))
         return resolved
 

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 import base_cli
 from base_cli import command_filters, command_protocol, history
@@ -13,6 +16,19 @@ class PublicApiTests(unittest.TestCase):
 
         version_file = Path(__file__).resolve().parents[1] / "VERSION"
         self.assertEqual(base_cli.__version__, version_file.read_text(encoding="utf-8").splitlines()[0].strip())
+
+    def test_version_resolution_ignores_unrelated_ancestor_version_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            checkout = root / "project" / "checkout"
+            package_file = checkout / "lib" / "python" / "base_cli" / "__init__.py"
+            (root / "VERSION").write_text("unrelated\n", encoding="utf-8")
+            package_file.parent.mkdir(parents=True)
+            (checkout / "pyproject.toml").write_text("[project]\nname = 'other'\n", encoding="utf-8")
+
+            with mock.patch.object(base_cli, "__file__", str(package_file)):
+                with mock.patch.object(base_cli, "distribution_version", return_value="installed"):
+                    self.assertEqual(base_cli._resolve_version(), "installed")
 
     def test_facade_exports_supported_modules_functions_and_types(self) -> None:
         expected = {
@@ -49,7 +65,17 @@ class PublicApiTests(unittest.TestCase):
         )
         self.assertEqual(
             set(command_protocol.__all__),
-            {"CommandProtocolError", "dumps_record", "dumps_records", "loads_records"},
+            {
+                "BOOLEAN",
+                "CommandProtocolError",
+                "FieldSpec",
+                "NULLABLE_STRING",
+                "STRING",
+                "dumps_record",
+                "dumps_records",
+                "loads_records",
+                "register_record_schema",
+            },
         )
         self.assertIn("write_primary_record", history.__all__)
         self.assertNotIn("lock_history_file", history.__all__)
