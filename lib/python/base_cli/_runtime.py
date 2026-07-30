@@ -75,8 +75,11 @@ def prune_log_files(
     tracked = _read_log_index(index_path)
     if tracked is None:
         tracked = {path.resolve() for path in log_dir.glob("*/logs/*.log")}
-    tracked.add(current_log_file.resolve())
-    candidates = [(path.name, path) for path in tracked if not _same_path(path, current_log_file)]
+    current_log_file = current_log_file.resolve()
+    tracked = {path.resolve() for path in tracked}
+    tracked = {path for path in tracked if path.exists() or path == current_log_file}
+    tracked.add(current_log_file)
+    candidates = [(path.name, path) for path in tracked if path != current_log_file]
 
     excess_count = len(candidates) + 1 - max_log_files
     if excess_count > 0:
@@ -87,7 +90,7 @@ def prune_log_files(
             except OSError as exc:
                 logger.warning("Could not prune log file '%s': %s", path, exc)
 
-    tracked = {path for path in tracked if path.exists() or _same_path(path, current_log_file)}
+    tracked = {path for path in tracked if path.exists() or path == current_log_file}
     try:
         write_private_json(index_path, {"version": 1, "logs": sorted(str(path) for path in tracked)})
     except (OSError, TypeError, ValueError) as exc:
@@ -121,10 +124,3 @@ def _runtime_directory_error(path: Path, cache_root: Path, exc: OSError) -> str:
         f"Check permissions on that directory. If the Base cache root '{cache_root}' is unusable, "
         "set BASE_CACHE_DIR to a writable directory."
     )
-
-
-def _same_path(left: Path, right: Path) -> bool:
-    try:
-        return left.resolve() == right.resolve()
-    except OSError:
-        return left.absolute() == right.absolute()
