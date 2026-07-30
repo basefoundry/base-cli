@@ -15,18 +15,18 @@ documented in [`docs/releasing.md`](docs/releasing.md). The package exposes
 The package is distributed under the Apache License 2.0. Base itself remains
 licensed separately under AGPL-3.0-or-later.
 
-`base_cli` is Base's small Python framework for writing command-line tools that
-feel consistent across Base and Base-supported projects.
+`base_cli` is a small Python framework for writing command-line tools with
+a consistent lifecycle. It is designed to be embedded by applications rather
+than to define an application's project model. Base is one consumer of the
+library, not part of its generic contract.
 
 It is intentionally thin. Click still owns argument parsing and command
-execution, while `base_cli` adds the Base-specific behavior every project CLI
-should get by default:
+execution, while `base_cli` provides reusable lifecycle behavior:
 
 - standard command options such as `--debug`, `--quiet`, `--environment`,
   `--config`, `--keep-temp`, and `--log-file`
 - structured logging to stderr and, by default, to a persistent per-run log file
-- Base project discovery through `base_manifest.yaml`
-- config loading with predictable precedence
+- optional project discovery and configuration policies supplied by the consumer
 - per-run temp directories, persistent cache directories, and cleanup hooks
 - sensitive argument redaction in debug invocation logs
 - a command context object shared by command code and helper functions
@@ -34,7 +34,7 @@ should get by default:
 
 ## Design Goals
 
-Base CLI tools should be easy to write, but not magical. A command should be
+CLI tools should be easy to write, but not magical. A command should be
 explicitly registered, receive an explicit `Context`, and use standard Python
 functions instead of import-time side effects.
 
@@ -44,12 +44,37 @@ The package follows these rules:
   decorating a function.
 - **Logs go to stderr**: user-facing program output can stay on stdout, while
   logs remain redirectable and skippable.
-- **Every run has a context**: logs, paths, config, environment, manifest, and
-  cleanup are available through one object.
+- **Every run has a context**: logs, paths, configuration, environment, and
+  cleanup are available through one object. Project metadata is available when
+  the selected consumer profile supplies it.
 - **No import-time filesystem writes**: state directories are created only when
   a command runs.
-- **Base-aware, Click-compatible**: command authors keep using familiar Click
-  concepts such as options and arguments.
+- **Consumer-neutral, Click-compatible**: command authors keep using familiar
+  Click concepts such as options and arguments.
+
+## Consumer Profiles
+
+`App` accepts a `CliProfile` that supplies the policies which vary
+between applications: project discovery, configuration, runtime placement, and
+optional history persistence.
+
+Standalone consumers should opt into the generic profile explicitly:
+
+```python
+app = base_cli.App(
+    name="hello",
+    version="0.1.0",
+    profile=base_cli.CliProfile.generic(),
+)
+```
+
+The generic profile has no manifest filename convention, no product-owned
+configuration directory, and no implicit history writer. Applications can
+provide those policies through callbacks or build their own profile. The
+temporary default, `CliProfile.legacy_base()`, preserves the historical
+Base behavior for existing callers while Base migrates to an explicit adapter.
+See [`docs/consumer-profiles.md`](docs/consumer-profiles.md) for the boundary
+and migration plan.
 
 ## Public API
 
@@ -72,7 +97,11 @@ from __future__ import annotations
 import base_cli
 
 
-app = base_cli.App(name="hello", version="0.1.0")
+app = base_cli.App(
+    name="hello",
+    version="0.1.0",
+    profile=base_cli.CliProfile.generic(),
+)
 
 
 @app.command()
@@ -87,7 +116,7 @@ if __name__ == "__main__":
 ```
 
 Running this command directly as a Python package automatically adds the
-standard Base options:
+standard options:
 
 ```bash
 hello --name Ada
@@ -100,19 +129,16 @@ hello --log-file /tmp/hello.log --name Ada
 
 Long options with values use space-separated syntax. `base_cli.run_app()` rejects
 equals-form values such as `--name=Ada` before Click parses arguments.
-These are direct package options. Public `basectl` launchers expose `-v` for
-command-level debug logs and command-specific flags from
-`basectl <command> --help`; they do not expose `--debug`, `--quiet`,
-`--log-file`, `--config`, or `--environment` as public `basectl` options.
-The wrapper-level `basectl --keep-temp <command>` option preserves the
-complete temporary tree for that run.
+These options belong to the application-level lifecycle. A consumer may expose
+them through its own launcher or compose them with a higher-level command
+wrapper.
 
 ## Command Registration
 
 Use `App` when you want a named command:
 
 ```python
-app = base_cli.App(name="base-projects", version="0.1.0")
+app = base_cli.App(name="workspace-tools", version="0.1.0")
 ```
 
 Register the command function explicitly:
@@ -124,7 +150,7 @@ def main(ctx: base_cli.Context) -> None:
 ```
 
 The command function always receives `ctx` as its first argument. User-defined
-options and arguments are passed after the Base standard options have been
+options and arguments are passed after the standard lifecycle options have been
 removed from Click's keyword arguments.
 
 For small scripts, the module-level decorators are available:
@@ -135,10 +161,10 @@ def main(ctx: base_cli.Context) -> None:
     ...
 ```
 
-In Base itself, prefer an explicit `App` so command names and versions are
-obvious at the top of the module.
+Prefer an explicit `App` when command names, versions, or consumer
+policies should be visible at the top of the module.
 
-Use `@app.subcommand()` when one CLI needs multiple verbs while keeping Base's
+Use `@app.subcommand()` when one CLI needs multiple verbs while keeping the
 standard context, logging, redaction, and cleanup lifecycle for each invocation:
 
 ```python
@@ -164,7 +190,7 @@ def sync_project(ctx: base_cli.Context, dry_run: bool) -> None:
 
 Subcommands use the same `base_cli.option()` and `base_cli.argument()` metadata
 as single commands. `App(help=...)` appears in the command group's `--help`
-output. For subcommand apps, prefer standard Base options before the subcommand
+output. For subcommand apps, prefer standard options before the subcommand
 name, for example `workspace-tools --debug status demo`. The post-subcommand
 form, such as `workspace-tools status --debug demo`, remains accepted for
 compatibility. Use either `@app.command()` for a single-command CLI or
@@ -193,11 +219,11 @@ def main(ctx: base_cli.Context, token: str) -> None:
 ```
 
 Both `--token secret` and an externally supplied `--token=secret` token are
-redacted in debug logs, even though Base command invocation rejects equals-form
-option values before Click parses them.
+redacted in debug logs. The lifecycle rejects equals-form option values before
+Click parses them.
 
 Use `dry_run=True` when a nonstandard option should drive `ctx.dry_run` and
-Base's default durable-write suppression:
+the lifecycle's default durable-write suppression:
 
 ```python
 @base_cli.option("--preview", is_flag=True, dry_run=True)
@@ -229,7 +255,7 @@ are consumed before the command function is called.
 
 ## Exit Codes
 
-Use `base_cli.ExitCode` when command code or tests need to name Base's standard
+Use `base_cli.ExitCode` when command code or tests need to name standard
 command result meanings:
 
 - `ExitCode.SUCCESS` (`0`): the command completed successfully.
@@ -243,28 +269,31 @@ constants when it makes intent clearer:
 
 ```python
 if ctx.project_root is None:
-    ctx.log.error("run this command from a Base project")
+    ctx.log.error("run this command from a project recognized by the consumer")
     return base_cli.ExitCode.USAGE_ERROR
 ```
 
 ## Context
 
 `Context` is the object command code should pass around instead of rediscovering
-Base paths or global settings.
+runtime paths or global settings.
 
 Important fields include:
 
 - `ctx.cli_name`: normalized CLI name used for state paths and logger names.
 - `ctx.run_id`: timestamp plus short random suffix for this invocation.
-- `ctx.base_home`: resolved `BASE_HOME`, when available.
-- `ctx.project_root`: directory containing the nearest `base_manifest.yaml`.
-- `ctx.workspace_root`: configured workspace root from `~/.base.d/config.yaml`.
-- `ctx.manifest_path`: nearest discovered Base manifest.
-- `ctx.history_scope`: compatibility scope marker; delegated children are not
-  written as separate history events.
-- `ctx.history_parent_run_id`: shared parent `basectl` invocation ID, when delegated.
-- `ctx.runtime_owner`: `base` or `project`.
-- `ctx.owner_root`: owner namespace root under the Base cache root.
+- `ctx.application_home`: optional application home supplied by the profile.
+- `ctx.base_home`: compatibility alias for `ctx.application_home`.
+- `ctx.project_root`: project root returned by the profile, when any.
+- `ctx.workspace_root`: optional workspace root supplied by user configuration.
+- `ctx.manifest_path`: project metadata path returned by the profile, when any.
+- `ctx.history_scope`: history scope supplied by the profile or its
+  compatibility adapter.
+- `ctx.history_parent_run_id`: optional parent invocation ID supplied by
+  the consumer.
+- `ctx.runtime_owner`: consumer-defined runtime owner; the generic
+  profile uses `default`.
+- `ctx.owner_root`: application namespace root under the configured cache root.
 - `ctx.run_root`: this invocation's run bundle.
 - `ctx.state_dir`: owner root (compatibility alias).
 - `ctx.log_dir`: run-bundle log directory.
@@ -273,13 +302,13 @@ Important fields include:
 - `ctx.log_file`: the run's shared `logs/primary.log`, or `None` when persistent
   logging is disabled.
 - `ctx.config`: merged configuration dictionary.
-- `ctx.user_config`: typed user configuration from `~/.base.d/config.yaml`.
+- `ctx.user_config`: typed user configuration returned by the profile.
 - `ctx.environment`: active environment, defaulting to `dev`.
 - `ctx.debug`: whether debug logging is enabled for the stderr stream.
 - `ctx.quiet`: whether INFO logs are suppressed on the stderr stream.
 - `ctx.dry_run`: whether the command is running in a no-durable-write mode.
 - `ctx.keep_temp`: whether `ctx.temp_dir` should survive cleanup.
-- `ctx.log`: standard Python logger configured by Base.
+- `ctx.log`: standard Python logger configured by `base_cli`.
 
 Helpers can retrieve the active context without threading it through every call:
 
@@ -308,8 +337,8 @@ warnings and errors. `--debug` and `--quiet` cannot be used together. Persistent
 log files still receive DEBUG-level detail, including INFO messages suppressed
 from stderr. User-facing logs use colors automatically on interactive terminals;
 persistent log files remain plain text. Set `NO_COLOR=1` or
-`BASE_CLI_COLOR=0` to disable colors. The Base wrapper's `--color` option
-remains compatible with this behavior.
+`BASE_CLI_COLOR=0` to disable colors. A consumer wrapper may add its own color
+option and map it to the environment variable.
 
 Click also provides shell completion. For an app named `hello`, request a
 completion script with `_HELLO_COMPLETE=bash_source hello`, replacing `bash`
@@ -318,31 +347,27 @@ shell startup files remain under user control.
 
 Advanced tests and CI wrappers can call `base_cli.configure_logger(...,
 stream=..., formatter=...)` to capture user-facing logs or apply a custom
-formatter without replacing Base's logger setup. Leave those arguments as
-`None` to keep the default stderr stream and `BaseCliFormatter`. Base CLI log
-timestamps use the host's local timezone and include its numeric offset by
-default. When the wrapper sets `LOG_UTC=1` (for example via
-`basectl --utc-wrapper`), they use UTC and include an explicit `UTC` marker.
+formatter. Leave those arguments as `None` to keep the default stderr stream
+and formatter. Log timestamps use the host's local timezone and include its
+numeric offset by default. A consumer can set `LOG_UTC=1` to use UTC and
+include an explicit `UTC` marker.
 
 This setting affects log presentation only. Run metadata, history records, and
 run IDs retain their canonical UTC representation.
 
 Commands that inspect runtime artifacts can use `base_cli.App(log_to_file=False)`
 to keep the standard context, `--debug`, and `--quiet` behavior without creating
-default `logs/`, `cache/`, or `tmp/<run-id>/` directories. `base_logs` uses this
-mode so `basectl logs` does not appear in its own output; `base_history` does
-the same for `basectl history`. An explicit `--log-file <path>` still enables
-file logging for that invocation.
+default `logs/`, `cache/`, or `tmp/<run-id>/` directories. An explicit
+`--log-file <path>` still enables file logging for that invocation.
 
 Commands running with `ctx.dry_run` also skip default `logs/`, `cache/`, and
 `tmp/<run-id>/` creation. Passing `--log-file <path>` still writes to that
 explicit file so tests and diagnostics can inspect dry-run logs when needed.
 
-For Python-backed commands with persistent logs, `base_cli.App` also writes a
-best-effort final history record to `<base-cache-root>/base/history/runs.jsonl`.
-History records contain redacted command metadata, timing, exit status, project
-context when known, and a pointer to the raw log file. History writes are local
-only and do not fail the user command when the index cannot be updated.
+The generic profile does not write command history. A profile may provide a
+history writer to persist redacted command metadata, timing, exit status,
+project context, and a pointer to the raw log file. History writes should be
+best-effort and should not fail the user command when an index cannot be updated.
 
 High-frequency tools can set `base_cli.App(max_log_files=<count>)` to keep at
 most that many default persistent log files across the owner's run bundles.
@@ -351,10 +376,10 @@ resolved, and the current run's log file is never pruned. The policy is skipped
 for `ctx.dry_run`,
 `log_to_file=False`, and explicit `--log-file` paths so no-durable-write modes
 and caller-selected log locations stay under caller control. Use this as a
-small guardrail for busy local tools; `basectl clean` remains the broader
-maintenance command for caches, logs, and retained temp files.
+small guardrail for busy local tools; an application can provide broader
+maintenance commands for caches, logs, and retained temp files.
 
-Logs use the same general shape as Base Bash logs:
+Logs use a stable, human-readable shape:
 
 ```text
 2026-05-26 12:34:56 INFO    path/to/file.py:42 message
@@ -381,65 +406,51 @@ the real command output.
 
 ## Config Precedence
 
-Configuration is loaded from YAML files and environment variables in this order:
+The generic profile has no implicit configuration files. It loads the file
+passed through `--config`, when present, and otherwise starts with an empty
+configuration dictionary. Standard command-line options are applied by the
+lifecycle after the profile's configuration is loaded; for example,
+`--environment prod` overrides `environment: dev` from an explicit
+configuration file.
 
-1. user config: `~/.base.d/config.yaml`
-2. project config: `<project>/.base/config.yaml`
-3. explicit config from `--config`
-4. environment variables
-5. direct command-line standard options
 
-Environment variables currently recognized by the config layer:
+`ctx.config` exposes the dictionary returned by the profile. `ctx.user_config`
+exposes the user-configuration value returned by the profile. Consumers that
+need user files, project files, environment variables, or a merge precedence
+must implement those policies in `CliProfile.load_config` and
+`CliProfile.load_user_config`.
 
-- `BASE_CLI_ENVIRONMENT`
-- `BASE_CLI_LOG_LEVEL`
-- `BASE_CLI_KEEP_TEMP`
-
-`LOG_DEBUG=1` or `LOG_DEBUG=true` is also accepted as an internal compatibility
-fallback for wrapper/debug paths when `BASE_CLI_LOG_LEVEL` is unset. Prefer
-`BASE_CLI_LOG_LEVEL=debug` for user-facing Python CLI debug logging.
-
-Command-line standard options are applied after config is loaded. For example,
-`--environment prod` overrides `environment: dev` from config.
-
-`ctx.config` exposes the merged raw configuration after user, project,
-explicit, and environment layers are applied. `ctx.user_config` exposes only the
-typed machine-local user config, including `workspace.root`,
-`workspace.manifest`, and IDE
-preferences, so command code does not need to re-read `~/.base.d/config.yaml`
-for those structured values.
-
-The user config file is machine-local by default. Base owns the semantics of
-`~/.base.d/config.yaml`, while users own backup and sync choices such as iCloud,
-chezmoi, dotfiles repositories, Time Machine, or manual copy. See
-[`docs/local-config.md`](docs/local-config.md) for the product-level boundary.
+The legacy Base profile retains its historical `~/.base.d` and `.base`
+conventions temporarily; those paths are not part of the generic API. The
+Base-specific details remain documented in
+[`docs/local-config.md`](docs/local-config.md).
 
 ## Project Discovery
 
-When a command runs, `base_cli` walks upward from the current working directory
-looking for `base_manifest.yaml`.
+The generic profile does not discover projects or assume a manifest filename.
+Its `ctx.project_root` and `ctx.manifest_path` fields are `None` unless the
+consumer supplies a `discover_project` policy. A profile can discover projects
+from a manifest, workspace, repository metadata, or any other application-owned
+source and return a `ProjectInfo` value.
 
-If found:
-
-- `ctx.manifest_path` points to the manifest
-- `ctx.project_root` points to the manifest's parent directory
-
-If no manifest is found, both fields are `None`. Commands that require a Base
-project should validate this explicitly and return a clear usage error or
-actionable message.
+Commands that require a project should validate the profile-provided value
+explicitly and return a clear usage error or actionable message. The legacy
+Base profile retains upward discovery of `base_manifest.yaml` for existing
+callers.
 
 ## Runtime Directories
 
-Runtime state is rooted at `~/Library/Caches/base` on macOS and `~/.cache/base`
-elsewhere. `BASE_CACHE_DIR` overrides the root. See
-[`docs/cache-ownership-and-layout.md`](docs/cache-ownership-and-layout.md)
-for the owner-aware layout. Base control-plane commands use `base/`; a
-Base-compliant project's own commands use `projects/<project>/<checkout-id>/`.
+The generic profile uses the configured cache root and an application namespace
+to create per-run logs, caches, and temporary directories. Pass
+`cache_root` to `CliProfile.generic()` for deterministic placement in tests or
+applications; otherwise the platform cache directory is used. The generic
+profile does not prescribe a product-wide cache name or cleanup command.
+
 Each invocation is a run bundle containing private (`0600`) `run.json`,
-`logs/`, and `tmp/`,
-while persistent component caches live in the owner's `cache/components/`.
-`basectl clean --older-than <age>` removes old bundles and component caches;
-`--keep-last <count>` retains the newest completed bundles per owner.
+`logs/`, and `tmp/`, while persistent component caches live in the
+bundle's cache directory. The legacy Base profile retains the owner-aware
+`base/` and `projects/<project>/<checkout-id>` layout for existing
+callers.
 
 Use `ctx.on_cleanup()` for cleanup work that should happen even when helper code
 does not own the main command wrapper:
@@ -482,34 +493,29 @@ def test_command(tmp_path: Path) -> None:
 ```
 
 The helper wraps Click's `CliRunner`, sets `HOME` when requested, and supplies
-`cwd` to Base's context discovery by temporarily changing process-global cwd
-for the duration of the invocation. Calls that use `cwd` are serialized and
-the caller's cwd is restored afterward, but this remains process-global: do not
-use it concurrently with code that changes cwd outside `invoke()` or from
-threads spawned by the invoked command. Use `cwd` for commands whose behavior
-depends on project discovery, including tests that intentionally run outside a
-Base project. Pass
-`manifest={...}` with `cwd` to write a temporary `base_manifest.yaml` before
-the command runs.
+`cwd` to the invocation for the duration of the test. Calls that use
+`cwd` are serialized and the caller's cwd is restored afterward, but this
+remains process-global: do not use it concurrently with code that changes cwd
+outside `invoke()` or from threads spawned by the invoked command. A
+generic profile should receive project fixtures through its
+`discover_project` callback. The `manifest={...}` convenience is a legacy
+compatibility helper for the Base profile.
 
-When `home` is supplied, `invoke()` also defaults `BASE_CACHE_DIR` to
-`<home>/.cache/base` so helper-based tests do not inherit a developer's real
-cache root. Pass `env={"BASE_CACHE_DIR": str(path)}` when a test needs an
-explicit cache location.
+When `home` is supplied, `invoke()` provides an isolated default cache
+environment for tests. Pass `env={"BASE_CACHE_DIR": str(path)}` when a test
+needs an explicit cache location.
 
 ## When To Use `base_cli`
 
-Use `base_cli` for Python commands that are part of Base or a Base-supported
-project and need standard Base behavior.
+Use `base_cli` for Python commands that need a predictable command
+lifecycle: standard options, logging, redaction, runtime state, cleanup, and
+test helpers. Standalone consumers should use `CliProfile.generic()` or
+provide an explicit profile with their own project and configuration policies.
 
-Base public command engines under `cli/python/base_*/engine.py` should
-instantiate `base_cli.App` so standard options, logging, redaction, runtime
-state, and local command history stay consistent. If a future public Python
-engine intentionally bypasses this lifecycle, document the reason in code and
-in this guide, then add it as an explicit lifecycle-audit exemption. Shell-only
-helpers that avoid Python startup, such as `basectl config path`, do not create
-Python logs or history records; once a `basectl` path enters a Python command
-package, it should participate in `base_cli.App`.
+The legacy Base profile exists only for compatibility while Base's command
+engines migrate to an explicit consumer adapter. Base-specific behavior such as
+manifest discovery, `.base` configuration, IDE settings, and command history
+should eventually live in that adapter rather than in the generic package.
 
 It is a good fit for:
 
@@ -519,5 +525,5 @@ It is a good fit for:
 - CLIs that need predictable logs, temp directories, and config precedence
 
 It is not meant to replace Click, Typer, argparse, or rich terminal UI
-frameworks. It is the Base layer around command lifecycle, context, logging,
+frameworks. It is the reusable layer around command lifecycle, context, logging,
 configuration, and state.

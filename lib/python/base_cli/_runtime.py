@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ._private_files import write_private_json
-from .paths import runtime_owner_root, runtime_run_directory_name
+from .paths import runtime_owner_root, runtime_run_directory_name, runtime_slug
 
 
 @dataclass(frozen=True)
@@ -29,11 +29,16 @@ def runtime_layout(
     run_id: str,
     *,
     owner: str = "base",
+    namespace: str | None = None,
     project_name: str | None = None,
     project_root: Path | None = None,
     inherited_run_root: Path | None = None,
 ) -> RuntimeLayout:
-    owner_root = runtime_owner_root(cache_root, owner, project_name, project_root)
+    owner_root = (
+        runtime_namespace_root(cache_root, namespace)
+        if namespace is not None
+        else runtime_owner_root(cache_root, owner, project_name, project_root)
+    )
     run_root = inherited_run_root or owner_root / "runs" / runtime_run_directory_name(run_id, cli_name, project_name)
     state_dir = owner_root
     # Every public invocation owns one run bundle and one diagnostic log.
@@ -63,6 +68,11 @@ def create_runtime_directory(path: Path, cache_root: Path) -> None:
                 directory.chmod(0o700)
     except OSError as exc:
         raise RuntimeError(_runtime_directory_error(path, cache_root, exc)) from exc
+
+
+def runtime_namespace_root(cache_root: Path, namespace: str) -> Path:
+    """Return an application-owned runtime namespace without product assumptions."""
+    return cache_root / runtime_slug(namespace, fallback="application")
 
 
 def prune_log_files(
