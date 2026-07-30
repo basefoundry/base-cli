@@ -6,8 +6,11 @@ import os
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest import mock
 import base_cli
 from base_cli.testing import invoke
 
@@ -133,3 +136,56 @@ class InvokeTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertIsNone(seen["project_root"])
         self.assertIsNone(seen["manifest_path"])
+
+    def test_invoke_with_cwd_serializes_process_cwd_mutation(self) -> None:
+        app = base_cli.App(name="testing-cwd-serialization", log_to_file=False)
+
+        @app.command()
+        def main() -> None:
+            return None
+
+        first_started = threading.Event()
+        second_started = threading.Event()
+        release_first = threading.Event()
+        state_lock = threading.Lock()
+        observed_cwds: list[Path] = []
+        active_calls = 0
+        max_active_calls = 0
+
+        def fake_invoke(_runner: object, *_args: object, **_kwargs: object) -> object:
+            nonlocal active_calls, max_active_calls
+            with state_lock:
+                active_calls += 1
+                max_active_calls = max(max_active_calls, active_calls)
+                observed_cwds.append(Path.cwd())
+                if len(observed_cwds) == 1:
+                    first_started.set()
+                else:
+                    second_started.set()
+            if not release_first.wait(timeout=5):
+                raise AssertionError("timed out waiting to release invoke")
+            with state_lock:
+                active_calls -= 1
+            return mock.sentinel.result
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            first_cwd = root / "first"
+            second_cwd = root / "second"
+            first_cwd.mkdir()
+            second_cwd.mkdir()
+            original_cwd = Path.cwd()
+
+            with mock.patch("click.testing.CliRunner.invoke", new=fake_invoke):
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    first = executor.submit(invoke, app, home=root / "home", cwd=first_cwd)
+                    self.assertTrue(first_started.wait(timeout=5))
+                    second = executor.submit(invoke, app, home=root / "home", cwd=second_cwd)
+                    self.assertFalse(second_started.wait(timeout=0.1))
+                    release_first.set()
+                    self.assertIs(first.result(timeout=5), mock.sentinel.result)
+                    self.assertIs(second.result(timeout=5), mock.sentinel.result)
+
+        self.assertEqual(max_active_calls, 1)
+        self.assertEqual(set(observed_cwds), {first_cwd.resolve(), second_cwd.resolve()})
+        self.assertEqual(Path.cwd(), original_cwd)
