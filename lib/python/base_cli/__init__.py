@@ -58,11 +58,13 @@ from .output import (
     render_records,
     resolve_output_format,
 )
+from .profile import CliProfile, ProjectInfo, RuntimeBinding
 
 __all__ = [
     "App",
     "__version__",
     "BOOLEAN",
+    "CliProfile",
     "CommandProtocolError",
     "Context",
     "ExitCode",
@@ -98,6 +100,7 @@ __all__ = [
     "normalize_command_filters",
     "OutputFormatError",
     "PUBLIC_OUTPUT_FORMATS",
+    "ProjectInfo",
     "is_terminal",
     "output_format_choices",
     "option",
@@ -106,4 +109,5 @@ __all__ = [
     "register_record_schema",
     "resolve_output_format",
     "run_app",
+    "RuntimeBinding",
 ]

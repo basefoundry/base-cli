@@ -7,24 +7,17 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Callable
 
-from ._runtime import create_runtime_directory, prune_log_files, runtime_layout
+from ._runtime import create_runtime_directory, prune_log_files
 from ._private_files import write_private_json
-from .config import load_config, read_user_config
 from .context import Context, reset_current_context, set_current_context
 from .exit_codes import ExitCode
-from .history import HISTORY_SCOPE_INTERNAL, utc_now, write_finished_record
+from .history import utc_now
 from .logging import configure_logger, log_invocation
 from .paths import (
-    base_cache_root,
     current_working_dir,
-    discover_manifest,
-    make_run_id,
     normalize_cli_name,
-    normalize_runtime_owner,
-    runtime_project_name,
-    runtime_project_root,
-    resolve_base_home,
 )
+from .profile import CliProfile
 from .redaction import parameter_name_from_decls
 
 _STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp", "log_file")
@@ -33,22 +26,8 @@ DISPLAY_COMMAND_ENV = "BASE_CLI_DISPLAY_COMMAND"
 _INVOCATION_ARGV: ContextVar[list[str] | None] = ContextVar("base_cli_invocation_argv", default=None)
 
 
-def _default_log_file(layout: Any, inherited_path: Path | None) -> Path:
-    if inherited_path is not None:
-        return Path(
-            os.environ.get(
-                "BASE_CLI_PRIMARY_LOG",
-                str(layout.log_dir / "primary.log"),
-            )
-        ).expanduser()
-    return layout.log_dir / "primary.log"
-
-
-def _history_scope(inherited_path: Path | None) -> str:
-    return os.environ.get(
-        "BASE_CLI_HISTORY_SCOPE",
-        HISTORY_SCOPE_INTERNAL if inherited_path is not None else "primary",
-    )
+def _default_log_file(layout: Any, configured_log_file: Path | None) -> Path:
+    return configured_log_file or layout.log_dir / "primary.log"
 
 
 def _require_click():
@@ -61,7 +40,7 @@ def _require_click():
 
 # pylint: disable=too-many-statements
 class App:
-    """Define a Click-backed command with Base's shared runtime lifecycle."""
+    """Define a Click-backed command with a shared runtime lifecycle."""
 
     # pylint: disable=too-many-arguments,too-many-positional-arguments
     def __init__(
@@ -71,6 +50,7 @@ class App:
         help: str | None = None,  # pylint: disable=redefined-builtin
         log_to_file: bool = True,
         max_log_files: int | None = None,
+        profile: CliProfile | None = None,
     ) -> None:
         if max_log_files is not None and max_log_files < 1:
             raise ValueError("max_log_files must be greater than 0 when set.")
@@ -79,6 +59,7 @@ class App:
         self.help = help
         self.log_to_file = log_to_file
         self.max_log_files = max_log_files
+        self.profile = profile or CliProfile.legacy_base()
         self._click_command = None
         self._command_func: Callable[..., Any] | None = None
         self._command_args: tuple[Any, ...] = ()
@@ -179,7 +160,14 @@ class App:
                 exit_code = ExitCode.FAILURE
                 raise
             finally:
-                write_finished_record(context, invocation_argv, sensitive_options, started_at, exit_code)
+                if self.profile.history_writer is not None:
+                    self.profile.history_writer(
+                        context,
+                        invocation_argv,
+                        sensitive_options,
+                        started_at,
+                        exit_code,
+                    )
                 reset_current_context(token)
                 context.cleanup()
 
@@ -193,41 +181,25 @@ class App:
 
     def _create_context(self, standard: dict[str, Any], sensitive_options: set[str], dry_run: bool = False) -> Context:
         del sensitive_options
-        manifest_override = os.environ.get("BASE_CLI_PROJECT_MANIFEST")
-        manifest_path = (
-            Path(manifest_override).expanduser().resolve()
-            if manifest_override
-            else discover_manifest(current_working_dir())
-        )
-        project_root = manifest_path.parent if manifest_path is not None else None
+        project = self.profile.discover_project(current_working_dir())
+        manifest_path = project.manifest if project is not None else None
         explicit_config = Path(standard["config"]).expanduser() if standard.get("config") else None
-        user_config = read_user_config()
-        config = load_config(project_root, explicit_config)
+        user_config = self.profile.load_user_config()
+        config = self.profile.load_config(project, explicit_config)
 
         environment = standard.get("environment") or config.get("environment") or "dev"
         debug = bool(standard.get("debug") or str(config.get("log_level", "")).lower() == "debug")
         quiet = bool(standard.get("quiet"))
         keep_temp = bool(standard.get("keep_temp") or config.get("keep_temp"))
 
-        cache_root = base_cache_root()
-        runtime_owner = normalize_runtime_owner()
-        selected_project_root = runtime_project_root() or project_root
-        selected_project_name = runtime_project_name() or (
-            selected_project_root.name if selected_project_root else None
-        )
-        inherited_run_root = os.environ.get("BASE_CLI_RUN_ROOT") if runtime_owner == "base" else None
-        inherited_path = Path(inherited_run_root).expanduser().resolve() if inherited_run_root else None
-        inherited_run_id = os.environ.get("BASE_CLI_RUN_ID") if inherited_path is not None else None
-        run_id = inherited_run_id or (inherited_path.name if inherited_path is not None else make_run_id())
-        layout = runtime_layout(
-            cache_root,
-            self.name,
-            run_id,
-            owner=runtime_owner,
-            project_name=selected_project_name,
-            project_root=selected_project_root,
-            inherited_run_root=inherited_path,
-        )
+        runtime = self.profile.resolve_runtime(self.name, project)
+        cache_root = runtime.cache_root
+        runtime_owner = runtime.runtime_owner
+        selected_project_root = runtime.project_root
+        selected_project_name = runtime.project_name
+        inherited_path = runtime.inherited_path
+        run_id = runtime.run_id
+        layout = runtime.layout
 
         log_file = Path(standard["log_file"]).expanduser() if standard.get("log_file") else None
         uses_default_log_file = log_file is None
@@ -238,7 +210,7 @@ class App:
             for directory in (layout.log_dir, layout.cache_dir, layout.temp_dir):
                 create_runtime_directory(directory, cache_root)
             if log_file is None:
-                log_file = _default_log_file(layout, inherited_path)
+                log_file = _default_log_file(layout, runtime.primary_log_file)
             create_runtime_directory(log_file.parent, cache_root)
         if inherited_path is None and not dry_run and self.log_to_file:
             create_runtime_directory(layout.owner_root, cache_root)
@@ -259,7 +231,7 @@ class App:
                 write_private_json(run_metadata_path, run_metadata)
             except OSError:
                 pass
-        if runtime_owner == "project" and selected_project_root is not None and not dry_run and self.log_to_file:
+        if runtime.write_identity and selected_project_root is not None and not dry_run and self.log_to_file:
             try:
                 create_runtime_directory(layout.owner_root, cache_root)
                 identity_path = layout.owner_root / "identity.json"
@@ -287,7 +259,8 @@ class App:
             runtime_owner=runtime_owner,
             owner_root=layout.owner_root,
             run_root=layout.run_root,
-            base_home=resolve_base_home(),
+            base_home=runtime.application_home,
+            application_home=runtime.application_home,
             project_root=selected_project_root,
             workspace_root=user_config.workspace.root,
             manifest_path=manifest_path,
@@ -305,8 +278,8 @@ class App:
             log=logger,
             user_config=user_config,
             dry_run=dry_run,
-            history_scope=_history_scope(inherited_path),
-            history_parent_run_id=os.environ.get("BASE_CLI_HISTORY_PARENT_RUN_ID") or None,
+            history_scope=runtime.history_scope,
+            history_parent_run_id=runtime.history_parent_run_id,
         )
 
 
@@ -323,7 +296,7 @@ def run_app(app: App, argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     try:
         _reject_equals_option_values(click, args)
-        display_command = delegated_display_command()
+        display_command = app.profile.display_command()
         invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
         invocation_token = _INVOCATION_ARGV.set(invocation_argv)
         try:
@@ -420,7 +393,7 @@ def _decorate_standard_options(click: Any, func: Callable[..., Any], version: st
     func = click.option("--log-file", type=click.Path(dir_okay=False), help="Override the persistent log file.")(func)
     func = click.option("--keep-temp", is_flag=True, default=None, help="Preserve this run's temp directory.")(func)
     func = click.option("--config", type=click.Path(dir_okay=False), help="Load an additional config file.")(func)
-    func = click.option("--environment", help="Set the Base CLI environment.")(func)
+    func = click.option("--environment", help="Set the CLI environment.")(func)
     func = click.option(
         "--debug",
         is_flag=True,

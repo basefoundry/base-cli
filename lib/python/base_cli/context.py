@@ -22,7 +22,7 @@ def _default_user_config() -> UserConfig:
 
 @dataclass
 class Context:
-    """Runtime state and cleanup hooks available to an active Base CLI command."""
+    """Runtime state and cleanup hooks available to an active CLI command."""
 
     cli_name: str
     run_id: str
@@ -38,6 +38,7 @@ class Context:
     log: logging.Logger
     dry_run: bool = False
     base_home: Path | None = None
+    application_home: Path | None = None
     project_root: Path | None = None
     manifest_path: Path | None = None
     project_name: str | None = None
@@ -50,6 +51,12 @@ class Context:
     runtime_owner: str = "base"
     owner_root: Path | None = None
     run_root: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.application_home is None:
+            self.application_home = self.base_home
+        if self.base_home is None:
+            self.base_home = self.application_home
 
     def on_cleanup(self, hook: Callable[[], None]) -> None:
         self.cleanup_hooks.append(hook)
