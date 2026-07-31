@@ -7,7 +7,6 @@ import re
 from typing import Any
 
 from ._dependencies import require_yaml
-from .ide_schema import SUPPORTED_IDES
 from .ide_schema import parse_ide_extensions
 from .ide_schema import parse_ide_settings
 from .paths import base_state_root
@@ -82,14 +81,18 @@ def load_user_config(home: Path | None = None) -> dict[str, Any]:
     return load_yaml_file(user_config_path(home))
 
 
-def read_user_config(home: Path | None = None) -> UserConfig:
+def read_user_config(
+    home: Path | None = None,
+    *,
+    supported_ides: frozenset[str] | None = None,
+) -> UserConfig:
     raw = load_user_config(home)
     path = user_config_path(home)
     return UserConfig(
         raw=raw,
         workspace=_read_user_workspace_config(path, raw.get("workspace")),
         github=_read_user_github_config(path, raw.get("github")),
-        ide=_read_user_ide_config(path, raw.get("ide")),
+        ide=_read_user_ide_config(path, raw.get("ide"), supported_ides=supported_ides),
     )
 
 
@@ -174,21 +177,35 @@ def _optional_non_empty_string(path: Path, key: str, value: Any) -> str | None:
     return value.strip()
 
 
-def _read_user_ide_config(path: Path, ide_data: Any) -> UserIdeConfig:
+def _read_user_ide_config(
+    path: Path,
+    ide_data: Any,
+    *,
+    supported_ides: frozenset[str] | None,
+) -> UserIdeConfig:
     if ide_data is None:
         return UserIdeConfig(enabled=None, preferences={})
     if not isinstance(ide_data, dict):
         raise ValueError(f"{path}: ide must be a mapping when provided.")
 
-    allowed_keys = SUPPORTED_IDES | {"enabled"}
-    unknown_keys = sorted(set(ide_data) - allowed_keys)
+    invalid_keys = sorted(
+        str(key) for key in ide_data if not isinstance(key, str) or not key.strip()
+    )
+    if invalid_keys:
+        raise ValueError(f"{path}: ide keys must be non-empty strings.")
+
+    unknown_keys = (
+        sorted(set(ide_data) - supported_ides - {"enabled"})
+        if supported_ides is not None
+        else []
+    )
     if unknown_keys:
         raise ValueError(f"{path}: unsupported ide keys: {', '.join(unknown_keys)}.")
 
     enabled = _optional_bool(path, "ide.enabled", ide_data.get("enabled"))
     preferences = {
         ide_name: _read_user_ide_preference(path, ide_name, ide_data.get(ide_name))
-        for ide_name in sorted(SUPPORTED_IDES)
+        for ide_name in sorted(set(ide_data) - {"enabled"})
         if ide_name in ide_data
     }
     return UserIdeConfig(enabled=enabled, preferences=preferences)

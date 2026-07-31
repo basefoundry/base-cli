@@ -18,7 +18,6 @@ except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
     _msvcrt = None  # type: ignore[assignment]
 
 from ._private_files import restrict_file, write_private_json
-from .config import load_yaml_file
 from .context import Context
 from .paths import base_cache_root
 from .redaction import REDACTED, is_secret_key, option_name_to_parameter, redact_argv, redact_text_value
@@ -29,7 +28,6 @@ __all__ = [
     "HISTORY_SCOPE_INTERNAL",
     "HISTORY_SCOPE_PRIMARY",
     "SCHEMA_VERSION",
-    "base_setup_action",
     "base_version",
     "build_finished_record",
     "compact_home_text",
@@ -57,45 +55,6 @@ SCHEMA_VERSION = 1
 HISTORY_PATH = Path("base") / "history" / "runs.jsonl"
 HISTORY_SCOPE_PRIMARY = "primary"
 HISTORY_SCOPE_INTERNAL = "internal"
-
-# Only these names are Base-owned Python entry points. A standalone caller
-# may legitimately choose a name beginning with ``base_`` and should not have
-# that name rewritten by the shared framework.
-_BASE_DISPLAY_COMMANDS = frozenset(
-    {
-        "base_activate",
-        "base_build",
-        "base_check",
-        "base_ci",
-        "base_clean",
-        "base_config",
-        "base_demo",
-        "base_dev",
-        "base_devcontainer",
-        "base_devenv",
-        "base_devenv_report",
-        "base_docs",
-        "base_export_context",
-        "base_gh",
-        "base_github_projects",
-        "base_history",
-        "base_logs",
-        "base_onboard",
-        "base_pr_policy",
-        "base_projects",
-        "base_prompt",
-        "base_release",
-        "base_repo",
-        "base_run",
-        "base_setup",
-        "base_test",
-        "base_trust",
-        "base_update",
-        "base_update_profile",
-        "base_workspace",
-    }
-)
-
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
@@ -134,7 +93,7 @@ def build_finished_record(
         "schema_version": SCHEMA_VERSION,
         "run_id": context.run_id,
         "event": "finished",
-        "command": display_command(context.cli_name, argv),
+        "command": context.history_display_command(context.cli_name, argv),
         "raw_command": context.cli_name,
         "argv": redact_history_argv(argv, sensitive_options),
         "started_at": format_timestamp(started_at),
@@ -320,10 +279,7 @@ def duration_ms(started_at: datetime, ended_at: datetime) -> int:
 
 
 def display_command(cli_name: str, argv: list[str]) -> str:
-    if cli_name == "base_setup":
-        return base_setup_action(argv) or "setup"
-    if cli_name in _BASE_DISPLAY_COMMANDS:
-        return cli_name.removeprefix("base_").replace("_", "-")
+    del argv
     return cli_name.replace("_", "-")
 
 
@@ -356,21 +312,14 @@ def optional_int(value: Any) -> int | None:
     return value if isinstance(value, int) else None
 
 
-def base_setup_action(argv: list[str]) -> str | None:
-    for index, arg in enumerate(argv):
-        if arg == "--action" and index + 1 < len(argv):
-            return argv[index + 1]
-        if arg.startswith("--action="):
-            return arg.partition("=")[2]
-    return None
-
-
 def project_name(context: Context) -> str | None:
     if context.project_name:
         return context.project_name
     if context.manifest_path is None:
         return None
     try:
+        from .config import load_yaml_file
+
         data = load_yaml_file(context.manifest_path)
     except (OSError, RuntimeError, ValueError):
         return None

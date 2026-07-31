@@ -105,3 +105,9 @@ class GenericProfileTests(unittest.TestCase):
         self.assertEqual(seen["manifest_path"], manifest)
         self.assertEqual(seen["project_name"], "demo")
         self.assertEqual(seen["config"], {"project": "demo", "explicit": None})
+
+    def test_generic_profile_accepts_consumer_history_display_policy(self) -> None:
+        formatter = lambda cli_name, argv: f"tool {cli_name} {' '.join(argv)}"  # noqa: E731
+        profile = base_cli.CliProfile.generic(history_display_command=formatter)
+
+        self.assertIs(profile.history_display_command, formatter)

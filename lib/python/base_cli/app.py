@@ -277,6 +277,7 @@ class App:
             keep_temp=keep_temp,
             log=logger,
             user_config=user_config,
+            history_display_command=self.profile.history_display_command,
             dry_run=dry_run,
             history_scope=runtime.history_scope,
             history_parent_run_id=runtime.history_parent_run_id,
