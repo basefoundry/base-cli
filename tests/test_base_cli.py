@@ -402,7 +402,7 @@ class BaseCliTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "ide must be a mapping"):
                 read_user_config(home)
 
-    def test_read_user_config_rejects_unknown_ide_key(self) -> None:
+    def test_read_user_config_accepts_consumer_defined_ide_key(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
             path = user_config_path(home)
@@ -418,8 +418,19 @@ class BaseCliTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            config = read_user_config(home)
+
+        self.assertTrue(config.ide.preferences["windswept"].enabled)
+
+    def test_read_user_config_can_validate_consumer_supported_ide_names(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            path = user_config_path(home)
+            path.parent.mkdir(parents=True)
+            path.write_text("ide:\n  windswept:\n    enabled: true\n", encoding="utf-8")
+
             with self.assertRaisesRegex(ValueError, "unsupported ide keys: windswept"):
-                read_user_config(home)
+                read_user_config(home, supported_ides=frozenset({"vscode"}))
 
     def test_read_user_config_rejects_non_boolean_ide_enabled(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -46,10 +46,15 @@ ConfigLoader = Callable[[ProjectInfo | None, Path | None], dict[str, Any]]
 RuntimeResolver = Callable[[str, ProjectInfo | None], RuntimeBinding]
 HistoryWriter = Callable[[Any, list[str], set[str], datetime, int], None]
 DisplayCommandResolver = Callable[[], str | None]
+HistoryDisplayResolver = Callable[[str, list[str]], str]
 
 
 def _no_display_command() -> str | None:
     return None
+
+
+def _generic_history_display_command(cli_name: str, _argv: list[str]) -> str:
+    return cli_name.replace("_", "-")
 
 
 @dataclass(frozen=True)
@@ -68,6 +73,7 @@ class CliProfile:
     resolve_runtime: RuntimeResolver
     history_writer: HistoryWriter | None = None
     display_command: DisplayCommandResolver = _no_display_command
+    history_display_command: HistoryDisplayResolver = _generic_history_display_command
 
     @classmethod
     def generic(
@@ -78,6 +84,7 @@ class CliProfile:
         discover_project: ProjectDiscovery | None = None,
         load_user_config: UserConfigLoader | None = None,
         load_config: ConfigLoader | None = None,
+        history_display_command: HistoryDisplayResolver | None = None,
     ) -> CliProfile:
         """Create a profile with consumer-neutral defaults.
 
@@ -90,6 +97,7 @@ class CliProfile:
             load_config=load_config or _load_explicit_config,
             resolve_runtime=_generic_runtime_resolver(cache_root, application_home),
             display_command=_no_display_command,
+            history_display_command=history_display_command or _generic_history_display_command,
         )
 
     @classmethod
@@ -179,6 +187,7 @@ class CliProfile:
             resolve_runtime=resolve_runtime,
             history_writer=write_finished_record,
             display_command=_legacy_display_command,
+            history_display_command=_generic_history_display_command,
         )
 
 

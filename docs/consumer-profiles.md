@@ -17,6 +17,7 @@ base_cli.App + Context + logging + cleanup
     +-- user configuration      -> CliProfile.load_user_config
     +-- project/explicit config -> CliProfile.load_config
     +-- runtime placement       -> CliProfile.resolve_runtime
+    +-- history command labels  -> CliProfile.history_display_command
     +-- optional history        -> CliProfile.history_writer
 ```
 
@@ -70,6 +71,11 @@ The callback types are deliberately small. A consumer can wrap an existing
 project library, use a different serialization format, or return no project
 metadata at all.
 
+If a consumer persists history, it can provide `history_display_command` to
+translate internal entry-point names into user-facing labels. The generic
+default only replaces underscores with hyphens; it does not know any product's
+command aliases.
+
 ## Compatibility profile
 
 For the migration period, `App()` without an explicit profile selects
@@ -84,7 +90,8 @@ The legacy profile contains the current Base conventions, including:
 - `BASE_HOME`, `BASE_CACHE_DIR`, and Base owner/runtime environment variables;
 - `~/.base.d/config.yaml` and project `.base/config.yaml`;
 - Base's owner-aware cache and run layout;
-- Base history persistence and delegation metadata.
+- Base history persistence and delegation metadata. Base's command-label policy
+  is supplied by Base rather than encoded in `base_cli.history`.
 
 These conventions are intentionally isolated behind one profile so they can be
 moved into the Base consumer without changing command lifecycle code.

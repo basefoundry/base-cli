@@ -20,6 +20,10 @@ def _default_user_config() -> UserConfig:
     return UserConfig(raw={}, ide=UserIdeConfig(enabled=None, preferences={}))
 
 
+def _default_history_display_command(cli_name: str, _argv: list[str]) -> str:
+    return cli_name.replace("_", "-")
+
+
 @dataclass
 class Context:
     """Runtime state and cleanup hooks available to an active CLI command."""
@@ -45,6 +49,7 @@ class Context:
     history_scope: str = "primary"
     history_parent_run_id: str | None = None
     user_config: UserConfig = field(default_factory=_default_user_config)
+    history_display_command: Callable[[str, list[str]], str] = _default_history_display_command
     cleanup_hooks: list[Callable[[], None]] = field(default_factory=list)
     workspace_root: Path | None = None
     quiet: bool = False
