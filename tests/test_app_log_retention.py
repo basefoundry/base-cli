@@ -14,6 +14,10 @@ from base_cli._runtime import prune_log_files
 from base_cli.testing import invoke
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 def write_log_file(path: Path, mtime: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("old log\n", encoding="utf-8")
@@ -56,7 +60,7 @@ class AppLogRetentionTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_uses_retention_index_after_initial_discovery(self) -> None:
-        app = base_cli.App(name="retention-index", max_log_files=2)
+        app = legacy_app(name="retention-index", max_log_files=2)
 
         @app.command()
         def main(ctx: base_cli.Context) -> None:
@@ -77,7 +81,7 @@ class AppLogRetentionTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_prunes_oldest_default_logs(self) -> None:
-        app = base_cli.App(name="retention-demo", max_log_files=2)
+        app = legacy_app(name="retention-demo", max_log_files=2)
         seen = {}
 
         @app.command()
@@ -104,7 +108,7 @@ class AppLogRetentionTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_prunes_by_filename_when_mtimes_disagree(self) -> None:
-        app = base_cli.App(name="retention-filename", max_log_files=2)
+        app = legacy_app(name="retention-filename", max_log_files=2)
         seen = {}
 
         @app.command()
@@ -131,7 +135,7 @@ class AppLogRetentionTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_preserves_current_log_file(self) -> None:
-        app = base_cli.App(name="retention-current", max_log_files=1)
+        app = legacy_app(name="retention-current", max_log_files=1)
         seen = {}
 
         @app.command()
@@ -158,7 +162,7 @@ class AppLogRetentionTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_keeps_logs_when_count_is_within_limit(self) -> None:
-        app = base_cli.App(name="retention-within-limit", max_log_files=3)
+        app = legacy_app(name="retention-within-limit", max_log_files=3)
         seen = {}
 
         @app.command()
@@ -185,7 +189,7 @@ class AppLogRetentionTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_is_disabled_by_default(self) -> None:
-        app = base_cli.App(name="retention-unset")
+        app = legacy_app(name="retention-unset")
         seen = {}
 
         @app.command()
@@ -212,7 +216,7 @@ class AppLogRetentionTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_skips_no_durable_write_modes(self) -> None:
-        dry_run_app = base_cli.App(name="retention-dry-run", max_log_files=1)
+        dry_run_app = legacy_app(name="retention-dry-run", max_log_files=1)
         dry_seen = {}
 
         @dry_run_app.command()
@@ -222,7 +226,7 @@ class AppLogRetentionTests(unittest.TestCase):
             dry_seen["log_file"] = ctx.log_file
             ctx.log.info("dry retention")
 
-        no_file_app = base_cli.App(
+        no_file_app = legacy_app(
             name="retention-no-file",
             log_to_file=False,
             max_log_files=1,

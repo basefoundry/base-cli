@@ -58,7 +58,8 @@ The package follows these rules:
 between applications: project discovery, configuration, runtime placement, and
 optional history persistence.
 
-Standalone consumers should opt into the generic profile explicitly:
+Standalone consumers use the generic profile by default. It can also be passed
+explicitly when making the policy boundary visible:
 
 ```python
 app = base_cli.App(
@@ -71,10 +72,11 @@ app = base_cli.App(
 The generic profile has no manifest filename convention, no product-owned
 configuration directory, and no implicit history writer. Applications can
 provide those policies through callbacks or build their own profile. The
-temporary default, `CliProfile.legacy_base()`, preserves the historical
-Base behavior for existing callers while Base migrates to an explicit adapter.
-See [`docs/consumer-profiles.md`](docs/consumer-profiles.md) for the boundary
-and migration plan.
+temporary compatibility profile, `CliProfile.legacy_base()`, preserves the
+historical Base behavior only for callers that opt into it explicitly while
+Base completes its adapter extraction. See
+[`docs/consumer-profiles.md`](docs/consumer-profiles.md) for the boundary and
+migration plan.
 
 ## Public API
 

@@ -9,6 +9,10 @@ import base_cli
 from base_cli.config import read_user_config, user_config_path
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 class GithubUserConfigTests(unittest.TestCase):
     def test_read_user_config_defaults_github_settings_to_none(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -70,7 +74,7 @@ class GithubUserConfigTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_context_exposes_github_typed_user_config(self) -> None:
-        app = base_cli.App(name="typed-config-github", log_to_file=False)
+        app = legacy_app(name="typed-config-github", log_to_file=False)
         seen = {}
 
         @app.command()

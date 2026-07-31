@@ -14,6 +14,10 @@ import base_cli
 from base_cli.testing import invoke
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 class AppRuntimeErrorTests(unittest.TestCase):
     def test_missing_click_error_recommends_pip_install(self) -> None:
         app = base_cli.App(name="missing-click")
@@ -39,7 +43,7 @@ class AppRuntimeErrorTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_reports_unwritable_cache_root_without_traceback(self) -> None:
-        app = base_cli.App(name="cache-failure", version="0.1.0")
+        app = legacy_app(name="cache-failure", version="0.1.0")
 
         @app.command()
         def main(ctx: base_cli.Context) -> None:

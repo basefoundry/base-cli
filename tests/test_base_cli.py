@@ -33,6 +33,10 @@ def change_directory(path: Path):
         os.chdir(original)
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 class BaseCliTests(unittest.TestCase):
     @staticmethod
     def make_context(tmpdir: str) -> tuple[base_cli.Context, mock.Mock]:
@@ -509,7 +513,7 @@ class BaseCliTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_context_exposes_populated_typed_user_config(self) -> None:
-        app = base_cli.App(name="typed-config-populated", log_to_file=False)
+        app = legacy_app(name="typed-config-populated", log_to_file=False)
         seen = {}
 
         @app.command()
@@ -587,7 +591,7 @@ class BaseCliTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_app_runs_with_context_and_cleans_temp_dir(self) -> None:
-        app = base_cli.App(name="demo", version="0.1.0")
+        app = legacy_app(name="demo", version="0.1.0")
         seen = {}
 
         @app.command()
@@ -774,7 +778,7 @@ class BaseCliTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_testing_invoke_uses_supplied_cwd_for_manifest_discovery(self) -> None:
-        app = base_cli.App(name="project-aware", log_to_file=False)
+        app = legacy_app(name="project-aware", log_to_file=False)
         seen = {}
 
         @app.command()
@@ -855,7 +859,7 @@ class BaseCliTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_testing_invoke_defaults_base_cache_dir_under_home(self) -> None:
-        app = base_cli.App(name="cache-default")
+        app = legacy_app(name="cache-default")
         seen = {}
 
         @app.command()
@@ -881,7 +885,7 @@ class BaseCliTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_testing_invoke_preserves_explicit_environment_overrides(self) -> None:
-        app = base_cli.App(name="cache-override")
+        app = legacy_app(name="cache-override")
         seen = {}
 
         @app.command()
@@ -917,7 +921,7 @@ class BaseCliTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_standard_options_manifest_context_and_sensitive_redaction(self) -> None:
-        app = base_cli.App(name="secret-tool", version="0.1.0")
+        app = legacy_app(name="secret-tool", version="0.1.0")
         seen = {}
 
         @app.command()

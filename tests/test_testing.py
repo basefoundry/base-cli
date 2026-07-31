@@ -15,6 +15,10 @@ import base_cli
 from base_cli.testing import invoke
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 class PackageExportTests(unittest.TestCase):
     def test_package_exports_testing_module_for_documented_access(self) -> None:
         env = os.environ.copy()
@@ -51,7 +55,7 @@ class InvokeTests(unittest.TestCase):
         self.assertIn("Result", str(return_annotation))
 
     def test_invoke_writes_manifest_fixture_into_cwd(self) -> None:
-        app = base_cli.App(name="testing-manifest", log_to_file=False)
+        app = legacy_app(name="testing-manifest", log_to_file=False)
         seen: dict[str, Path | None] = {}
 
         @app.command()
@@ -80,13 +84,13 @@ class InvokeTests(unittest.TestCase):
         self.assertEqual(seen["manifest_path"], manifest_path.resolve())
 
     def test_invoke_rejects_manifest_without_cwd(self) -> None:
-        app = base_cli.App(name="testing-manifest-without-cwd", log_to_file=False)
+        app = legacy_app(name="testing-manifest-without-cwd", log_to_file=False)
 
         with self.assertRaisesRegex(ValueError, "manifest requires cwd"):
             invoke(app, [], manifest={"project": {"name": "demo"}})
 
     def test_invoke_with_cwd_exposes_process_cwd_and_restores_it(self) -> None:
-        app = base_cli.App(name="testing-cwd-isolation", log_to_file=False)
+        app = legacy_app(name="testing-cwd-isolation", log_to_file=False)
         seen: dict[str, Path | None | str] = {}
 
         @app.command()

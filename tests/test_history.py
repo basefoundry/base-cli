@@ -14,6 +14,10 @@ import base_cli
 from base_cli import history as history_helpers
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 def read_history_records(cache_root: Path) -> list[dict]:
     history_path = cache_root / "base" / "history" / "runs.jsonl"
     return [json.loads(line) for line in history_path.read_text(encoding="utf-8").splitlines()]
@@ -185,7 +189,7 @@ class BaseCliHistoryTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_app_records_successful_command_history_with_redacted_metadata(self) -> None:
-        app = base_cli.App(name="history-demo", version="0.1.0")
+        app = legacy_app(name="history-demo", version="0.1.0")
         seen = {}
 
         @app.command()
@@ -255,7 +259,7 @@ class BaseCliHistoryTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_app_reuses_parent_run_and_does_not_record_internal_history(self) -> None:
-        app = base_cli.App(name="history-internal")
+        app = legacy_app(name="history-internal")
 
         seen = {}
 
@@ -291,7 +295,7 @@ class BaseCliHistoryTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_project_owner_uses_checkout_scoped_run_bundle(self) -> None:
-        app = base_cli.App(name="project-native")
+        app = legacy_app(name="project-native")
 
         @app.command()
         def main(ctx: base_cli.Context) -> None:
@@ -329,7 +333,7 @@ class BaseCliHistoryTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_uses_explicit_argv_for_history_and_log_metadata(self) -> None:
-        app = base_cli.App(name="history-explicit", version="0.1.0")
+        app = legacy_app(name="history-explicit", version="0.1.0")
         seen = {}
         current_endpoint = "https://current.example/path"
         stale_endpoint = "https://stale.invalid/path"
@@ -380,7 +384,7 @@ class BaseCliHistoryTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_app_records_failed_command_history(self) -> None:
-        app = base_cli.App(name="failing-history")
+        app = legacy_app(name="failing-history")
 
         @app.command()
         def main(ctx: base_cli.Context) -> int:
@@ -405,7 +409,7 @@ class BaseCliHistoryTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_app_history_write_failures_do_not_fail_command(self) -> None:
-        app = base_cli.App(name="history-best-effort")
+        app = legacy_app(name="history-best-effort")
 
         @app.command()
         def main(ctx: base_cli.Context) -> None:

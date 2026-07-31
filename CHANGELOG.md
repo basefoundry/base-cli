@@ -7,6 +7,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Changed
+
+- Make `base_cli.App()` use the consumer-neutral profile by default; the
+  temporary Base compatibility profile is now explicit.
+
 ### Added
 
 - Initialized the repository with the Base-managed repo baseline.

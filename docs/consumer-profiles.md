@@ -78,11 +78,11 @@ command aliases.
 
 ## Compatibility profile
 
-For the migration period, `App()` without an explicit profile selects
-`CliProfile.legacy_base()`. This preserves existing Base consumers while they
-move their integration code out of the generic package. New standalone
-consumers should pass `CliProfile.generic()` explicitly so their behavior does
-not depend on the compatibility default.
+`App()` uses `CliProfile.generic()` when no profile is supplied. This keeps the
+standalone default consumer-neutral. During the migration, Base and other
+existing integrations that still need these conventions can opt into
+`CliProfile.legacy_base()` explicitly while they move their adapters out of the
+generic package.
 
 The legacy profile contains the current Base conventions, including:
 
@@ -108,13 +108,12 @@ The following behaviors should not be added to generic lifecycle modules:
 - product-specific command lists or history schema;
 - assumptions about a downstream repository's directory layout.
 
-The next migration phases are:
+The remaining migration phases are:
 
-1. Change Base command engines to construct and pass an explicit legacy profile.
-2. Move Base discovery, config, runtime, and history adapters into Base.
-3. Generalize the remaining context/config types where their names still encode
+1. Move Base discovery, config, runtime, and history adapters into Base.
+2. Generalize the remaining context/config types where their names still encode
    Base concepts.
-4. Remove the compatibility default and keep `base_cli` focused on the generic
+3. Remove the compatibility profile and keep `base_cli` focused on the generic
    lifecycle.
 
 The package rename is deliberately separate from this refactor. Names can be

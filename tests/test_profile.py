@@ -56,6 +56,13 @@ class GenericProfileTests(unittest.TestCase):
             self.assertFalse((home / ".base.d").exists())
             self.assertFalse((home / ".cache" / "base").exists())
 
+    def test_app_defaults_to_generic_profile(self) -> None:
+        app = base_cli.App(name="plain-tool", log_to_file=False)
+
+        self.assertIsNone(app.profile.history_writer)
+        self.assertIsNone(app.profile.display_command())
+        self.assertEqual(app.profile.resolve_runtime("plain-tool", None).runtime_owner, "default")
+
     def test_generic_profile_accepts_consumer_project_and_config_policies(self) -> None:
         seen: dict[str, object] = {}
 

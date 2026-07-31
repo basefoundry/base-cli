@@ -9,10 +9,14 @@ import base_cli
 from base_cli.config import user_config_path
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
 class ContextWorkspaceRootTests(unittest.TestCase):
     def test_context_exposes_workspace_root_when_configured(self) -> None:
-        app = base_cli.App(name="workspace-root-configured", log_to_file=False)
+        app = legacy_app(name="workspace-root-configured", log_to_file=False)
         seen: dict[str, Path | None] = {}
 
         @app.command()
