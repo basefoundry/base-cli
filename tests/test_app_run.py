@@ -13,10 +13,14 @@ import base_cli
 from base_cli.config import user_config_path
 
 
+def legacy_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+
+
 class RunAppTests(unittest.TestCase):
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_reports_config_errors_without_traceback(self) -> None:
-        app = base_cli.App(name="bad-config", log_to_file=False)
+        app = legacy_app(name="bad-config", log_to_file=False)
         seen = {}
 
         @app.command()
@@ -122,7 +126,7 @@ class RunAppTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_uses_delegated_display_command_for_usage_errors(self) -> None:
-        app = base_cli.App(name="internal-cli", log_to_file=False)
+        app = legacy_app(name="internal-cli", log_to_file=False)
 
         @app.command(context_settings={"help_option_names": ["-h", "--help"]})
         def main(ctx: base_cli.Context) -> None:

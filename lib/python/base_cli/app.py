@@ -59,7 +59,10 @@ class App:
         self.help = help
         self.log_to_file = log_to_file
         self.max_log_files = max_log_files
-        self.profile = profile or CliProfile.legacy_base()
+        # Standalone applications must not inherit a consumer's product
+        # conventions. Consumers with an existing integration should pass an
+        # explicit profile, such as Base's temporary legacy adapter.
+        self.profile = profile or CliProfile.generic()
         self._click_command = None
         self._command_func: Callable[..., Any] | None = None
         self._command_args: tuple[Any, ...] = ()
