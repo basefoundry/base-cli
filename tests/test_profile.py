@@ -58,6 +58,8 @@ class GenericProfileTests(unittest.TestCase):
 
         self.assertIsNone(app.profile.history_writer)
         self.assertIsNone(app.profile.display_command())
+        self.assertIsNone(app.profile.load_user_config())
+        self.assertIsNone(app.profile.resolve_workspace_root(None))
         self.assertEqual(app.profile.resolve_runtime("plain-tool", None).runtime_owner, "default")
 
     def test_generic_profile_accepts_consumer_project_and_config_policies(self) -> None:

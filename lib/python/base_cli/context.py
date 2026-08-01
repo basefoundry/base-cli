@@ -7,17 +7,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from .config import UserConfig, UserIdeConfig
-
 
 _current_context: contextvars.ContextVar[Context | None] = contextvars.ContextVar(
     "base_cli_current_context",
     default=None,
 )
-
-
-def _default_user_config() -> UserConfig:
-    return UserConfig(raw={}, ide=UserIdeConfig(enabled=None, preferences={}))
 
 
 def _default_history_display_command(cli_name: str, _argv: list[str]) -> str:
@@ -41,14 +35,13 @@ class Context:
     keep_temp: bool
     log: logging.Logger
     dry_run: bool = False
-    base_home: Path | None = None
     application_home: Path | None = None
     project_root: Path | None = None
     manifest_path: Path | None = None
     project_name: str | None = None
     history_scope: str = "primary"
     history_parent_run_id: str | None = None
-    user_config: UserConfig = field(default_factory=_default_user_config)
+    user_config: object | None = None
     history_display_command: Callable[[str, list[str]], str] = _default_history_display_command
     cleanup_hooks: list[Callable[[], None]] = field(default_factory=list)
     workspace_root: Path | None = None
@@ -56,12 +49,6 @@ class Context:
     runtime_owner: str = "default"
     owner_root: Path | None = None
     run_root: Path | None = None
-
-    def __post_init__(self) -> None:
-        if self.application_home is None:
-            self.application_home = self.base_home
-        if self.base_home is None:
-            self.base_home = self.application_home
 
     def on_cleanup(self, hook: Callable[[], None]) -> None:
         self.cleanup_hooks.append(hook)

@@ -15,6 +15,7 @@ base_cli.App + Context + logging + cleanup
     |
     +-- project discovery       -> CliProfile.discover_project
     +-- user configuration      -> CliProfile.load_user_config
+    +-- workspace projection    -> CliProfile.resolve_workspace_root
     +-- project/explicit config -> CliProfile.load_config
     +-- runtime placement       -> CliProfile.resolve_runtime
     +-- history command labels  -> CliProfile.history_display_command
@@ -68,8 +69,11 @@ profile = base_cli.CliProfile.generic(
 ```
 
 The callback types are deliberately small. A consumer can wrap an existing
-project library, use a different serialization format, or return no project
-metadata at all.
+project library, use a different serialization format, return no project
+metadata, or keep its typed user-configuration object entirely in the consumer.
+`Context.user_config` is opaque to `base_cli`; `resolve_workspace_root` is an
+optional projection used when commands need a workspace root without exposing
+the consumer's configuration schema to the generic lifecycle.
 
 If a consumer persists history, it can provide `history_display_command` to
 translate internal entry-point names into user-facing labels. The generic
