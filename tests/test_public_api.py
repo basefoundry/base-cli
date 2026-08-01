@@ -51,7 +51,7 @@ class PublicApiTests(unittest.TestCase):
     def test_module_all_surfaces_are_explicit(self) -> None:
         self.assertEqual(
             set(command_filters.__all__),
-            {"command_matches", "normalize_command_filter", "normalize_command_filters"},
+            {"CommandFilterNormalizer", "command_matches", "normalize_command_filter", "normalize_command_filters"},
         )
         self.assertEqual(
             set(command_protocol.__all__),

@@ -32,7 +32,7 @@ __version__ = _resolve_version()
 
 from . import command_filters, command_protocol, history, testing
 from .app import App, argument, command, delegated_display_command, option, run_app
-from .command_filters import command_matches, normalize_command_filter, normalize_command_filters
+from .command_filters import CommandFilterNormalizer, command_matches, normalize_command_filter, normalize_command_filters
 from .command_protocol import (
     BOOLEAN,
     NULLABLE_STRING,
@@ -64,6 +64,7 @@ __all__ = [
     "__version__",
     "BOOLEAN",
     "CliProfile",
+    "CommandFilterNormalizer",
     "CommandProtocolError",
     "Context",
     "ExitCode",
