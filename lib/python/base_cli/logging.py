@@ -64,7 +64,7 @@ def _user_stream_level(debug: bool, quiet: bool) -> int:
 def _handler_formatter(formatter: logging.Formatter | None, *, use_color: bool) -> logging.Formatter:
     if formatter is not None:
         return formatter
-    return BaseCliFormatter(use_color=use_color)
+    return CliFormatter(use_color=use_color)
 
 
 def _use_color(stream: TextIO) -> bool:
@@ -102,7 +102,7 @@ def _secure_log_file_open_flags(mode: str) -> int:
     return flags | os.O_APPEND | os.O_WRONLY
 
 
-class BaseCliFormatter(logging.Formatter):
+class CliFormatter(logging.Formatter):
     def __init__(self, *, use_utc: bool | None = None, use_color: bool = False) -> None:
         self.use_utc = use_utc if use_utc is not None else os.environ.get("LOG_UTC") == "1"
         self.use_color = use_color

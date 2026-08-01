@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
 import tempfile
@@ -71,3 +72,9 @@ class GenericCoreTests(unittest.TestCase):
         self.assertFalse(hasattr(paths, "discover_manifest"))
         self.assertFalse(hasattr(paths, "normalize_runtime_owner"))
         self.assertFalse(hasattr(base_cli.CliProfile, "legacy_base"))
+
+    def test_consumer_specific_ide_schema_and_formatter_are_not_in_generic_module(self) -> None:
+        import base_cli.logging as logging_module
+
+        self.assertIsNone(importlib.util.find_spec("base_cli.ide_schema"))
+        self.assertFalse(hasattr(logging_module, "BaseCliFormatter"))

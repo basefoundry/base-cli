@@ -11,7 +11,7 @@ from unittest import mock
 
 import base_cli
 import base_cli.logging as logging_module
-from base_cli.logging import BaseCliFormatter
+from base_cli.logging import CliFormatter
 
 
 class ConfigureLoggerTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class ConfigureLoggerTests(unittest.TestCase):
             logger.info("hello default")
 
         handler = logger.handlers[0]
-        self.assertIsInstance(handler.formatter, BaseCliFormatter)
+        self.assertIsInstance(handler.formatter, CliFormatter)
         self.assertIn("INFO", stream.getvalue())
         self.assertIn("hello default", stream.getvalue())
         self.assertRegex(stream.getvalue(), r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{4} INFO")
