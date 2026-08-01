@@ -44,7 +44,6 @@ from .command_protocol import (
     loads_records,
     register_record_schema,
 )
-from .config import UserConfig, UserGithubConfig, UserIdeConfig, UserIdePreference, UserWorkspaceConfig
 from .context import Context, get_current_context
 from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
@@ -71,11 +70,6 @@ __all__ = [
     "FieldSpec",
     "NULLABLE_STRING",
     "STRING",
-    "UserConfig",
-    "UserGithubConfig",
-    "UserIdeConfig",
-    "UserIdePreference",
-    "UserWorkspaceConfig",
     "command_filters",
     "command_matches",
     "command_protocol",

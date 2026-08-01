@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Move manifest discovery, implicit configuration, owner-aware runtime layout,
   and history persistence out of the generic package. Consumers now provide
   those policies through an explicit `CliProfile`.
+- Make `Context.user_config` an opaque consumer-owned value and remove the
+  Base-shaped `UserConfig` types from the public package facade.
 
 ### Migration notes
 
@@ -23,6 +25,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - `base_cli.history.write_history_record()` and
   `base_cli.history.write_primary_record()` now require a consumer-selected
   history path; they never choose an application cache location themselves.
+- Consumers that need a workspace root should provide the optional
+  `CliProfile.resolve_workspace_root` projection; the generic lifecycle no
+  longer reads fields from a prescribed user-configuration schema.
 
 ### Added
 

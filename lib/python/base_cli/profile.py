@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ._runtime import RuntimeLayout, runtime_layout
-from .config import UserConfig, UserIdeConfig, load_yaml_file
+from .config import load_yaml_file
 from .paths import make_run_id
 
 
@@ -41,15 +41,20 @@ class RuntimeBinding:
 
 
 ProjectDiscovery = Callable[[Path], ProjectInfo | None]
-UserConfigLoader = Callable[[], UserConfig]
+UserConfigLoader = Callable[[], object | None]
 ConfigLoader = Callable[[ProjectInfo | None, Path | None], dict[str, Any]]
 RuntimeResolver = Callable[[str, ProjectInfo | None], RuntimeBinding]
+WorkspaceRootResolver = Callable[[object | None], Path | None]
 HistoryWriter = Callable[[Any, list[str], set[str], datetime, int], None]
 DisplayCommandResolver = Callable[[], str | None]
 HistoryDisplayResolver = Callable[[str, list[str]], str]
 
 
 def _no_display_command() -> str | None:
+    return None
+
+
+def _no_workspace_root(_user_config: object | None) -> Path | None:
     return None
 
 
@@ -73,6 +78,7 @@ class CliProfile:
     history_writer: HistoryWriter | None = None
     display_command: DisplayCommandResolver = _no_display_command
     history_display_command: HistoryDisplayResolver = _generic_history_display_command
+    resolve_workspace_root: WorkspaceRootResolver = _no_workspace_root
 
     @classmethod
     def generic(
@@ -84,6 +90,7 @@ class CliProfile:
         load_user_config: UserConfigLoader | None = None,
         load_config: ConfigLoader | None = None,
         history_display_command: HistoryDisplayResolver | None = None,
+        resolve_workspace_root: WorkspaceRootResolver | None = None,
     ) -> CliProfile:
         """Create a profile with consumer-neutral defaults.
 
@@ -97,14 +104,15 @@ class CliProfile:
             resolve_runtime=_generic_runtime_resolver(cache_root, application_home),
             display_command=_no_display_command,
             history_display_command=history_display_command or _generic_history_display_command,
+            resolve_workspace_root=resolve_workspace_root or _no_workspace_root,
         )
 
 def _discover_no_project(_cwd: Path) -> ProjectInfo | None:
     return None
 
 
-def _empty_user_config() -> UserConfig:
-    return UserConfig(raw={}, ide=UserIdeConfig(enabled=None, preferences={}))
+def _empty_user_config() -> None:
+    return None
 
 
 def _load_explicit_config(_project: ProjectInfo | None, explicit: Path | None) -> dict[str, Any]:

@@ -188,6 +188,7 @@ class App:
         manifest_path = project.manifest if project is not None else None
         explicit_config = Path(standard["config"]).expanduser() if standard.get("config") else None
         user_config = self.profile.load_user_config()
+        workspace_root = self.profile.resolve_workspace_root(user_config)
         config = self.profile.load_config(project, explicit_config)
 
         environment = standard.get("environment") or config.get("environment") or "dev"
@@ -228,7 +229,7 @@ class App:
                     "project": selected_project_name,
                     "project_root": str(selected_project_root) if selected_project_root else None,
                     "manifest": str(manifest_path) if manifest_path else None,
-                    "workspace_root": str(user_config.workspace.root) if user_config.workspace.root else None,
+                    "workspace_root": str(workspace_root) if workspace_root else None,
                 }
                 run_metadata_path = layout.run_root / "run.json"
                 write_private_json(run_metadata_path, run_metadata)
@@ -262,10 +263,9 @@ class App:
             runtime_owner=runtime_owner,
             owner_root=layout.owner_root,
             run_root=layout.run_root,
-            base_home=runtime.application_home,
             application_home=runtime.application_home,
             project_root=selected_project_root,
-            workspace_root=user_config.workspace.root,
+            workspace_root=workspace_root,
             manifest_path=manifest_path,
             project_name=selected_project_name,
             state_dir=layout.state_dir,

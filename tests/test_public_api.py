@@ -7,7 +7,6 @@ from unittest import mock
 
 import base_cli
 from base_cli import command_filters, command_protocol, history
-from base_cli.config import UserConfig, UserGithubConfig, UserIdeConfig, UserIdePreference, UserWorkspaceConfig
 
 
 class PublicApiTests(unittest.TestCase):
@@ -33,11 +32,6 @@ class PublicApiTests(unittest.TestCase):
     def test_facade_exports_supported_modules_functions_and_types(self) -> None:
         expected = {
             "CommandProtocolError",
-            "UserConfig",
-            "UserGithubConfig",
-            "UserIdeConfig",
-            "UserIdePreference",
-            "UserWorkspaceConfig",
             "command_filters",
             "command_matches",
             "command_protocol",
@@ -50,11 +44,7 @@ class PublicApiTests(unittest.TestCase):
         }
 
         self.assertTrue(expected.issubset(base_cli.__all__))
-        self.assertIs(base_cli.UserConfig, UserConfig)
-        self.assertIs(base_cli.UserGithubConfig, UserGithubConfig)
-        self.assertIs(base_cli.UserIdeConfig, UserIdeConfig)
-        self.assertIs(base_cli.UserIdePreference, UserIdePreference)
-        self.assertIs(base_cli.UserWorkspaceConfig, UserWorkspaceConfig)
+        self.assertFalse(hasattr(base_cli, "UserConfig"))
         self.assertIs(base_cli.command_filters, command_filters)
         self.assertIs(base_cli.command_protocol, command_protocol)
 

@@ -80,8 +80,9 @@ migration guidance.
 
 The supported facade is `import base_cli`. It exports the command lifecycle
 (`App`, `Context`, `run_app`, decorators, and logging helpers), command filters,
-the structured command protocol helpers, and the user configuration types used
-by `Context.user_config`. The corresponding modules are also available as
+and the structured command protocol helpers. Consumer-owned user configuration
+is passed through `Context.user_config`; the library does not impose a schema.
+The corresponding modules are also available as
 `base_cli.command_filters`, `base_cli.command_protocol`, and
 `base_cli.history`.
 
@@ -301,7 +302,8 @@ Important fields include:
 - `ctx.log_file`: the run's shared `logs/primary.log`, or `None` when persistent
   logging is disabled.
 - `ctx.config`: merged configuration dictionary.
-- `ctx.user_config`: typed user configuration returned by the profile.
+- `ctx.user_config`: opaque consumer-owned user configuration returned by the
+  profile, or `None` for the generic default.
 - `ctx.environment`: active environment, defaulting to `dev`.
 - `ctx.debug`: whether debug logging is enabled for the stderr stream.
 - `ctx.quiet`: whether INFO logs are suppressed on the stderr stream.
@@ -414,10 +416,10 @@ configuration file.
 
 
 `ctx.config` exposes the dictionary returned by the profile. `ctx.user_config`
-exposes the user-configuration value returned by the profile. Consumers that
-need user files, project files, environment variables, or a merge precedence
-must implement those policies in `CliProfile.load_config` and
-`CliProfile.load_user_config`.
+exposes the opaque user-configuration value returned by the profile. Consumers
+that need user files, project files, environment variables, or a merge
+precedence must implement those policies in `CliProfile.load_config` and
+`CliProfile.load_user_config`; `base_cli` does not define the value's fields.
 
 ## Project Discovery
 
