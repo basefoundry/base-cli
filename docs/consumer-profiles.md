@@ -76,25 +76,17 @@ translate internal entry-point names into user-facing labels. The generic
 default only replaces underscores with hyphens; it does not know any product's
 command aliases.
 
-## Compatibility profile
+## Consumer-owned adapters
 
 `App()` uses `CliProfile.generic()` when no profile is supplied. This keeps the
-standalone default consumer-neutral. During the migration, Base and other
-existing integrations that still need these conventions can opt into
-`CliProfile.legacy_base()` explicitly while they move their adapters out of the
-generic package.
+standalone default consumer-neutral. A product consumer that needs manifest
+discovery, implicit configuration, owner-aware runtime placement, or history
+should implement those policies in its own adapter module and pass the resulting
+profile to `App`.
 
-The legacy profile contains the current Base conventions, including:
-
-- upward discovery of `base_manifest.yaml`;
-- `BASE_HOME`, `BASE_CACHE_DIR`, and Base owner/runtime environment variables;
-- `~/.base.d/config.yaml` and project `.base/config.yaml`;
-- Base's owner-aware cache and run layout;
-- Base history persistence and delegation metadata. Base's command-label policy
-  is supplied by Base rather than encoded in `base_cli.history`.
-
-These conventions are intentionally isolated behind one profile so they can be
-moved into the Base consumer without changing command lifecycle code.
+The generic history helpers likewise do not select a product-owned history
+path. Consumers resolve that path in their adapter and pass it to
+`write_history_record()` or `write_primary_record()`.
 
 ## Refactoring boundary
 
@@ -108,13 +100,8 @@ The following behaviors should not be added to generic lifecycle modules:
 - product-specific command lists or history schema;
 - assumptions about a downstream repository's directory layout.
 
-The remaining migration phases are:
-
-1. Move Base discovery, config, runtime, and history adapters into Base.
-2. Generalize the remaining context/config types where their names still encode
-   Base concepts.
-3. Remove the compatibility profile and keep `base_cli` focused on the generic
-   lifecycle.
+The next migration step is to generalize the remaining context/config types
+whose compatibility names still reflect one historical consumer.
 
 The package rename is deliberately separate from this refactor. Names can be
 changed after the dependency boundary is stable.

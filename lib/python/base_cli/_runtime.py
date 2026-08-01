@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ._private_files import write_private_json
-from .paths import runtime_owner_root, runtime_run_directory_name, runtime_slug
+from .paths import runtime_run_directory_name, runtime_slug
 
 
 @dataclass(frozen=True)
@@ -28,17 +28,11 @@ def runtime_layout(
     cli_name: str,
     run_id: str,
     *,
-    owner: str = "base",
     namespace: str | None = None,
     project_name: str | None = None,
-    project_root: Path | None = None,
     inherited_run_root: Path | None = None,
 ) -> RuntimeLayout:
-    owner_root = (
-        runtime_namespace_root(cache_root, namespace)
-        if namespace is not None
-        else runtime_owner_root(cache_root, owner, project_name, project_root)
-    )
+    owner_root = runtime_namespace_root(cache_root, namespace or cli_name)
     run_root = inherited_run_root or owner_root / "runs" / runtime_run_directory_name(run_id, cli_name, project_name)
     state_dir = owner_root
     # Every public invocation owns one run bundle and one diagnostic log.
@@ -130,7 +124,7 @@ def _is_within(path: Path, root: Path) -> bool:
 
 def _runtime_directory_error(path: Path, cache_root: Path, exc: OSError) -> str:
     return (
-        f"Unable to create Base runtime directory '{path}': {exc}. "
-        f"Check permissions on that directory. If the Base cache root '{cache_root}' is unusable, "
-        "set BASE_CACHE_DIR to a writable directory."
+        f"Unable to create runtime directory '{path}': {exc}. "
+        f"Check permissions on that directory. If the cache root '{cache_root}' is unusable, "
+        "configure the application's cache root."
     )

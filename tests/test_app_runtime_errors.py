@@ -14,8 +14,8 @@ import base_cli
 from base_cli.testing import invoke
 
 
-def legacy_app(**kwargs: object) -> base_cli.App:
-    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+def generic_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.generic(), **kwargs)
 
 
 class AppRuntimeErrorTests(unittest.TestCase):
@@ -43,7 +43,7 @@ class AppRuntimeErrorTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_reports_unwritable_cache_root_without_traceback(self) -> None:
-        app = legacy_app(name="cache-failure", version="0.1.0")
+        app = generic_app(name="cache-failure", version="0.1.0")
 
         @app.command()
         def main(ctx: base_cli.Context) -> None:
@@ -59,7 +59,7 @@ class AppRuntimeErrorTests(unittest.TestCase):
             cache_root.chmod(0o500)
             stderr = io.StringIO()
             try:
-                with mock.patch.dict(os.environ, {"HOME": str(home), "BASE_CACHE_DIR": str(cache_root)}):
+                with mock.patch.dict(os.environ, {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(cache_root)}):
                     with redirect_stderr(stderr):
                         try:
                             exit_code = base_cli.run_app(app, [])
@@ -71,7 +71,6 @@ class AppRuntimeErrorTests(unittest.TestCase):
         error = stderr.getvalue()
         self.assertEqual(exit_code, 1)
         self.assertIn("Error:", error)
-        self.assertIn("Unable to create Base runtime directory", error)
-        self.assertIn(str(cache_root / "base" / "runs"), error)
-        self.assertIn("BASE_CACHE_DIR", error)
+        self.assertIn("Unable to create runtime directory", error)
+        self.assertIn(str(cache_root / "cache-failure" / "runs"), error)
         self.assertNotIn("Traceback", error)

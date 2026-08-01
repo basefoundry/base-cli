@@ -72,11 +72,9 @@ app = base_cli.App(
 The generic profile has no manifest filename convention, no product-owned
 configuration directory, and no implicit history writer. Applications can
 provide those policies through callbacks or build their own profile. The
-temporary compatibility profile, `CliProfile.legacy_base()`, preserves the
-historical Base behavior only for callers that opt into it explicitly while
-Base completes its adapter extraction. See
+consumer-owned adapters should supply any product-specific policies. See
 [`docs/consumer-profiles.md`](docs/consumer-profiles.md) for the boundary and
-migration plan.
+migration guidance.
 
 ## Public API
 
@@ -285,7 +283,6 @@ Important fields include:
 - `ctx.cli_name`: normalized CLI name used for state paths and logger names.
 - `ctx.run_id`: timestamp plus short random suffix for this invocation.
 - `ctx.application_home`: optional application home supplied by the profile.
-- `ctx.base_home`: compatibility alias for `ctx.application_home`.
 - `ctx.project_root`: project root returned by the profile, when any.
 - `ctx.workspace_root`: optional workspace root supplied by user configuration.
 - `ctx.manifest_path`: project metadata path returned by the profile, when any.
@@ -422,11 +419,6 @@ need user files, project files, environment variables, or a merge precedence
 must implement those policies in `CliProfile.load_config` and
 `CliProfile.load_user_config`.
 
-The legacy Base profile retains its historical `~/.base.d` and `.base`
-conventions temporarily; those paths are not part of the generic API. The
-Base-specific details remain documented in
-[`docs/local-config.md`](docs/local-config.md).
-
 ## Project Discovery
 
 The generic profile does not discover projects or assume a manifest filename.
@@ -436,9 +428,7 @@ from a manifest, workspace, repository metadata, or any other application-owned
 source and return a `ProjectInfo` value.
 
 Commands that require a project should validate the profile-provided value
-explicitly and return a clear usage error or actionable message. The legacy
-Base profile retains upward discovery of `base_manifest.yaml` for existing
-callers.
+explicitly and return a clear usage error or actionable message.
 
 ## Runtime Directories
 
@@ -450,9 +440,7 @@ profile does not prescribe a product-wide cache name or cleanup command.
 
 Each invocation is a run bundle containing private (`0600`) `run.json`,
 `logs/`, and `tmp/`, while persistent component caches live in the
-bundle's cache directory. The legacy Base profile retains the owner-aware
-`base/` and `projects/<project>/<checkout-id>` layout for existing
-callers.
+bundle's cache directory.
 
 Use `ctx.on_cleanup()` for cleanup work that should happen even when helper code
 does not own the main command wrapper:
@@ -487,7 +475,6 @@ def test_command(tmp_path: Path) -> None:
         ["--name", "Ada"],
         home=tmp_path,
         cwd=project,
-        manifest={"project": {"name": "demo"}, "artifacts": []},
     )
 
     assert result.exit_code == 0
@@ -500,11 +487,11 @@ The helper wraps Click's `CliRunner`, sets `HOME` when requested, and supplies
 remains process-global: do not use it concurrently with code that changes cwd
 outside `invoke()` or from threads spawned by the invoked command. A
 generic profile should receive project fixtures through its
-`discover_project` callback. The `manifest={...}` convenience is a legacy
-compatibility helper for the Base profile.
+`discover_project` callback. The helper does not create or interpret any
+product-specific manifest fixture.
 
 When `home` is supplied, `invoke()` provides an isolated default cache
-environment for tests. Pass `env={"BASE_CACHE_DIR": str(path)}` when a test
+environment for tests. Pass `env={"BASE_CLI_CACHE_DIR": str(path)}` when a test
 needs an explicit cache location.
 
 ## When To Use `base_cli`
@@ -513,11 +500,6 @@ Use `base_cli` for Python commands that need a predictable command
 lifecycle: standard options, logging, redaction, runtime state, cleanup, and
 test helpers. Standalone consumers should use `CliProfile.generic()` or
 provide an explicit profile with their own project and configuration policies.
-
-The legacy Base profile exists only for compatibility while Base's command
-engines migrate to an explicit consumer adapter. Base-specific behavior such as
-manifest discovery, `.base` configuration, IDE settings, and command history
-should eventually live in that adapter rather than in the generic package.
 
 It is a good fit for:
 

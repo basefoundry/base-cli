@@ -61,7 +61,7 @@ class App:
         self.max_log_files = max_log_files
         # Standalone applications must not inherit a consumer's product
         # conventions. Consumers with an existing integration should pass an
-        # explicit profile, such as Base's temporary legacy adapter.
+        # Consumers with product-specific policies should pass an explicit profile.
         self.profile = profile or CliProfile.generic()
         self._click_command = None
         self._command_func: Callable[..., Any] | None = None

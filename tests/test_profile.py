@@ -41,7 +41,6 @@ class GenericProfileTests(unittest.TestCase):
                 env={
                     "BASE_CLI_PRIMARY_LOG": str(root / "base.log"),
                     "BASE_CLI_HISTORY_SCOPE": "internal",
-                    "BASE_CLI_DISPLAY_COMMAND": "basectl",
                 },
             )
 
@@ -53,8 +52,6 @@ class GenericProfileTests(unittest.TestCase):
             self.assertEqual(seen["runtime_owner"], "default")
             self.assertEqual(seen["history_scope"], "primary")
             self.assertTrue(Path(seen["cache_dir"]).resolve().is_relative_to(cache.resolve()))
-            self.assertFalse((home / ".base.d").exists())
-            self.assertFalse((home / ".cache" / "base").exists())
 
     def test_app_defaults_to_generic_profile(self) -> None:
         app = base_cli.App(name="plain-tool", log_to_file=False)

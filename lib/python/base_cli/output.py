@@ -1,4 +1,4 @@
-"""Shared output-format resolution and rendering for Base CLIs."""
+"""Shared output-format resolution and rendering for Python CLIs."""
 
 from __future__ import annotations
 

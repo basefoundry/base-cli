@@ -19,16 +19,13 @@ except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
 
 from ._private_files import restrict_file, write_private_json
 from .context import Context
-from .paths import base_cache_root
 from .redaction import REDACTED, is_secret_key, option_name_to_parameter, redact_argv, redact_text_value
 
 
 __all__ = [
-    "HISTORY_PATH",
     "HISTORY_SCOPE_INTERNAL",
     "HISTORY_SCOPE_PRIMARY",
     "SCHEMA_VERSION",
-    "base_version",
     "build_finished_record",
     "compact_home_text",
     "compact_optional_path",
@@ -40,45 +37,21 @@ __all__ = [
     "optional_string",
     "parse_finished_history_record_line",
     "parse_positive_int",
-    "project_name",
     "redact_history_argv",
     "redact_history_text",
-    "runtime_bundle_path",
     "utc_now",
-    "write_finished_record",
     "write_history_record",
     "write_primary_record",
 ]
 
 
 SCHEMA_VERSION = 1
-HISTORY_PATH = Path("base") / "history" / "runs.jsonl"
 HISTORY_SCOPE_PRIMARY = "primary"
 HISTORY_SCOPE_INTERNAL = "internal"
 
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def write_finished_record(
-    context: Context,
-    argv: list[str],
-    sensitive_options: set[str],
-    started_at: datetime,
-    exit_code: int,
-) -> None:
-    # Base-dispatched child commands share the parent's run bundle and
-    # diagnostic stream.  Their completion is an implementation detail, so
-    # keep history at the public-invocation level as well.
-    if context.dry_run or context.log_file is None or context.history_scope == HISTORY_SCOPE_INTERNAL:
-        return
-    try:
-        record = build_finished_record(context, argv, sensitive_options, started_at, exit_code)
-        write_history_record(record)
-        if context.run_root is not None:
-            update_run_metadata(context.run_root, record)
-    except Exception as exc:  # pylint: disable=broad-exception-caught
-        context.log.debug("Unable to write command history record: %s", exc)
 
 
 def build_finished_record(
@@ -107,11 +80,10 @@ def build_finished_record(
         "os": normalized_os(),
     }
     optional_fields = {
-        "project": project_name(context),
+        "project": context.project_name,
         "project_root": compact_optional_path(context.project_root),
         "manifest": compact_optional_path(context.manifest_path),
         "workspace_root": compact_optional_path(context.workspace_root),
-        "base_version": base_version(context.base_home),
         "shell": os.environ.get("SHELL"),
         "scope": context.history_scope,
         "parent_run_id": context.history_parent_run_id,
@@ -122,6 +94,7 @@ def build_finished_record(
 
 # pylint: disable=too-many-arguments,too-many-positional-arguments
 def write_primary_record(
+    path: Path,
     command: str,
     argv: list[str],
     started_at: datetime,
@@ -131,13 +104,13 @@ def write_primary_record(
     project: str | None = None,
     project_root: str | None = None,
     manifest: str | None = None,
-    log_path: str | None = None,
-    owner: str = "base",
-    bundle_path: str | None = None,
+    log_path: str | Path | None = None,
+    owner: str = "default",
+    bundle_path: str | Path | None = None,
     *,
-    raw_command: str = "basectl",
+    raw_command: str = "cli",
 ) -> None:
-    """Write the user-facing record for a Bash-dispatched command."""
+    """Build and append a user-facing command record to ``path``."""
     ended_at = utc_now()
     record: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -154,7 +127,7 @@ def write_primary_record(
         "os": normalized_os(),
         "scope": scope,
     }
-    resolved_bundle = Path(bundle_path).expanduser() if bundle_path else runtime_bundle_path()
+    resolved_bundle = Path(bundle_path).expanduser() if bundle_path else None
     resolved_log = Path(log_path).expanduser() if log_path else (
         resolved_bundle / "logs" / "primary.log" if resolved_bundle is not None else None
     )
@@ -167,23 +140,16 @@ def write_primary_record(
         "bundle_path": compact_optional_path(resolved_bundle),
     }
     record.update({key: value for key, value in optional_fields.items() if value})
-    write_history_record(record)
+    write_history_record(path, record)
     if resolved_bundle is not None:
         update_run_metadata(resolved_bundle, record)
 
 
-def write_history_record(record: dict[str, Any]) -> None:
-    path = base_cache_root() / HISTORY_PATH
+def write_history_record(path: Path, record: dict[str, Any]) -> None:
+    """Append one serialized record to a consumer-selected history path."""
     path.parent.mkdir(parents=True, exist_ok=True)
     append_history_line(path, f"{json.dumps(record, sort_keys=True)}\n")
     restrict_file(path)
-
-
-def runtime_bundle_path() -> Path | None:
-    value = os.environ.get("BASE_CLI_RUN_ROOT")
-    if not value:
-        return None
-    return Path(value).expanduser().resolve(strict=False)
 
 
 def update_run_metadata(run_root: Path, record: dict[str, Any]) -> None:
@@ -197,7 +163,7 @@ def update_run_metadata(run_root: Path, record: dict[str, Any]) -> None:
         metadata.update(
             {
                 "run_id": record.get("run_id"),
-                "owner": record.get("owner", metadata.get("owner", "base")),
+                "owner": record.get("owner", metadata.get("owner", "default")),
                 "status": record.get("status"),
                 "exit_code": record.get("exit_code"),
                 "ended_at": record.get("ended_at"),
@@ -310,34 +276,6 @@ def optional_string(value: Any) -> str | None:
 
 def optional_int(value: Any) -> int | None:
     return value if isinstance(value, int) else None
-
-
-def project_name(context: Context) -> str | None:
-    if context.project_name:
-        return context.project_name
-    if context.manifest_path is None:
-        return None
-    try:
-        from .config import load_yaml_file
-
-        data = load_yaml_file(context.manifest_path)
-    except (OSError, RuntimeError, ValueError):
-        return None
-    project_data = data.get("project")
-    if not isinstance(project_data, dict):
-        return None
-    value = project_data.get("name")
-    return value if isinstance(value, str) and value else None
-
-
-def base_version(base_home: Path | None) -> str | None:
-    if base_home is None:
-        return None
-    try:
-        version = (base_home / "VERSION").read_text(encoding="utf-8").splitlines()[0].strip()
-    except (IndexError, OSError):
-        return None
-    return version or None
 
 
 def normalized_os() -> str:

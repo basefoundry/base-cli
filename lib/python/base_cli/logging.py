@@ -132,9 +132,9 @@ def _level_name(record: logging.LogRecord) -> str:
 def _source_path(record: logging.LogRecord) -> str:
     path = Path(record.pathname)
     candidates = []
-    base_home = os.environ.get("BASE_HOME")
-    if base_home:
-        candidates.append(Path(base_home))
+    application_home = _active_application_home()
+    if application_home is not None:
+        candidates.append(application_home)
     project_root = _active_project_root()
     if project_root is not None:
         candidates.append(project_root)
@@ -154,6 +154,14 @@ def _active_project_root() -> Path | None:
     except RuntimeError:
         return None
     return context.project_root
+
+
+def _active_application_home() -> Path | None:
+    try:
+        context = get_current_context()
+    except RuntimeError:
+        return None
+    return context.application_home
 
 
 def log_invocation(logger: logging.Logger, argv: list[str], sensitive_options: set[str]) -> None:

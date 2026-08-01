@@ -1,4 +1,4 @@
-"""Shared command-name filter normalization for Base reports."""
+"""Shared command-name filter normalization for CLI reports."""
 
 from __future__ import annotations
 
