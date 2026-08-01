@@ -86,6 +86,12 @@ The corresponding modules are also available as
 `base_cli.command_filters`, `base_cli.command_protocol`, and
 `base_cli.history`.
 
+The command protocol owns only generic framing, field validation, and schema
+registration. It ships with no application record types and uses
+`COMMAND_PROTOCOL_V1` by default. A consumer can register its own schemas and
+pass a compatibility `protocol_header` when it must interoperate with an
+existing peer protocol.
+
 Low-level implementation helpers are intentionally not included in the
 module `__all__` surfaces. Downstream code should use the documented facade or
 the explicitly supported symbols from those modules.

@@ -6,32 +6,41 @@ from unittest.mock import patch
 from base_cli.command_protocol import BOOLEAN
 from base_cli.command_protocol import CommandProtocolError
 from base_cli.command_protocol import NULLABLE_STRING
+from base_cli.command_protocol import RECORD_SCHEMAS
 from base_cli.command_protocol import STRING
 from base_cli.command_protocol import dumps_record
 from base_cli.command_protocol import dumps_records
 from base_cli.command_protocol import loads_records
-from base_cli.command_protocol import RECORD_SCHEMAS
 from base_cli.command_protocol import register_record_schema
 
 
-def project_command_record(**overrides: object) -> dict[str, object]:
+RECORD_TYPE = "test-record"
+RECORD_FIELDS = {
+    "name": STRING,
+    "enabled": BOOLEAN,
+    "note": NULLABLE_STRING,
+    "command": STRING,
+}
+
+
+def generic_record(**overrides: object) -> dict[str, object]:
     record: dict[str, object] = {
-        "project_name": "demo",
-        "project_root": "/tmp/work space/demo",
-        "manifest_path": "/tmp/work space/demo/tool.manifest",
-        "project_venv_dir": "/tmp/work space/demo/.venv",
-        "uses_uv_manager": False,
-        "manifest_command_trust_required": True,
+        "name": "demo",
+        "enabled": True,
+        "note": None,
         "command": "printf 'tab=\t unicode=λ newline=\n control=\x01'",
-        "runner": None,
     }
     record.update(overrides)
     return record
 
 
 class CommandProtocolTests(unittest.TestCase):
+    def setUp(self) -> None:
+        register_record_schema(RECORD_TYPE, RECORD_FIELDS)
+        self.addCleanup(RECORD_SCHEMAS.pop, RECORD_TYPE, None)
+
     def test_downstream_code_can_register_a_framing_safe_record_schema(self) -> None:
-        record_type = "test-record"
+        record_type = "registered-record"
         self.addCleanup(RECORD_SCHEMAS.pop, record_type, None)
         register_record_schema(
             record_type,
@@ -51,69 +60,83 @@ class CommandProtocolTests(unittest.TestCase):
 
     def test_record_schema_registration_rejects_invalid_or_duplicate_schemas(self) -> None:
         with self.assertRaisesRegex(CommandProtocolError, "already registered"):
-            register_record_schema("demo", {"name": STRING})
+            register_record_schema(RECORD_TYPE, {"name": STRING})
         with self.assertRaisesRegex(CommandProtocolError, "non-empty mapping"):
             register_record_schema("custom", {})
         with self.assertRaisesRegex(CommandProtocolError, "field name"):
             register_record_schema("custom", {"bad-name": STRING})
 
-    def test_project_python_requirement_is_scoped_to_project_setup_route_records(self) -> None:
-        self.assertIn("requires_project_python", RECORD_SCHEMAS["project-setup-route"])
+    def test_generic_registry_does_not_ship_application_record_schemas(self) -> None:
+        self.assertEqual(set(RECORD_SCHEMAS), {RECORD_TYPE})
         for record_type in ("project-route", "project-command", "build-target", "demo"):
-            with self.subTest(record_type=record_type):
-                self.assertNotIn("requires_project_python", RECORD_SCHEMAS[record_type])
+            self.assertNotIn(record_type, RECORD_SCHEMAS)
 
     def test_round_trip_preserves_manifest_strings_and_empty_optional_fields(self) -> None:
         records = (
-            project_command_record(),
-            project_command_record(command="line one\nline two\t雪", runner=""),
+            generic_record(),
+            generic_record(command="line one\nline two\t雪", note=""),
         )
 
-        payload = dumps_records("project-command", records)
-        record_type, decoded = loads_records(payload, expected_record_type="project-command")
+        payload = dumps_records(RECORD_TYPE, records)
+        record_type, decoded = loads_records(payload, expected_record_type=RECORD_TYPE)
 
-        self.assertEqual(record_type, "project-command")
+        self.assertEqual(record_type, RECORD_TYPE)
         self.assertEqual(decoded, records)
-        self.assertIsNone(decoded[0]["runner"])
-        self.assertEqual(decoded[1]["runner"], "")
+        self.assertIsNone(decoded[0]["note"])
+        self.assertEqual(decoded[1]["note"], "")
 
-    def test_protocol_has_stable_version_type_and_explicit_field_names(self) -> None:
-        payload = dumps_record("project-command", project_command_record())
+    def test_consumer_can_preserve_a_legacy_wire_header(self) -> None:
+        payload = dumps_record(
+            RECORD_TYPE,
+            generic_record(),
+            protocol_header="BASE_COMMAND_PROTOCOL_V1",
+        )
 
         self.assertTrue(payload.startswith("BASE_COMMAND_PROTOCOL_V1\n"))
-        self.assertIn("record_type=project-command\n", payload)
-        self.assertIn("record_count=1\n", payload)
-        self.assertIn("field.project_name:string=", payload)
-        self.assertIn("field.runner:null=\n", payload)
+        _, decoded = loads_records(
+            f"{payload}\n",
+            expected_record_type=RECORD_TYPE,
+            protocol_header="BASE_COMMAND_PROTOCOL_V1",
+        )
+        self.assertEqual(decoded, (generic_record(),))
 
-        _, decoded = loads_records(f"{payload}\n", expected_record_type="project-command")
-        self.assertEqual(decoded, (project_command_record(),))
+    def test_protocol_has_stable_generic_version_and_explicit_field_names(self) -> None:
+        payload = dumps_record(RECORD_TYPE, generic_record())
+
+        self.assertTrue(payload.startswith("COMMAND_PROTOCOL_V1\n"))
+        self.assertIn(f"record_type={RECORD_TYPE}\n", payload)
+        self.assertIn("record_count=1\n", payload)
+        self.assertIn("field.name:string=", payload)
+        self.assertIn("field.note:null=\n", payload)
+
+        _, decoded = loads_records(f"{payload}\n", expected_record_type=RECORD_TYPE)
+        self.assertEqual(decoded, (generic_record(),))
 
     def test_rejects_missing_and_unknown_fields_before_serializing(self) -> None:
-        missing = project_command_record()
+        missing = generic_record()
         del missing["command"]
-        unknown = project_command_record(extra="value")
+        unknown = generic_record(extra="value")
 
         with self.assertRaisesRegex(CommandProtocolError, "missing fields: command"):
-            dumps_record("project-command", missing)
+            dumps_record(RECORD_TYPE, missing)
         with self.assertRaisesRegex(CommandProtocolError, "unknown fields: extra"):
-            dumps_record("project-command", unknown)
+            dumps_record(RECORD_TYPE, unknown)
 
     def test_rejects_oversized_record_sets_before_serializing(self) -> None:
         with patch("base_cli.command_protocol.MAX_RECORD_COUNT", 0):
             with self.assertRaisesRegex(CommandProtocolError, "protocol maximum"):
-                dumps_record("project-command", project_command_record())
+                dumps_record(RECORD_TYPE, generic_record())
 
     def test_rejects_wrong_field_types_and_nul(self) -> None:
-        with self.assertRaisesRegex(CommandProtocolError, "uses_uv_manager.*boolean"):
-            dumps_record("project-command", project_command_record(uses_uv_manager="false"))
-        with self.assertRaisesRegex(CommandProtocolError, "runner.*string"):
-            dumps_record("project-command", project_command_record(runner=7))
+        with self.assertRaisesRegex(CommandProtocolError, "enabled.*boolean"):
+            dumps_record(RECORD_TYPE, generic_record(enabled="false"))
+        with self.assertRaisesRegex(CommandProtocolError, "note.*string"):
+            dumps_record(RECORD_TYPE, generic_record(note=7))
         with self.assertRaisesRegex(CommandProtocolError, "command.*NUL"):
-            dumps_record("project-command", project_command_record(command="bad\0command"))
+            dumps_record(RECORD_TYPE, generic_record(command="bad\0command"))
 
     def test_rejects_wrong_protocol_version_and_record_type(self) -> None:
-        payload = dumps_record("project-command", project_command_record())
+        payload = dumps_record(RECORD_TYPE, generic_record())
 
         with self.assertRaisesRegex(CommandProtocolError, "unsupported protocol header"):
             loads_records(payload.replace("_V1", "_V2", 1))
@@ -121,7 +144,7 @@ class CommandProtocolTests(unittest.TestCase):
             loads_records(payload, expected_record_type="demo")
 
     def test_rejects_malformed_record_metadata_and_trailing_data(self) -> None:
-        payload = dumps_record("project-command", project_command_record())
+        payload = dumps_record(RECORD_TYPE, generic_record())
 
         with self.assertRaisesRegex(CommandProtocolError, "record_count"):
             loads_records(payload.replace("record_count=1", "record_count=one", 1))
@@ -143,36 +166,37 @@ class CommandProtocolTests(unittest.TestCase):
             loads_records(payload.replace("\n", "\v"))
 
     def test_rejects_duplicate_unknown_missing_and_invalidly_encoded_fields(self) -> None:
-        payload = dumps_record("project-command", project_command_record())
+        payload = dumps_record(RECORD_TYPE, generic_record())
         duplicate = payload.replace(
-            "field.project_root:string=",
-            "field.project_name:string=",
+            "field.enabled:boolean=",
+            "field.name:string=",
             1,
         )
         unknown = payload.replace(
-            "field.project_root:string=",
+            "field.enabled:boolean=",
             "field.unknown:string=",
             1,
         )
         wrong_type = payload.replace(
-            "field.uses_uv_manager:boolean=false",
-            "field.uses_uv_manager:string=false",
+            "field.enabled:boolean=true",
+            "field.enabled:string=true",
             1,
         )
         malformed_hex = payload.replace(
-            "field.project_name:string=64656d6f",
-            "field.project_name:string=xyz",
+            "field.name:string=64656d6f",
+            "field.name:string=xyz",
             1,
         )
 
-        with self.assertRaisesRegex(CommandProtocolError, "duplicates field 'project_name'"):
+        with self.assertRaisesRegex(CommandProtocolError, "duplicates field 'name'"):
             loads_records(duplicate)
         with self.assertRaisesRegex(CommandProtocolError, "unknown field 'unknown'"):
             loads_records(unknown)
-        with self.assertRaisesRegex(CommandProtocolError, "uses_uv_manager.*boolean"):
+        with self.assertRaisesRegex(CommandProtocolError, "enabled.*boolean"):
             loads_records(wrong_type)
         with self.assertRaisesRegex(CommandProtocolError, "invalid lowercase hexadecimal"):
             loads_records(malformed_hex)
+
 
 if __name__ == "__main__":
     unittest.main()
