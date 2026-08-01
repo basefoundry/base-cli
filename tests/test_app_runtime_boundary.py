@@ -10,17 +10,17 @@ import base_cli
 from base_cli import app
 
 
-def test_runtime_layout_names_base_cli_directories() -> None:
+def test_runtime_layout_names_consumer_neutral_directories() -> None:
     assert importlib.util.find_spec("base_cli._runtime") is not None
     runtime = importlib.import_module("base_cli._runtime")
     layout = runtime.runtime_layout(Path("/tmp/base-cache"), "demo", "run-123")
 
-    assert layout.owner_root == Path("/tmp/base-cache/base")
-    assert layout.run_root == Path("/tmp/base-cache/base/runs/run-123__demo")
-    assert layout.state_dir == Path("/tmp/base-cache/base")
-    assert layout.log_dir == Path("/tmp/base-cache/base/runs/run-123__demo/logs")
-    assert layout.cache_dir == Path("/tmp/base-cache/base/cache/components/demo")
-    assert layout.temp_dir == Path("/tmp/base-cache/base/runs/run-123__demo/tmp/demo/run-123")
+    assert layout.owner_root == Path("/tmp/base-cache/demo")
+    assert layout.run_root == Path("/tmp/base-cache/demo/runs/run-123__demo")
+    assert layout.state_dir == Path("/tmp/base-cache/demo")
+    assert layout.log_dir == Path("/tmp/base-cache/demo/runs/run-123__demo/logs")
+    assert layout.cache_dir == Path("/tmp/base-cache/demo/cache/components/demo")
+    assert layout.temp_dir == Path("/tmp/base-cache/demo/runs/run-123__demo/tmp/demo/run-123")
 
 
 def test_runtime_helpers_stay_out_of_public_api() -> None:
@@ -28,26 +28,23 @@ def test_runtime_helpers_stay_out_of_public_api() -> None:
     assert "runtime_layout" not in base_cli.__all__
 
 
-def test_runtime_layout_is_checkout_scoped_for_project_owner() -> None:
+def test_runtime_layout_accepts_a_consumer_namespace() -> None:
     runtime = importlib.import_module("base_cli._runtime")
     layout = runtime.runtime_layout(
         Path("/tmp/base-cache"),
         "native-cli",
         "run-123",
-        owner="project",
-        project_name="banyanlabs",
-        project_root=Path("/work/banyanlabs"),
+        namespace="project-tool",
     )
 
-    assert layout.owner_root.parent.parent == Path("/tmp/base-cache/projects")
-    assert layout.owner_root.parent.name == "banyanlabs"
-    assert layout.run_root == layout.owner_root / "runs" / "run-123__native-cli__banyanlabs"
+    assert layout.owner_root == Path("/tmp/base-cache/project-tool")
+    assert layout.run_root == layout.owner_root / "runs" / "run-123__native-cli"
     assert layout.log_dir == layout.run_root / "logs"
 
 
 def test_runtime_layout_places_inherited_base_children_in_the_shared_logs_dir() -> None:
     runtime = importlib.import_module("base_cli._runtime")
-    parent = Path("/tmp/base-cache/base/runs/parent")
+    parent = Path("/tmp/base-cache/parent-tool/runs/parent")
     layout = runtime.runtime_layout(
         Path("/tmp/base-cache"),
         "base_projects",

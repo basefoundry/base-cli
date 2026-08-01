@@ -1,11 +1,9 @@
 # Local configuration
 
-`base-cli` reads machine-local configuration from `~/.base.d/config.yaml`.
-Project configuration is read from `<project>/.base/config.yaml`, and an
-explicit `--config` file can provide the final project-specific override.
+`base-cli` does not read machine-local or project configuration implicitly.
+Standalone applications can accept an explicit `--config` file through the
+generic profile, or provide their own `load_user_config` and `load_config`
+callbacks for application-owned configuration sources.
 
-The package owns the configuration schema and merge semantics. Users own the
-operational choice of whether to back up or synchronize the machine-local file,
-using tools such as iCloud, chezmoi, a dotfiles repository, Time Machine, or a
-manual copy. The file can contain paths and other machine-specific values and
-should not be synchronized blindly across incompatible machines.
+The consumer owns the configuration schema, merge semantics, and operational
+choice of whether to back up or synchronize its machine-local files.

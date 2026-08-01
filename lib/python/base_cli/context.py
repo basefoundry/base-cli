@@ -53,7 +53,7 @@ class Context:
     cleanup_hooks: list[Callable[[], None]] = field(default_factory=list)
     workspace_root: Path | None = None
     quiet: bool = False
-    runtime_owner: str = "base"
+    runtime_owner: str = "default"
     owner_root: Path | None = None
     run_root: Path | None = None
 

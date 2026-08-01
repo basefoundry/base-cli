@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import inspect
 import os
-from collections.abc import Mapping
 from pathlib import Path
 from threading import RLock
 from typing import TYPE_CHECKING, Any
 
 from .paths import use_working_dir
-from ._dependencies import require_yaml
 
 if TYPE_CHECKING:
     from click.testing import Result
@@ -24,14 +22,8 @@ def invoke(
     home: Path | None = None,
     cwd: Path | str | None = None,
     env: dict[str, str] | None = None,
-    *,
-    manifest: Mapping[str, Any] | None = None,
 ) -> Result:
     cwd_path = Path(cwd).expanduser().resolve() if cwd is not None else None
-    if manifest is not None:
-        if cwd_path is None:
-            raise ValueError("manifest requires cwd so base_manifest.yaml has a target directory.")
-        _write_manifest_fixture(cwd_path, manifest)
 
     try:
         from click.testing import CliRunner
@@ -41,7 +33,7 @@ def invoke(
     invoke_env = dict(env or {})
     if home is not None:
         invoke_env.setdefault("HOME", str(home))
-        invoke_env.setdefault("BASE_CACHE_DIR", str(home / ".cache" / "base"))
+        invoke_env.setdefault("BASE_CLI_CACHE_DIR", str(home / ".cache"))
     runner_kwargs = {}
     if "mix_stderr" in inspect.signature(CliRunner).parameters:
         runner_kwargs["mix_stderr"] = False
@@ -58,15 +50,3 @@ def invoke(
                 return runner.invoke(app.click_command, args or [], env=invoke_env)
             finally:
                 os.chdir(original_cwd)
-
-
-def _write_manifest_fixture(cwd: Path, manifest: Mapping[str, Any]) -> None:
-    yaml = require_yaml(
-        "PyYAML is required to write base_cli.testing manifest fixtures. "
-        "Install it with 'pip install PyYAML'."
-    )
-
-    (cwd / "base_manifest.yaml").write_text(
-        yaml.safe_dump(dict(manifest), sort_keys=False),
-        encoding="utf-8",
-    )

@@ -15,8 +15,15 @@ import base_cli
 from base_cli.testing import invoke
 
 
-def legacy_app(**kwargs: object) -> base_cli.App:
-    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+def manifest_app(**kwargs: object) -> base_cli.App:
+    def discover(cwd: Path) -> base_cli.ProjectInfo | None:
+        manifest = cwd / "tool.manifest"
+        if not manifest.is_file():
+            return None
+        return base_cli.ProjectInfo(root=cwd, manifest=manifest, name="demo")
+
+    profile = base_cli.CliProfile.generic(discover_project=discover)
+    return base_cli.App(profile=profile, **kwargs)
 
 
 class PackageExportTests(unittest.TestCase):
@@ -55,7 +62,7 @@ class InvokeTests(unittest.TestCase):
         self.assertIn("Result", str(return_annotation))
 
     def test_invoke_writes_manifest_fixture_into_cwd(self) -> None:
-        app = legacy_app(name="testing-manifest", log_to_file=False)
+        app = manifest_app(name="testing-manifest", log_to_file=False)
         seen: dict[str, Path | None] = {}
 
         @app.command()
@@ -68,29 +75,26 @@ class InvokeTests(unittest.TestCase):
             home = root / "home"
             project = root / "project"
             project.mkdir()
+            (project / "tool.manifest").write_text(
+                "name: demo\n",
+                encoding="utf-8",
+            )
 
             result = invoke(
                 app,
                 [],
                 home=home,
                 cwd=project,
-                manifest={"project": {"name": "demo"}, "artifacts": []},
             )
 
-            manifest_path = project / "base_manifest.yaml"
+            manifest_path = project / "tool.manifest"
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(seen["project_root"], project.resolve())
         self.assertEqual(seen["manifest_path"], manifest_path.resolve())
 
-    def test_invoke_rejects_manifest_without_cwd(self) -> None:
-        app = legacy_app(name="testing-manifest-without-cwd", log_to_file=False)
-
-        with self.assertRaisesRegex(ValueError, "manifest requires cwd"):
-            invoke(app, [], manifest={"project": {"name": "demo"}})
-
     def test_invoke_with_cwd_exposes_process_cwd_and_restores_it(self) -> None:
-        app = legacy_app(name="testing-cwd-isolation", log_to_file=False)
+        app = manifest_app(name="testing-cwd-isolation", log_to_file=False)
         seen: dict[str, Path | None | str] = {}
 
         @app.command()
@@ -106,8 +110,8 @@ class InvokeTests(unittest.TestCase):
             project = root / "project"
             home.mkdir()
             project.mkdir()
-            manifest_path = project / "base_manifest.yaml"
-            manifest_path.write_text("project:\n  name: demo\n", encoding="utf-8")
+            manifest_path = project / "tool.manifest"
+            manifest_path.write_text("name: demo\n", encoding="utf-8")
             (project / "relative.txt").write_text("cwd works\n", encoding="utf-8")
             original_cwd = Path.cwd()
 

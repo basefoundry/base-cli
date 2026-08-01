@@ -9,8 +9,20 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
-- Make `base_cli.App()` use the consumer-neutral profile by default; the
-  temporary Base compatibility profile is now explicit.
+- Make `base_cli.App()` use the consumer-neutral profile by default.
+- Move manifest discovery, implicit configuration, owner-aware runtime layout,
+  and history persistence out of the generic package. Consumers now provide
+  those policies through an explicit `CliProfile`.
+
+### Migration notes
+
+- The removed implicit Base profile and Base path/config/history helpers are no
+  longer available from `base_cli`. Existing Base integrations should use the
+  adapter modules in the Base repository and pass `base_cli_profile()` to
+  `base_cli.App`.
+- `base_cli.history.write_history_record()` and
+  `base_cli.history.write_primary_record()` now require a consumer-selected
+  history path; they never choose an application cache location themselves.
 
 ### Added
 

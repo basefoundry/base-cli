@@ -18,7 +18,7 @@ def project_command_record(**overrides: object) -> dict[str, object]:
     record: dict[str, object] = {
         "project_name": "demo",
         "project_root": "/tmp/work space/demo",
-        "manifest_path": "/tmp/work space/demo/base_manifest.yaml",
+        "manifest_path": "/tmp/work space/demo/tool.manifest",
         "project_venv_dir": "/tmp/work space/demo/.venv",
         "uses_uv_manager": False,
         "manifest_command_trust_required": True,

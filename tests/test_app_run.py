@@ -6,21 +6,26 @@ import os
 import tempfile
 import unittest
 from contextlib import redirect_stderr
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
 import base_cli
-from base_cli.config import user_config_path
 
 
-def legacy_app(**kwargs: object) -> base_cli.App:
-    return base_cli.App(profile=base_cli.CliProfile.legacy_base(), **kwargs)
+def generic_app(**kwargs: object) -> base_cli.App:
+    return base_cli.App(profile=base_cli.CliProfile.generic(), **kwargs)
 
 
 class RunAppTests(unittest.TestCase):
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_reports_config_errors_without_traceback(self) -> None:
-        app = legacy_app(name="bad-config", log_to_file=False)
+        profile = base_cli.CliProfile.generic(
+            load_config=lambda _project, _explicit: (_ for _ in ()).throw(
+                ValueError("workspace must be a mapping when provided.")
+            )
+        )
+        app = base_cli.App(profile=profile, name="bad-config", log_to_file=False)
         seen = {}
 
         @app.command()
@@ -30,15 +35,12 @@ class RunAppTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
-            config_path = user_config_path(home)
-            config_path.parent.mkdir(parents=True)
-            config_path.write_text("workspace: [not-a-mapping]\n", encoding="utf-8")
             stderr = io.StringIO()
             with mock.patch.dict(
                 os.environ,
                 {
                     "HOME": str(home),
-                    "BASE_CACHE_DIR": str(home / ".cache" / "base"),
+                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
                 },
             ), redirect_stderr(stderr):
                 status = base_cli.run_app(app, [])
@@ -63,7 +65,7 @@ class RunAppTests(unittest.TestCase):
                 os.environ,
                 {
                     "HOME": str(home),
-                    "BASE_CACHE_DIR": str(home / ".cache" / "base"),
+                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
                 },
             ):
                 with self.assertRaisesRegex(RuntimeError, "boom"):
@@ -85,7 +87,7 @@ class RunAppTests(unittest.TestCase):
                 os.environ,
                 {
                     "HOME": str(home),
-                    "BASE_CACHE_DIR": str(home / ".cache" / "base"),
+                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
                 },
             ), redirect_stderr(stderr):
                 status = base_cli.run_app(app, [])
@@ -111,7 +113,7 @@ class RunAppTests(unittest.TestCase):
                 os.environ,
                 {
                     "HOME": str(home),
-                    "BASE_CACHE_DIR": str(home / ".cache" / "base"),
+                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
                 },
             ), redirect_stderr(stderr):
                 status = base_cli.run_app(app, ["--name=demo"])
@@ -126,7 +128,11 @@ class RunAppTests(unittest.TestCase):
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_uses_delegated_display_command_for_usage_errors(self) -> None:
-        app = legacy_app(name="internal-cli", log_to_file=False)
+        profile = replace(
+            base_cli.CliProfile.generic(),
+            display_command=lambda: "tool demo",
+        )
+        app = base_cli.App(profile=profile, name="internal-cli", log_to_file=False)
 
         @app.command(context_settings={"help_option_names": ["-h", "--help"]})
         def main(ctx: base_cli.Context) -> None:
@@ -135,12 +141,12 @@ class RunAppTests(unittest.TestCase):
         stderr = io.StringIO()
         with mock.patch.dict(
             os.environ,
-            {"BASE_CLI_DISPLAY_COMMAND": "basectl demo"},
+            {"BASE_CLI_DISPLAY_COMMAND": "tool demo"},
         ), redirect_stderr(stderr):
             status = base_cli.run_app(app, ["--bad-option"])
 
         self.assertEqual(status, 2)
-        self.assertIn("Usage: basectl demo", stderr.getvalue())
+        self.assertIn("Usage: tool demo", stderr.getvalue())
         self.assertIn("No such option '--bad-option'.", stderr.getvalue())
         self.assertNotIn("internal-cli", stderr.getvalue())
 
