@@ -92,6 +92,11 @@ registration. It ships with no application record types and uses
 pass a compatibility `protocol_header` when it must interoperate with an
 existing peer protocol.
 
+Command filters use consumer-neutral name normalization by default. Consumers
+with legacy command names can pass a `normalizer` callback to
+`normalize_command_filter`, `normalize_command_filters`, and
+`command_matches` to define compatibility aliases or prefixes.
+
 Low-level implementation helpers are intentionally not included in the
 module `__all__` surfaces. Downstream code should use the documented facade or
 the explicitly supported symbols from those modules.

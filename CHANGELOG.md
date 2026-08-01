@@ -15,6 +15,8 @@ and versions are tracked in the repo-root `VERSION` file.
   those policies through an explicit `CliProfile`.
 - Make `Context.user_config` an opaque consumer-owned value and remove the
   Base-shaped `UserConfig` types from the public package facade.
+- Make command-filter normalization consumer-neutral by default. Consumers
+  can provide a normalizer callback for legacy prefixes or aliases.
 - Make command protocol schemas consumer-owned. The generic protocol now ships
   only framing and validation, with `COMMAND_PROTOCOL_V1` as its default
   header; consumers can register schemas and preserve a legacy header through
