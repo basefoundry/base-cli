@@ -18,7 +18,7 @@ __all__ = [
 ]
 
 
-PROTOCOL_HEADER = "BASE_COMMAND_PROTOCOL_V1"
+PROTOCOL_HEADER = "COMMAND_PROTOCOL_V1"
 MAX_RECORD_COUNT = 1_000_000
 
 
@@ -36,58 +36,8 @@ STRING = FieldSpec("string")
 NULLABLE_STRING = FieldSpec("string", nullable=True)
 BOOLEAN = FieldSpec("boolean")
 
-PROJECT_REFERENCE_FIELDS = {
-    "project_name": STRING,
-    "project_root": STRING,
-    "manifest_path": STRING,
-}
-PROJECT_ROUTE_FIELDS = {
-    **PROJECT_REFERENCE_FIELDS,
-    "project_venv_dir": STRING,
-    "uses_uv_manager": BOOLEAN,
-    "manifest_command_trust_required": BOOLEAN,
-}
-PROJECT_SETUP_ROUTE_FIELDS = {
-    **PROJECT_ROUTE_FIELDS,
-    "requires_project_python": BOOLEAN,
-}
-
-RECORD_SCHEMAS: dict[str, dict[str, FieldSpec]] = {
-    "project-list-entry": {
-        "project_name": STRING,
-        "project_root": STRING,
-    },
-    "project-reference": PROJECT_REFERENCE_FIELDS,
-    "project-route": PROJECT_ROUTE_FIELDS,
-    "project-setup-route": PROJECT_SETUP_ROUTE_FIELDS,
-    "project-command": {
-        **PROJECT_ROUTE_FIELDS,
-        "command": STRING,
-        "runner": NULLABLE_STRING,
-    },
-    "named-command": {
-        **PROJECT_REFERENCE_FIELDS,
-        "command_name": STRING,
-        "command": STRING,
-        "runner": NULLABLE_STRING,
-    },
-    "build-target": {
-        **PROJECT_ROUTE_FIELDS,
-        "target_name": STRING,
-        "working_dir": STRING,
-        "command": STRING,
-        "description": NULLABLE_STRING,
-        "runner": NULLABLE_STRING,
-    },
-    "demo": {
-        **PROJECT_ROUTE_FIELDS,
-        "demo_script": STRING,
-        "runner": NULLABLE_STRING,
-    },
-    "activation-source": {
-        "source_path": STRING,
-    },
-}
+# Consumers register their record schemas at their integration boundary.
+RECORD_SCHEMAS: dict[str, dict[str, FieldSpec]] = {}
 
 RecordValue = str | bool | None
 Record = Mapping[str, RecordValue]
@@ -125,16 +75,26 @@ def register_record_schema(record_type: str, fields: Mapping[str, FieldSpec]) ->
     RECORD_SCHEMAS[record_type] = normalized
 
 
-def dumps_record(record_type: str, record: Record) -> str:
-    return dumps_records(record_type, (record,))
+def dumps_record(
+    record_type: str,
+    record: Record,
+    *,
+    protocol_header: str = PROTOCOL_HEADER,
+) -> str:
+    return dumps_records(record_type, (record,), protocol_header=protocol_header)
 
 
-def dumps_records(record_type: str, records: tuple[Record, ...] | list[Record]) -> str:
+def dumps_records(
+    record_type: str,
+    records: tuple[Record, ...] | list[Record],
+    *,
+    protocol_header: str = PROTOCOL_HEADER,
+) -> str:
     schema = _schema(record_type)
     if len(records) > MAX_RECORD_COUNT:
         raise CommandProtocolError(f"record_count exceeds protocol maximum of {MAX_RECORD_COUNT}")
     lines = [
-        PROTOCOL_HEADER,
+        protocol_header,
         f"record_type={record_type}",
         f"record_count={len(records)}",
     ]
@@ -152,6 +112,8 @@ def dumps_records(record_type: str, records: tuple[Record, ...] | list[Record]) 
 def loads_records(
     payload: str,
     expected_record_type: str | None = None,
+    *,
+    protocol_header: str = PROTOCOL_HEADER,
 ) -> tuple[str, tuple[dict[str, RecordValue], ...]]:
     # The wire framing is LF-delimited. `str.splitlines()` also accepts CR,
     # vertical tab, form feed, and Unicode separators, which would make the
@@ -170,8 +132,8 @@ def loads_records(
         cursor += 1
         return line
 
-    if take("protocol header") != PROTOCOL_HEADER:
-        raise CommandProtocolError(f"unsupported protocol header; expected {PROTOCOL_HEADER}")
+    if take("protocol header") != protocol_header:
+        raise CommandProtocolError(f"unsupported protocol header; expected {protocol_header}")
 
     record_type = _metadata_value(take("record_type"), "record_type")
     schema = _schema(record_type)
