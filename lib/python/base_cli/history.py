@@ -188,13 +188,14 @@ def update_run_metadata(run_root: Path, record: dict[str, Any]) -> None:
 
 
 def append_history_line(path: Path, line: str) -> None:
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    binary_flag = getattr(os, "O_BINARY", 0)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | binary_flag, 0o600)
     lock_fd = fd
     sidecar_fd: int | None = None
     try:
         if _fcntl is None and _msvcrt is not None:
             sidecar_path = path.with_name(f".{path.name}.lock")
-            sidecar_fd = os.open(sidecar_path, os.O_RDWR | os.O_CREAT, 0o600)
+            sidecar_fd = os.open(sidecar_path, os.O_RDWR | os.O_CREAT | binary_flag, 0o600)
             if os.fstat(sidecar_fd).st_size == 0:
                 os.write(sidecar_fd, b"0")
             restrict_file(sidecar_path)

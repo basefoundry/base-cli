@@ -26,5 +26,9 @@ Each invocation has a private run bundle containing:
 - `tmp/` for temporary command data.
 
 Persistent component caches live under the owner's `cache/components/` path.
-Runtime directories are owner-only (`0700`), and runtime files are owner-only
-(`0600`).
+On POSIX systems, runtime directories are owner-only (`0700`) and runtime files
+are owner-only (`0600`). On Windows, the default `%LOCALAPPDATA%` root relies
+on the user-profile ACL inherited by its children; POSIX mode bits cannot
+provide the same guarantee there. If `BASE_CLI_CACHE_DIR` points outside the
+user profile on Windows, the consumer is responsible for supplying an
+appropriately private ACL.

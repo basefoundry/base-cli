@@ -10,12 +10,25 @@ from typing import Any
 
 
 PRIVATE_FILE_MODE = 0o600
+PRIVATE_DIRECTORY_MODE = 0o700
 
 
 def restrict_file(path: Path) -> None:
-    """Ensure an existing runtime file is readable and writable only by its owner."""
+    """Apply owner-only POSIX permissions where mode bits are meaningful.
 
-    path.chmod(PRIVATE_FILE_MODE)
+    Windows inherits ACLs from the containing directory instead; the generic
+    package deliberately does not pretend that ``chmod`` can rewrite them.
+    """
+
+    if os.name != "nt":
+        path.chmod(PRIVATE_FILE_MODE)
+
+
+def restrict_directory(path: Path) -> None:
+    """Apply owner-only POSIX directory permissions when supported."""
+
+    if os.name != "nt":
+        path.chmod(PRIVATE_DIRECTORY_MODE)
 
 
 def write_private_json(path: Path, value: Mapping[str, Any]) -> None:
@@ -25,7 +38,7 @@ def write_private_json(path: Path, value: Mapping[str, Any]) -> None:
     fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, PRIVATE_FILE_MODE)
     try:
         fchmod = getattr(os, "fchmod", None)
-        if fchmod is not None:
+        if os.name != "nt" and fchmod is not None:
             fchmod(fd, PRIVATE_FILE_MODE)
         stream = os.fdopen(fd, "w", encoding="utf-8")
         fd = -1

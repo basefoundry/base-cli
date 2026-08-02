@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from ._private_files import write_private_json
+from ._private_files import restrict_directory, write_private_json
 from .paths import runtime_run_directory_name, runtime_slug
 
 
@@ -57,9 +58,9 @@ def create_runtime_directory(path: Path, cache_root: Path) -> None:
     restrict_permissions = _is_within(path, cache_root)
     try:
         path.mkdir(parents=True, exist_ok=True)
-        if restrict_permissions:
+        if restrict_permissions and os.name != "nt":
             for directory in [path, *missing]:
-                directory.chmod(0o700)
+                restrict_directory(directory)
     except OSError as exc:
         raise RuntimeError(_runtime_directory_error(path, cache_root, exc)) from exc
 
