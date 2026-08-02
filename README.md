@@ -230,6 +230,115 @@ hyphens and conventional `_command`, `_cmd`, `_group`, and `_grp` suffixes are
 removed. Pass an explicit subcommand name when a different public spelling is
 required.
 
+### Attach an existing Click application
+
+An established Click command tree can adopt the lifecycle without rebuilding
+its commands around `App`:
+
+```python
+import base_cli
+import click
+
+
+@click.group()
+@click.pass_context
+def cli(click_ctx: click.Context) -> None:
+    click_ctx.ensure_object(dict)
+
+
+@cli.command()
+def status() -> None:
+    ctx = base_cli.get_current_context()
+    ctx.log.info("checking status")
+
+
+cli = base_cli.attach(cli)
+
+
+if __name__ == "__main__":
+    raise SystemExit(base_cli.run_app(cli))
+```
+
+`attach()` returns the same Click command object. Existing callbacks,
+parameters, command and alias names, help text, context settings, result
+callbacks, and `click.Context.obj` values keep their Click semantics. The
+lifecycle wraps the whole selected invocation once, so nested groups and lazy
+`get_command()` implementations are supported without listing or importing
+unselected commands. A normal Click callback may keep returning any value its
+parent result callback expects; attached commands do not adopt the stricter
+`None`-or-integer return contract used by `App.command()` callbacks.
+Lifecycle options are installed only on the attached root and should precede
+the first subcommand. Existing option declarations, including a vendor-owned
+`--version`, are retained instead of being duplicated. Matching lifecycle
+declarations must expose one compatible scalar value; callbacks on those Click
+parameters are preserved, and their parsed results are validated before
+lifecycle startup.
+
+Pass destination names or option aliases through `sensitive_parameters` when
+an existing or lazily loaded Click parameter has a domain-specific name that
+does not look secret:
+
+```python
+cli = base_cli.attach(
+    cli,
+    sensitive_parameters={"access_code", "--credential"},
+)
+```
+
+These names are applied to the selected lazy path without enumerating other
+commands. Click password prompts configured with `hide_input=True` are treated
+as sensitive automatically.
+
+The module helper creates a generic `App`. Use an explicit app with the same
+canonical name as the Click root when the CLI has consumer-specific runtime or
+configuration policies:
+
+```python
+lifecycle = base_cli.App(name=cli.name, profile=my_profile)
+lifecycle.attach(cli)
+```
+
+Factories can create application state and services after Click has parsed the
+root parameters and before any existing group, command, or result callback
+runs:
+
+```python
+def make_application_context(ctx: base_cli.Context) -> ApplicationContext:
+    return ApplicationContext(environment=ctx.environment)
+
+
+def make_services(ctx: base_cli.Context) -> Services:
+    services = Services(ctx.config)
+    ctx.on_cleanup(services.close)
+    return services
+
+
+cli = base_cli.attach(
+    cli,
+    context_factory=make_application_context,
+    service_factory=make_services,
+)
+```
+
+Their results are available as `ctx.application_context` and `ctx.services`.
+The factories receive the active `base_cli.Context`, may register cleanup hooks,
+and never replace the existing Click context object. `get_current_context()` is
+valid in group callbacks, leaf callbacks, result callbacks, and factory-created
+helpers for the duration of the attached invocation. Root Click parameter
+callbacks run during initial parsing, before the attached lifecycle is active;
+descendant parameter callbacks run inside it as Click dispatches the selected
+path. Any root resources registered during pre-parse retain that early entry
+timing but close inside the Base lifecycle: the deliberate order is enter
+pre-parse resource, enter Base lifecycle, exit pre-parse resource, exit Base
+lifecycle. Resources and close hooks registered by either factory also exit
+before Base cleanup, so failures are reflected in history and run metadata
+while `get_current_context()` is still valid.
+
+Attach only the highest Click root that should share a lifecycle. A separately
+attached child or a native `base_cli.App` command selected beneath an attached
+root is rejected before its callbacks run, preventing duplicate lifecycle
+boundaries.
+
 ## Options And Arguments
 
 `base_cli.option` and `base_cli.argument` mirror Click's decorators:
@@ -381,6 +490,10 @@ Important fields include:
 - `ctx.log_file`: the run's shared `logs/primary.log`, or `None` when persistent
   logging is disabled.
 - `ctx.config`: merged configuration dictionary.
+- `ctx.application_context`: optional application state returned by an
+  attachment's `context_factory`, or `None`.
+- `ctx.services`: optional services returned by an attachment's
+  `service_factory`, or `None`.
 - `ctx.user_config`: opaque consumer-owned user configuration returned by the
   profile, or `None` for the generic default.
 - `ctx.environment`: active environment, defaulting to `dev`.
