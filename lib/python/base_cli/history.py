@@ -315,20 +315,24 @@ def redact_history_text(value: str) -> str:
     return compact_home_text(redact_text_value(value))
 
 
-def compact_optional_path(path: Path | None) -> str | None:
+def compact_optional_path(path: Path | None, *, home: Path | str | None = None) -> str | None:
     if path is None:
         return None
-    return compact_path(path)
+    return compact_path(path, home=home)
 
 
-def compact_path(path: Path) -> str:
-    return compact_home_text(str(path.expanduser().resolve(strict=False)))
+def compact_path(path: Path, *, home: Path | str | None = None) -> str:
+    return compact_home_text(str(path.expanduser().resolve(strict=False)), home=home)
 
 
-def compact_home_text(value: str) -> str:
-    home = str(Path.home().expanduser().resolve(strict=False))
-    if value == home:
+def compact_home_text(value: str, *, home: Path | str | None = None) -> str:
+    home_text = str(home) if home is not None else str(Path.home().expanduser().resolve(strict=False))
+    normalized_value = value.replace("\\", "/")
+    normalized_home = home_text.replace("\\", "/").rstrip("/")
+    comparison_value = normalized_value.lower() if os.name == "nt" else normalized_value
+    comparison_home = normalized_home.lower() if os.name == "nt" else normalized_home
+    if comparison_value == comparison_home:
         return "~"
-    if value.startswith(f"{home}/"):
-        return f"~/{value[len(home) + 1:]}"
+    if comparison_value.startswith(f"{comparison_home}/"):
+        return f"~/{normalized_value[len(normalized_home) + 1:]}"
     return value

@@ -448,7 +448,10 @@ explicitly and return a clear usage error or actionable message.
 The generic profile uses the configured cache root and an application namespace
 to create per-run logs, caches, and temporary directories. Pass
 `cache_root` to `CliProfile.generic()` for deterministic placement in tests or
-applications; otherwise the platform cache directory is used. The generic
+applications; otherwise the platform cache directory is used. Linux and WSL2
+follow `XDG_CACHE_HOME` or `~/.cache`, macOS uses `~/Library/Caches`, and
+Windows uses `%LOCALAPPDATA%` (falling back to `~/AppData/Local`). Set
+`BASE_CLI_CACHE_DIR` to override the default on any platform. The generic
 profile does not prescribe a product-wide cache name or cleanup command.
 
 Each invocation is a run bundle containing private (`0600`) `run.json`,

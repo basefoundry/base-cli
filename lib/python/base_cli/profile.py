@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,7 +8,7 @@ from typing import Any
 
 from ._runtime import RuntimeLayout, runtime_layout
 from .config import load_yaml_file
-from .paths import make_run_id
+from .paths import default_cache_root, make_run_id
 
 
 @dataclass(frozen=True)
@@ -124,7 +122,7 @@ def _generic_runtime_resolver(
     application_home: Path | None,
 ) -> RuntimeResolver:
     def resolve_runtime(cli_name: str, project: ProjectInfo | None) -> RuntimeBinding:
-        root = cache_root.expanduser().resolve() if cache_root is not None else _default_cache_root()
+        root = (cache_root if cache_root is not None else default_cache_root()).expanduser().resolve()
         run_id = make_run_id()
         project_root = project.root if project is not None else None
         project_name = project.name if project is not None else None
@@ -147,13 +145,3 @@ def _generic_runtime_resolver(
         )
 
     return resolve_runtime
-
-
-def _default_cache_root() -> Path:
-    configured = os.environ.get("BASE_CLI_CACHE_DIR")
-    if configured:
-        return Path(configured).expanduser().resolve()
-    root = Path.home()
-    if sys.platform == "darwin":
-        return root / "Library" / "Caches"
-    return root / ".cache"
