@@ -7,7 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Fixed
+
+- Make history persistence best-effort so secondary failures cannot mask the
+  command outcome or skip cleanup, context reset, and logger shutdown.
+- Allow finished history records to omit `log_path` when file logging is
+  disabled.
 
 ## [0.3.0] - 2026-08-01
 

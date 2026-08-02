@@ -30,6 +30,14 @@ def _default_log_file(layout: Any, configured_log_file: Path | None) -> Path:
     return configured_log_file or layout.log_dir / "primary.log"
 
 
+def _warn_lifecycle_failure(context: Context, message: str, exc: Exception) -> None:
+    """Report a secondary lifecycle failure without breaking teardown."""
+    try:
+        context.log.warning("%s: %s", message, exc)
+    except Exception:  # pylint: disable=broad-exception-caught
+        pass
+
+
 def _require_click():
     try:
         import click
@@ -163,16 +171,26 @@ class App:
                 exit_code = ExitCode.FAILURE
                 raise
             finally:
-                if self.profile.history_writer is not None:
-                    self.profile.history_writer(
-                        context,
-                        invocation_argv,
-                        sensitive_options,
-                        started_at,
-                        exit_code,
-                    )
-                reset_current_context(token)
-                context.cleanup()
+                try:
+                    if self.profile.history_writer is not None:
+                        try:
+                            self.profile.history_writer(
+                                context,
+                                invocation_argv,
+                                sensitive_options,
+                                started_at,
+                                exit_code,
+                            )
+                        except Exception as exc:  # pylint: disable=broad-exception-caught
+                            _warn_lifecycle_failure(context, "History finalization failed", exc)
+                finally:
+                    try:
+                        try:
+                            context.cleanup()
+                        except Exception as exc:  # pylint: disable=broad-exception-caught
+                            _warn_lifecycle_failure(context, "Lifecycle cleanup failed", exc)
+                    finally:
+                        reset_current_context(token)
 
         for kind, param_decls, attrs in getattr(func, "__base_cli_param_specs__", []):
             if kind == "option":

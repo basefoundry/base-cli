@@ -59,12 +59,18 @@ class Context:
         self.project_root = project_root.resolve()
         self.manifest_path = manifest_path.resolve() if manifest_path is not None else None
 
+    def _warn_cleanup_failure(self, message: str, *args: object) -> None:
+        try:
+            self.log.warning(message, *args)
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
+
     def cleanup(self) -> None:
         for hook in self.cleanup_hooks:
             try:
                 hook()
             except Exception as exc:  # pylint: disable=broad-exception-caught
-                self.log.warning("Cleanup hook failed: %s", exc)
+                self._warn_cleanup_failure("Cleanup hook failed: %s", exc)
         if not self.keep_temp and self.temp_dir.exists():
             try:
                 shutil.rmtree(self.temp_dir)
@@ -74,16 +80,16 @@ class Context:
                     except OSError:
                         break
             except OSError as exc:
-                self.log.warning("Temp directory cleanup failed for '%s': %s", self.temp_dir, exc)
+                self._warn_cleanup_failure("Temp directory cleanup failed for '%s': %s", self.temp_dir, exc)
         for handler in list(self.log.handlers):
             try:
                 handler.flush()
             except Exception as exc:  # pylint: disable=broad-exception-caught
-                self.log.warning("Log handler flush failed: %s", exc)
+                self._warn_cleanup_failure("Log handler flush failed: %s", exc)
             try:
                 handler.close()
             except Exception as exc:  # pylint: disable=broad-exception-caught
-                self.log.warning("Log handler close failed: %s", exc)
+                self._warn_cleanup_failure("Log handler close failed: %s", exc)
             self.log.removeHandler(handler)
 
 

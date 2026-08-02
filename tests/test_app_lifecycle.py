@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+import importlib.util
+import logging
+import tempfile
+import unittest
+from dataclasses import replace
+from pathlib import Path
+
+import base_cli
+from base_cli.testing import invoke
+
+
+class _BrokenHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        del record
+
+    def flush(self) -> None:
+        raise OSError("flush unavailable")
+
+    def close(self) -> None:
+        raise OSError("close unavailable")
+
+
+class _CommandFailure(RuntimeError):
+    pass
+
+
+@unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+class AppLifecycleTests(unittest.TestCase):
+    def test_history_failure_does_not_change_success_or_skip_teardown(self) -> None:
+        def fail_history(*_args: object) -> None:
+            raise RuntimeError("history unavailable")
+
+        profile = replace(base_cli.CliProfile.generic(), history_writer=fail_history)
+        app = base_cli.App(name="lifecycle-success", profile=profile)
+        seen: dict[str, object] = {}
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            seen["context"] = ctx
+            seen["temp_dir"] = ctx.temp_dir
+            seen["logger"] = ctx.log
+            seen["cleanup_context"] = None
+
+            def fail_cleanup() -> None:
+                raise RuntimeError("cleanup unavailable")
+
+            def record_cleanup_context() -> None:
+                seen["cleanup_context"] = base_cli.get_current_context()
+
+            ctx.on_cleanup(fail_cleanup)
+            ctx.on_cleanup(record_cleanup_context)
+            ctx.log.handlers.insert(0, _BrokenHandler())
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(app, [], home=Path(tmpdir))
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertIsNone(result.exception)
+            self.assertIs(seen["cleanup_context"], seen["context"])
+            self.assertFalse(Path(seen["temp_dir"]).exists())
+            self.assertEqual(seen["logger"].handlers, [])
+
+        with self.assertRaisesRegex(RuntimeError, "context is not active"):
+            base_cli.get_current_context()
+        self.assertIn("History finalization failed: history unavailable", result.stderr)
+        self.assertIn("Cleanup hook failed: cleanup unavailable", result.stderr)
+        self.assertIn("Log handler flush failed: flush unavailable", result.stderr)
+        self.assertIn("Log handler close failed: close unavailable", result.stderr)
+
+    def test_cleanup_failure_does_not_change_success_or_leak_context(self) -> None:
+        app = base_cli.App(name="cleanup-failure")
+        seen: dict[str, object] = {}
+        cleanup_calls: list[None] = []
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            seen["context"] = ctx
+            seen["original_cleanup"] = ctx.cleanup
+
+            def fail_cleanup() -> None:
+                cleanup_calls.append(None)
+                raise RuntimeError("cleanup unavailable")
+
+            ctx.cleanup = fail_cleanup  # type: ignore[method-assign]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(app, [], home=Path(tmpdir))
+
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertIsNone(result.exception)
+            self.assertEqual(cleanup_calls, [None])
+            self.assertIn("Lifecycle cleanup failed: cleanup unavailable", result.stderr)
+            with self.assertRaisesRegex(RuntimeError, "context is not active"):
+                base_cli.get_current_context()
+
+            original_cleanup = seen["original_cleanup"]
+            self.assertTrue(callable(original_cleanup))
+            original_cleanup()
+
+    def test_history_failure_does_not_mask_command_failure(self) -> None:
+        def fail_history(*_args: object) -> None:
+            raise OSError("history unavailable")
+
+        profile = replace(base_cli.CliProfile.generic(), history_writer=fail_history)
+        app = base_cli.App(name="lifecycle-failure", profile=profile)
+        primary_failure = _CommandFailure("command failed")
+        seen: dict[str, object] = {}
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            seen["temp_dir"] = ctx.temp_dir
+            seen["logger"] = ctx.log
+            ctx.on_cleanup(lambda: seen.update(cleanup_called=True))
+            raise primary_failure
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(app, [], home=Path(tmpdir))
+
+            self.assertEqual(result.exit_code, 1)
+            self.assertIs(result.exception, primary_failure)
+            self.assertTrue(seen["cleanup_called"])
+            self.assertFalse(Path(seen["temp_dir"]).exists())
+            self.assertEqual(seen["logger"].handlers, [])
+
+        with self.assertRaisesRegex(RuntimeError, "context is not active"):
+            base_cli.get_current_context()
+        self.assertIn("History finalization failed: history unavailable", result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()
