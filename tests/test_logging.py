@@ -37,6 +37,20 @@ class ConfigureLoggerTests(unittest.TestCase):
 
         self.assertEqual(stream.getvalue().strip(), "INFO:hello formatter")
 
+    def test_base_formatter_includes_exception_tracebacks(self) -> None:
+        stream = io.StringIO()
+        logger = base_cli.configure_logger("exception-traceback", None, debug=True, stream=stream)
+
+        try:
+            raise RuntimeError("diagnostic detail")
+        except RuntimeError:
+            logger.debug("unexpected command exception", exc_info=True)
+
+        output = stream.getvalue()
+        self.assertIn("unexpected command exception", output)
+        self.assertIn("Traceback", output)
+        self.assertIn("RuntimeError: diagnostic detail", output)
+
     def test_configure_logger_defaults_to_stderr_and_base_formatter(self) -> None:
         stream = io.StringIO()
 

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from ._dependencies import require_yaml
+from .errors import ConfigurationError
 
 
 __all__ = [
@@ -18,11 +19,15 @@ def load_yaml_file(path: Path) -> dict[str, Any]:
     yaml = require_yaml("PyYAML is required to load the explicit CLI configuration file.")
 
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        contents = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigurationError(f"Unable to read config file '{path}': {exc}") from exc
+    try:
+        data = yaml.safe_load(contents)
     except yaml.YAMLError as exc:
-        raise ValueError(f"Config file '{path}' contains invalid YAML: {exc}") from exc
+        raise ConfigurationError(f"Config file '{path}' contains invalid YAML: {exc}") from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
-        raise ValueError(f"Config file '{path}' must contain a YAML mapping.")
+        raise ConfigurationError(f"Config file '{path}' must contain a YAML mapping.")
     return data

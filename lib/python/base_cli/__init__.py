@@ -45,6 +45,7 @@ from .command_protocol import (
     register_record_schema,
 )
 from .context import Context, get_current_context
+from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
 from .logging import configure_logger, log_critical, log_debug, log_error, log_info, log_warning
@@ -66,6 +67,7 @@ __all__ = [
     "CliProfile",
     "CommandFilterNormalizer",
     "CommandProtocolError",
+    "ConfigurationError",
     "Context",
     "ExitCode",
     "FieldSpec",

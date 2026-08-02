@@ -49,6 +49,7 @@ class Context:
     runtime_owner: str = "default"
     owner_root: Path | None = None
     run_root: Path | None = None
+    _run_metadata_path: Path | None = field(default=None, init=False, repr=False, compare=False)
 
     def on_cleanup(self, hook: Callable[[], None]) -> None:
         self.cleanup_hooks.append(hook)
@@ -62,14 +63,14 @@ class Context:
     def _warn_cleanup_failure(self, message: str, *args: object) -> None:
         try:
             self.log.warning(message, *args)
-        except Exception:  # pylint: disable=broad-exception-caught
+        except BaseException:  # pylint: disable=broad-exception-caught
             pass
 
     def cleanup(self) -> None:
         for hook in self.cleanup_hooks:
             try:
                 hook()
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except BaseException as exc:  # pylint: disable=broad-exception-caught
                 self._warn_cleanup_failure("Cleanup hook failed: %s", exc)
         if not self.keep_temp and self.temp_dir.exists():
             try:
@@ -79,18 +80,25 @@ class Context:
                         parent.rmdir()
                     except OSError:
                         break
-            except OSError as exc:
+            except BaseException as exc:  # pylint: disable=broad-exception-caught
                 self._warn_cleanup_failure("Temp directory cleanup failed for '%s': %s", self.temp_dir, exc)
         for handler in list(self.log.handlers):
             try:
                 handler.flush()
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except BaseException as exc:  # pylint: disable=broad-exception-caught
                 self._warn_cleanup_failure("Log handler flush failed: %s", exc)
             try:
                 handler.close()
-            except Exception as exc:  # pylint: disable=broad-exception-caught
+            except BaseException as exc:  # pylint: disable=broad-exception-caught
                 self._warn_cleanup_failure("Log handler close failed: %s", exc)
-            self.log.removeHandler(handler)
+            try:
+                self.log.removeHandler(handler)
+            except BaseException as exc:  # pylint: disable=broad-exception-caught
+                self._warn_cleanup_failure("Log handler removal failed: %s", exc)
+                try:
+                    self.log.handlers.remove(handler)
+                except BaseException:  # pylint: disable=broad-exception-caught
+                    pass
 
 
 def set_current_context(context: Context | None) -> contextvars.Token[Context | None]:
@@ -98,7 +106,15 @@ def set_current_context(context: Context | None) -> contextvars.Token[Context | 
 
 
 def reset_current_context(token: contextvars.Token[Context | None]) -> None:
-    _current_context.reset(token)
+    try:
+        _current_context.reset(token)
+    except BaseException:  # pylint: disable=broad-exception-caught
+        recover_current_context(token)
+
+
+def recover_current_context(token: contextvars.Token[Context | None]) -> None:
+    previous = token.old_value
+    _current_context.set(None if previous is contextvars.Token.MISSING else previous)
 
 
 def get_current_context() -> Context:

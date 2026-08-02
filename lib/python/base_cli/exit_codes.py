@@ -7,3 +7,4 @@ class ExitCode:
     SUCCESS = 0
     FAILURE = 1
     USAGE_ERROR = 2
+    INTERRUPTED = 130

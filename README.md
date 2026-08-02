@@ -275,6 +275,8 @@ command result meanings:
   prevented successful completion.
 - `ExitCode.USAGE_ERROR` (`2`): the command could not proceed because user
   input, configuration, or environment setup was invalid or incomplete.
+- `ExitCode.INTERRUPTED` (`130`): the user interrupted the command with
+  <kbd>Ctrl</kbd>+<kbd>C</kbd>.
 
 Existing commands can keep returning integers. New code should prefer the named
 constants when it makes intent clearer:
@@ -284,6 +286,37 @@ if ctx.project_root is None:
     ctx.log.error("run this command from a project recognized by the consumer")
     return base_cli.ExitCode.USAGE_ERROR
 ```
+
+`run_app()` is the process boundary for production entry points. It preserves
+Click's messages and exit codes for usage and application errors, reports an
+explicit abort as `1`, and reports <kbd>Ctrl</kbd>+<kbd>C</kbd> during startup or
+command execution as `130` without a traceback. After the command outcome has
+settled, history, metadata, and cleanup are best-effort teardown: even a second
+interrupt there cannot replace the primary result.
+
+An unexpected exception returns `1` with a stable, detail-free message. The run
+ID and diagnostic-log path are included when context and file logging are
+available. The traceback is kept in the persistent log when enabled and is
+shown on stderr with an effective `--debug` setting. A failure before option
+parsing can provide a traceback only when `--debug` is an unambiguous leading
+flag; otherwise the message says that diagnostic context was unavailable.
+Tests or embedding code that need the original exception can pass
+`reraise_unexpected=True`.
+
+| Command result or exception | `outcome` | Exit code | Default message |
+| --- | --- | ---: | --- |
+| `None` or returned `0` | `success` | 0 | none |
+| returned `2` | `usage_error` | 2 | none |
+| another returned nonzero integer | `nonzero_return` | returned value | none |
+| `click.UsageError` | `usage_error` | exception code | Click usage error |
+| another `click.ClickException` | `click_error` | exception code | Click error |
+| `click.Abort` | `aborted` | 1 | `Aborted!` |
+| <kbd>Ctrl</kbd>+<kbd>C</kbd> | `interrupted` | 130 | `Interrupted.` |
+| `SystemExit` | `system_exit` | normalized payload | string payload, if any |
+| another unexpected exception | `unexpected_error` | 1 | stable internal-error message |
+
+For `SystemExit`, a missing payload becomes `0`, an integer payload is preserved,
+and any other payload is printed and normalized to `1`.
 
 ## Context
 
@@ -454,8 +487,26 @@ Windows uses `%LOCALAPPDATA%` (falling back to `~/AppData/Local`). Set
 `BASE_CLI_CACHE_DIR` to override the default on any platform. The generic
 profile does not prescribe a product-wide cache name or cleanup command.
 
-Each invocation is a run bundle containing a private `run.json`, `logs/`, and
-`tmp/`, while persistent component caches live in the bundle's cache directory.
+Each lifecycle-owned invocation is a run bundle containing a private
+`run.json`, `logs/`, and `tmp/`, while persistent component caches live in the
+owner's cache directory. When persistence succeeds, `run.json` begins with
+`status: "running"` and is finalized with `status`, `outcome`, `exit_code`,
+`ended_at`, and `duration_ms`, including command failures and interruptions.
+The stable outcome values are `success`, `usage_error`, `nonzero_return`,
+`click_error`, `aborted`, `interrupted`, `system_exit`, and
+`unexpected_error`. Terminal-write failures are warnings and cannot change the
+process result; base-cli then removes a matching or corrupt owned record on a
+best-effort basis so history data cannot masquerade as authoritative core data.
+
+Parsing errors, help, and version requests occur before the command lifecycle
+owns a bundle and therefore do not create one. Neither do inherited runtimes,
+`log_to_file=False`, or dry-run invocations; an explicit log path can still
+receive diagnostics in the latter two modes. Context startup is transactional:
+if directory creation, logger setup, or retention fails, base-cli closes
+partially installed handlers and removes new bundle-local temp/log artifacts
+and empty directories. Pre-existing content, persistent component caches, and
+parent-runtime data are preserved.
+
 On POSIX, base-cli enforces owner-only `0600`/`0700` modes. On Windows, the
 default user-local cache root relies on inherited user-profile ACLs; consumers
 using a custom cache root must provide the appropriate ACL themselves.

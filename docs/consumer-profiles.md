@@ -80,6 +80,20 @@ translate internal entry-point names into user-facing labels. The generic
 default only replaces underscores with hyphens; it does not know any product's
 command aliases.
 
+## Safe profile errors
+
+Plain exceptions from profile callbacks are treated as unexpected internal
+errors: production output hides their details, while `--debug` exposes the
+traceback after option parsing. This prevents a programming error or a private
+value in a callback from becoming user-facing output by accident.
+
+For a user-correctable configuration problem whose message is safe to show,
+raise `base_cli.ConfigurationError`; `run_app()` renders it as a Click usage
+error with exit code `2`. A callback may raise `click.UsageError` or another
+`click.ClickException` when it needs Click's standard rendering or a custom
+exit code. Consumers that previously raised plain `ValueError` for expected
+configuration failures should migrate those sites to `ConfigurationError`.
+
 ## Consumer-owned adapters
 
 `App()` uses `CliProfile.generic()` when no profile is supplied. This keeps the
