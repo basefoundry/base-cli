@@ -7,6 +7,12 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+## [0.3.0] - 2026-08-01
+
+### Changed
+
 - Keep private runtime files and directories owner-only on POSIX, use inherited
   user-profile ACLs on Windows, and make history appends binary-safe across
   locking backends.
