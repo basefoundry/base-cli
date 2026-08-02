@@ -38,6 +38,7 @@ class PublicApiTests(unittest.TestCase):
             "command_protocol",
             "dumps_record",
             "dumps_records",
+            "get_command_app",
             "history",
             "loads_records",
             "normalize_command_filter",
@@ -76,6 +77,7 @@ class PublicApiTests(unittest.TestCase):
     def test_entry_points_have_docstrings(self) -> None:
         self.assertTrue(base_cli.App.__doc__)
         self.assertTrue(base_cli.Context.__doc__)
+        self.assertTrue(base_cli.get_command_app.__doc__)
         self.assertTrue(base_cli.run_app.__doc__)
 
 

@@ -26,6 +26,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Make `App.name` authoritative for single-command identity, reject duplicate
+  or post-materialization registrations deterministically, stabilize inferred
+  names across Click releases, and make module-level `@command()` functions
+  retrievable and directly runnable through `run_app()`.
 - Redact sensitive option values across every declared alias and Click value
   form, redact sensitive positional arguments, and protect conventional secret
   parameter names automatically before argv reaches logs or history writers.

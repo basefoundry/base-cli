@@ -152,6 +152,10 @@ Use `App` when you want a named command:
 app = base_cli.App(name="workspace-tools", version="0.1.0")
 ```
 
+`App.name` is the canonical Click command and program name. It controls usage,
+help, version output, runtime identity, and the default invocation label. Do not
+pass a conflicting name to `@app.command(...)`; change `App(name=...)` instead.
+
 Register the command function explicitly:
 
 ```python
@@ -170,10 +174,19 @@ For small scripts, the module-level decorators are available:
 @base_cli.command()
 def main(ctx: base_cli.Context) -> None:
     ...
+
+
+if __name__ == "__main__":
+    raise SystemExit(base_cli.run_app(main))
 ```
 
-Prefer an explicit `App` when command names, versions, or consumer
-policies should be visible at the top of the module.
+The decorator returns the original function. `base_cli.get_command_app(main)`
+retrieves its private owning `App` when an embedding layer needs the command
+object. Every module-level registration gets an independent app; there is no
+process-global command registry. Its default name is inferred from the function;
+pass a public name such as `@base_cli.command("workspace-tools")` when needed.
+Prefer an explicit `App` when versions or consumer policies should be visible at
+the top of the module.
 
 Use `@app.subcommand()` when one CLI needs multiple verbs while keeping the
 standard context, logging, redaction, and cleanup lifecycle for each invocation:
@@ -207,6 +220,15 @@ form, such as `workspace-tools status --debug demo`, remains accepted for
 compatibility. Use either `@app.command()` for a single-command CLI or
 `@app.subcommand()` for a command group; do not mix the two registration styles
 on one `App`.
+
+Finish all command and subcommand registration before the first access to
+`app.click_command`, direct app invocation, `run_app()`, or
+`base_cli.testing.invoke()`. Successful materialization freezes registration;
+late mutations and duplicate effective command names fail deterministically.
+Inferred names are stable across supported Click releases: underscores become
+hyphens and conventional `_command`, `_cmd`, `_group`, and `_grp` suffixes are
+removed. Pass an explicit subcommand name when a different public spelling is
+required.
 
 ## Options And Arguments
 
