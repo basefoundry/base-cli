@@ -7,6 +7,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+No unreleased changes yet.
+
+## [0.2.0] - 2026-08-01
+
 ### Changed
 
 - Make `base_cli.App()` use the consumer-neutral profile by default.
