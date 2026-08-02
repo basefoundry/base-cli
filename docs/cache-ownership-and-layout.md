@@ -25,6 +25,29 @@ Each invocation has a private run bundle containing:
 - `logs/` for diagnostic logs; and
 - `tmp/` for temporary command data.
 
+The core lifecycle, rather than an optional history adapter, owns `run.json`.
+Once command context construction succeeds, the file is written with
+`status: "running"`. When persistence succeeds, the core writes a terminal
+snapshot containing `status`, `outcome`, `exit_code`, `ended_at`, and
+`duration_ms`. Terminal status is `ok` only for exit code zero; all other exit
+codes use `error`. The outcome discriminator is one of `success`,
+`usage_error`, `nonzero_return`, `click_error`, `aborted`, `interrupted`,
+`system_exit`, or `unexpected_error`.
+
+History may enrich a matching record with consumer fields, but the core writes
+the canonical lifecycle fields last. If terminal persistence fails, the
+process keeps its primary result and the framework best-effort removes its
+matching or corrupt record rather than leave history data or `running` state
+looking authoritative. Writes are not yet promised to be atomic.
+
+The ownership boundary intentionally excludes parser failures, help and version
+requests, inherited runtime bindings, `log_to_file=False`, and dry-run mode.
+Those invocations do not create or finalize a bundle. If context construction
+fails after creating artifacts, rollback closes partial logging handlers and
+removes new bundle-local temp/log artifacts and empty directories. It does not
+delete pre-existing content, persistent component caches, paths outside the
+selected run root, or a parent runtime's metadata.
+
 Persistent component caches live under the owner's `cache/components/` path.
 On POSIX systems, runtime directories are owner-only (`0700`) and runtime files
 are owner-only (`0600`). On Windows, the default `%LOCALAPPDATA%` root relies

@@ -116,6 +116,12 @@ class CliFormatter(logging.Formatter):
         source = _source_path(record)
         level = _level_name(record)
         line = f"{timestamp} {level:<7} {source}:{record.lineno} {record.getMessage()}"
+        if record.exc_info:
+            if not record.exc_text:
+                record.exc_text = self.formatException(record.exc_info)
+            line = f"{line}\n{record.exc_text}"
+        if record.stack_info:
+            line = f"{line}\n{self.formatStack(record.stack_info)}"
         if not self.use_color:
             return line
         color = _LEVEL_COLORS.get(record.levelno)

@@ -7,8 +7,29 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Added
+
+- Add `ConfigurationError` so consumer profiles can explicitly mark
+  user-correctable configuration messages as safe usage errors.
+
+### Changed
+
+- Normalize command returns, Click errors, aborts, interrupts, `SystemExit`, and
+  unexpected exceptions through one core outcome model and clean `run_app()`
+  process boundary.
+- Treat plain profile-callback exceptions as private internal failures. Profiles
+  that used `ValueError` for expected configuration problems should raise
+  `ConfigurationError` instead.
+
 ### Fixed
 
+- Finalize core-owned run metadata for successful, failed, aborted, interrupted,
+  and unexpected command outcomes without letting secondary persistence
+  failures replace the command result.
+- Roll back partially constructed command contexts without leaking handlers,
+  temporary directories, or incomplete run bundles.
+- Preserve exception tracebacks in persistent logs and show them on stderr only
+  when debug output is enabled.
 - Make history persistence best-effort so secondary failures cannot mask the
   command outcome or skip cleanup, context reset, and logger shutdown.
 - Allow finished history records to omit `log_path` when file logging is

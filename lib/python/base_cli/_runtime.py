@@ -23,6 +23,10 @@ class RuntimeLayout:
 _LOG_INDEX_NAME = ".base-cli-log-index.json"
 
 
+class RuntimeDirectoryError(RuntimeError):
+    """An actionable failure to create a framework-owned runtime directory."""
+
+
 # pylint: disable=too-many-arguments
 def runtime_layout(
     cache_root: Path,
@@ -62,7 +66,7 @@ def create_runtime_directory(path: Path, cache_root: Path) -> None:
             for directory in [path, *missing]:
                 restrict_directory(directory)
     except OSError as exc:
-        raise RuntimeError(_runtime_directory_error(path, cache_root, exc)) from exc
+        raise RuntimeDirectoryError(_runtime_directory_error(path, cache_root, exc)) from exc
 
 
 def runtime_namespace_root(cache_root: Path, namespace: str) -> Path:

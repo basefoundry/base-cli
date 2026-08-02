@@ -6,8 +6,11 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest import mock
 
 import base_cli
+import base_cli.app as app_module
+import base_cli.context as context_module
 from base_cli.testing import invoke
 
 
@@ -127,6 +130,93 @@ class AppLifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "context is not active"):
             base_cli.get_current_context()
         self.assertIn("History finalization failed: history unavailable", result.stderr)
+
+    def test_non_os_temp_cleanup_failure_still_closes_handlers(self) -> None:
+        app = base_cli.App(name="cleanup-runtime-failure")
+        seen: dict[str, object] = {}
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            seen["logger"] = ctx.log
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.object(
+                context_module.shutil,
+                "rmtree",
+                side_effect=RuntimeError("cleanup implementation failed"),
+            ):
+                result = invoke(app, [], home=Path(tmpdir))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn("Temp directory cleanup failed", result.stderr)
+        self.assertEqual(seen["logger"].handlers, [])
+        with self.assertRaisesRegex(RuntimeError, "context is not active"):
+            base_cli.get_current_context()
+
+    def test_active_context_reset_interruption_uses_direct_recovery(self) -> None:
+        app = base_cli.App(name="context-reset-interrupt")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
+            app_module,
+            "reset_current_context",
+            side_effect=KeyboardInterrupt(),
+        ):
+            result = invoke(app, [], home=Path(tmpdir))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        with self.assertRaisesRegex(RuntimeError, "context is not active"):
+            base_cli.get_current_context()
+
+    def test_handler_removal_interruption_uses_direct_detach_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            logger = logging.Logger("isolated-handler-removal")
+            logger.addHandler(logging.NullHandler())
+            logger.addHandler(logging.NullHandler())
+            logger.removeHandler = mock.Mock(side_effect=KeyboardInterrupt())
+            context = base_cli.Context(
+                cli_name="handler-removal-interrupt",
+                run_id="run-1",
+                state_dir=root / "state",
+                log_dir=root / "logs",
+                cache_dir=root / "cache",
+                temp_dir=root / "tmp",
+                log_file=None,
+                config={},
+                environment="dev",
+                debug=False,
+                keep_temp=False,
+                log=logger,
+            )
+
+            context.cleanup()
+
+        self.assertEqual(logger.handlers, [])
+
+    def test_context_var_reset_helper_restores_previous_value_after_interrupt(self) -> None:
+        class Token:
+            MISSING = object()
+            old_value = "parent"
+
+        class InterruptedVariable:
+            def __init__(self) -> None:
+                self.restored: object | None = None
+
+            def reset(self, _token: object) -> None:
+                raise KeyboardInterrupt()
+
+            def set(self, value: object) -> None:
+                self.restored = value
+
+        variable = InterruptedVariable()
+
+        app_module._reset_context_var(variable, Token())
+
+        self.assertEqual(variable.restored, "parent")
 
 
 if __name__ == "__main__":

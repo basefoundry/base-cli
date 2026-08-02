@@ -73,3 +73,31 @@ class AppRuntimeErrorTests(unittest.TestCase):
         self.assertIn("Unable to create runtime directory", error)
         self.assertIn(str(cache_root / "cache-failure" / "runs"), error)
         self.assertNotIn("Traceback", error)
+
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_run_app_reports_framework_log_path_failure_without_traceback(self) -> None:
+        app = generic_app(name="log-open-failure")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            self.fail("command body should not run when logging setup fails")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            home = root / "home"
+            not_a_directory = root / "not-a-directory"
+            not_a_directory.write_text("file", encoding="utf-8")
+            log_file = not_a_directory / "primary.log"
+            stderr = io.StringIO()
+            with mock.patch.dict(
+                os.environ,
+                {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(root / "cache")},
+            ), redirect_stderr(stderr):
+                exit_code = base_cli.run_app(app, ["--log-file", str(log_file)])
+
+        error = stderr.getvalue()
+        self.assertEqual(exit_code, 1)
+        self.assertIn(f"Unable to create runtime directory '{not_a_directory}'", error)
+        self.assertNotIn("Unexpected internal error", error)
+        self.assertNotIn("Traceback", error)

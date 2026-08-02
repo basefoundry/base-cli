@@ -1,15 +1,29 @@
 from __future__ import annotations
 
 import functools
+import logging
 import os
+import shutil
 import sys
-from contextvars import ContextVar
+import time
+import traceback
+from contextvars import ContextVar, Token
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
 
-from ._runtime import create_runtime_directory, prune_log_files
+from ._lifecycle import (
+    InvocationOutcome,
+    RunRecorder,
+    outcome_from_exception,
+    outcome_from_exit_code,
+    system_exit_code,
+)
 from ._private_files import write_private_json
-from .context import Context, reset_current_context, set_current_context
+from ._runtime import RuntimeDirectoryError, create_runtime_directory, prune_log_files
+from .context import Context, recover_current_context, reset_current_context, set_current_context
+from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .history import utc_now
 from .logging import configure_logger, log_invocation
@@ -26,16 +40,128 @@ DISPLAY_COMMAND_ENV = "BASE_CLI_DISPLAY_COMMAND"
 _INVOCATION_ARGV: ContextVar[list[str] | None] = ContextVar("base_cli_invocation_argv", default=None)
 
 
+@dataclass
+class _InvocationState:
+    run_id: str | None = None
+    log_file: Path | None = None
+    debug: bool = False
+    quiet: bool = False
+    options_parsed: bool = False
+
+
+_INVOCATION_STATE: ContextVar[_InvocationState | None] = ContextVar("base_cli_invocation_state", default=None)
+
+
+def _reset_context_var(variable: ContextVar[Any], token: Any) -> None:
+    try:
+        variable.reset(token)
+    except BaseException:  # pylint: disable=broad-exception-caught
+        try:
+            previous = token.old_value
+            variable.set(None if previous is Token.MISSING else previous)
+        except BaseException:  # pylint: disable=broad-exception-caught
+            pass
+
+
 def _default_log_file(layout: Any, configured_log_file: Path | None) -> Path:
     return configured_log_file or layout.log_dir / "primary.log"
 
 
-def _warn_lifecycle_failure(context: Context, message: str, exc: Exception) -> None:
+def _warn_lifecycle_failure(context: Context, message: str, exc: BaseException) -> None:
     """Report a secondary lifecycle failure without breaking teardown."""
     try:
-        context.log.warning("%s: %s", message, exc)
-    except Exception:  # pylint: disable=broad-exception-caught
+        detail = str(exc) or type(exc).__name__
+        context.log.warning("%s: %s", message, detail)
+    except BaseException:  # pylint: disable=broad-exception-caught
         pass
+
+
+def _capture_invocation_context(context: Context) -> None:
+    state = _INVOCATION_STATE.get()
+    if state is None:
+        return
+    state.run_id = context.run_id
+    state.log_file = context.log_file
+    state.debug = context.debug
+    state.quiet = context.quiet
+
+
+def _capture_standard_options(standard: dict[str, Any]) -> None:
+    state = _INVOCATION_STATE.get()
+    if state is None:
+        return
+    state.debug = bool(standard.get("debug"))
+    state.quiet = bool(standard.get("quiet"))
+    state.options_parsed = True
+
+
+def _capture_effective_output_options(*, debug: bool, quiet: bool) -> None:
+    state = _INVOCATION_STATE.get()
+    if state is None:
+        return
+    state.debug = debug
+    state.quiet = quiet
+
+
+def _record_unexpected_traceback(context: Context, outcome: InvocationOutcome) -> None:
+    if outcome.kind != "unexpected_error":
+        return
+    try:
+        context.log.debug("Unexpected command exception", exc_info=True)
+    except BaseException:  # pylint: disable=broad-exception-caught
+        pass
+
+
+def _start_run_recorder(recorder: RunRecorder) -> None:
+    try:
+        recorder.start()
+    except Exception as exc:  # pylint: disable=broad-exception-caught
+        _warn_lifecycle_failure(recorder.context, "Run metadata start failed", exc)
+
+
+def _finish_run_recorder(
+    recorder: RunRecorder,
+    outcome: InvocationOutcome,
+    *,
+    ended_at: datetime,
+    ended_monotonic_ns: int,
+) -> None:
+    try:
+        recorder.finish(
+            outcome,
+            ended_at=ended_at,
+            ended_monotonic_ns=ended_monotonic_ns,
+        )
+    except BaseException as exc:  # pylint: disable=broad-exception-caught
+        path = recorder.context._run_metadata_path
+        _warn_lifecycle_failure(
+            recorder.context,
+            f"Run metadata finalization failed for '{path}'",
+            exc,
+        )
+        _discard_owned_run_record(recorder)
+
+
+def _discard_owned_run_record(recorder: RunRecorder) -> None:
+    try:
+        recorder.discard_owned_record()
+    except BaseException as exc:  # pylint: disable=broad-exception-caught
+        _warn_lifecycle_failure(
+            recorder.context,
+            f"Run metadata recovery failed for '{recorder.context._run_metadata_path}'",
+            exc,
+        )
+
+
+def _reset_active_context(context: Context, token: Any) -> None:
+    try:
+        reset_current_context(token)
+    except BaseException as exc:  # pylint: disable=broad-exception-caught
+        _warn_lifecycle_failure(context, "Active context reset failed", exc)
+        try:
+            recover_current_context(token)
+        except BaseException:  # pylint: disable=broad-exception-caught
+            pass
 
 
 def _require_click():
@@ -68,8 +194,8 @@ class App:
         self.log_to_file = log_to_file
         self.max_log_files = max_log_files
         # Standalone applications must not inherit a consumer's product
-        # conventions. Consumers with an existing integration should pass an
-        # Consumers with product-specific policies should pass an explicit profile.
+        # conventions. Consumers with product-specific policies should pass an
+        # explicit profile.
         self.profile = profile or CliProfile.generic()
         self._click_command = None
         self._command_func: Callable[..., Any] | None = None
@@ -136,7 +262,12 @@ class App:
             group.add_command(click.command(*command_args, **command_kwargs)(wrapper))
         return group
 
-    def _build_command_wrapper(self, click: Any, func: Callable[..., Any], include_version: bool) -> Callable[..., Any]:
+    def _build_command_wrapper(
+        self,
+        click: Any,
+        func: Callable[..., Any],
+        include_version: bool,
+    ) -> Callable[..., Any]:
         sensitive_options = set(getattr(func, "__base_cli_sensitive_options__", set()))
         dry_run_parameter = getattr(func, "__base_cli_dry_run_parameter__", "dry_run")
 
@@ -147,15 +278,31 @@ class App:
                 _pop_standard_options(kwargs),
             )
             _validate_standard_options(click, standard)
-            try:
-                context = self._create_context(standard, sensitive_options, dry_run=bool(kwargs.get(dry_run_parameter)))
-            except (RuntimeError, ValueError) as exc:
-                raise click.ClickException(str(exc)) from exc
-            token = set_current_context(context)
+            _capture_standard_options(standard)
             started_at = utc_now()
-            exit_code = ExitCode.SUCCESS
-            invocation_argv = _current_invocation_argv()
+            started_monotonic_ns = time.monotonic_ns()
+            context: Context | None = None
+            recorder: RunRecorder | None = None
+            outcome = outcome_from_exit_code(ExitCode.SUCCESS)
+            invocation_argv: list[str] = []
+            token = None
             try:
+                try:
+                    context = self._create_context(
+                        standard,
+                        sensitive_options,
+                        dry_run=bool(kwargs.get(dry_run_parameter)),
+                    )
+                except ConfigurationError as exc:
+                    raise click.UsageError(str(exc)) from exc
+                except RuntimeDirectoryError as exc:
+                    raise click.ClickException(str(exc)) from exc
+
+                recorder = RunRecorder(context, started_at, started_monotonic_ns)
+                token = set_current_context(context)
+                _capture_invocation_context(context)
+                invocation_argv = _current_invocation_argv()
+                _start_run_recorder(recorder)
                 log_invocation(context.log, invocation_argv, sensitive_options)
                 if context.project_root is not None:
                     context.log.debug("project_root=%s", context.project_root)
@@ -166,31 +313,55 @@ class App:
                     exit_code = _normalize_command_result(result)
                 except TypeError as exc:
                     raise click.ClickException(str(exc)) from exc
+                outcome = outcome_from_exit_code(exit_code)
                 return result
-            except Exception:
-                exit_code = ExitCode.FAILURE
+            except BaseException as exc:
+                if context is not None:
+                    outcome = outcome_from_exception(click, exc)
+                    _record_unexpected_traceback(context, outcome)
                 raise
             finally:
-                try:
-                    if self.profile.history_writer is not None:
-                        try:
+                if context is not None:
+                    try:
+                        ended_at = utc_now()
+                        ended_monotonic_ns = time.monotonic_ns()
+                    except BaseException as exc:  # pylint: disable=broad-exception-caught
+                        ended_at = started_at
+                        ended_monotonic_ns = started_monotonic_ns
+                        _warn_lifecycle_failure(context, "Terminal clock capture failed", exc)
+
+                    try:
+                        if self.profile.history_writer is not None:
                             self.profile.history_writer(
                                 context,
                                 invocation_argv,
                                 sensitive_options,
                                 started_at,
-                                exit_code,
+                                outcome.exit_code,
                             )
-                        except Exception as exc:  # pylint: disable=broad-exception-caught
-                            _warn_lifecycle_failure(context, "History finalization failed", exc)
-                finally:
-                    try:
+                    except BaseException as exc:  # pylint: disable=broad-exception-caught
+                        _warn_lifecycle_failure(context, "History finalization failed", exc)
+
+                    if recorder is None:
                         try:
-                            context.cleanup()
-                        except Exception as exc:  # pylint: disable=broad-exception-caught
-                            _warn_lifecycle_failure(context, "Lifecycle cleanup failed", exc)
+                            recorder = RunRecorder(context, started_at, started_monotonic_ns)
+                        except BaseException as exc:  # pylint: disable=broad-exception-caught
+                            _warn_lifecycle_failure(context, "Run recorder construction failed", exc)
+                    if recorder is not None:
+                        _finish_run_recorder(
+                            recorder,
+                            outcome,
+                            ended_at=ended_at,
+                            ended_monotonic_ns=ended_monotonic_ns,
+                        )
+
+                    try:
+                        context.cleanup()
+                    except BaseException as exc:  # pylint: disable=broad-exception-caught
+                        _warn_lifecycle_failure(context, "Lifecycle cleanup failed", exc)
                     finally:
-                        reset_current_context(token)
+                        if token is not None:
+                            _reset_active_context(context, token)
 
         for kind, param_decls, attrs in getattr(func, "__base_cli_param_specs__", []):
             if kind == "option":
@@ -213,6 +384,7 @@ class App:
         debug = bool(standard.get("debug") or str(config.get("log_level", "")).lower() == "debug")
         quiet = bool(standard.get("quiet"))
         keep_temp = bool(standard.get("keep_temp") or config.get("keep_temp"))
+        _capture_effective_output_options(debug=debug, quiet=quiet)
 
         runtime = self.profile.resolve_runtime(self.name, project)
         cache_root = runtime.cache_root
@@ -225,57 +397,26 @@ class App:
 
         log_file = Path(standard["log_file"]).expanduser() if standard.get("log_file") else None
         uses_default_log_file = log_file is None
-        if dry_run or not self.log_to_file:
-            if log_file is not None:
-                create_runtime_directory(log_file.parent, cache_root)
-        else:
-            for directory in (layout.log_dir, layout.cache_dir, layout.temp_dir):
-                create_runtime_directory(directory, cache_root)
-            if log_file is None:
-                log_file = _default_log_file(layout, runtime.primary_log_file)
-            create_runtime_directory(log_file.parent, cache_root)
-        if inherited_path is None and not dry_run and self.log_to_file:
-            create_runtime_directory(layout.owner_root, cache_root)
-            create_runtime_directory(layout.run_root, cache_root)
-            try:
-                run_metadata = {
-                    "run_id": run_id,
-                    "owner": runtime_owner,
-                    "cli": self.name,
-                    "status": "running",
-                    "started_at": utc_now().isoformat(timespec="seconds").replace("+00:00", "Z"),
-                    "project": selected_project_name,
-                    "project_root": str(selected_project_root) if selected_project_root else None,
-                    "manifest": str(manifest_path) if manifest_path else None,
-                    "workspace_root": str(workspace_root) if workspace_root else None,
-                }
-                run_metadata_path = layout.run_root / "run.json"
-                write_private_json(run_metadata_path, run_metadata)
-            except OSError:
-                pass
-        if runtime.write_identity and selected_project_root is not None and not dry_run and self.log_to_file:
-            try:
-                create_runtime_directory(layout.owner_root, cache_root)
-                identity_path = layout.owner_root / "identity.json"
-                if not identity_path.exists():
-                    write_private_json(
-                        identity_path,
-                        {
-                            "schema_version": 1,
-                            "project": selected_project_name,
-                            "project_root": str(selected_project_root),
-                            "manifest": str(manifest_path) if manifest_path is not None else None,
-                            "checkout_id": layout.owner_root.name,
-                        },
-                    )
-            except OSError:
-                pass
-        logger = configure_logger(self.name, log_file, debug, quiet=quiet)
-        logger.debug("cli=%s run_id=%s environment=%s", self.name, run_id, environment)
-        if self.max_log_files is not None and uses_default_log_file and log_file is not None:
-            prune_log_files(layout.owner_root / "runs", log_file, self.max_log_files, logger)
+        if not dry_run and self.log_to_file and log_file is None:
+            log_file = _default_log_file(layout, runtime.primary_log_file)
 
-        return Context(
+        owns_run_metadata = inherited_path is None and not dry_run and self.log_to_file
+        run_metadata_path = layout.run_root / "run.json" if owns_run_metadata else None
+        run_root_was_new = not layout.run_root.exists()
+        temp_dir_was_new = not layout.temp_dir.exists()
+        rollback_empty_directories = tuple(
+            directory
+            for directory in (
+                layout.temp_dir.parent,
+                layout.temp_dir.parent.parent,
+                layout.log_dir,
+                layout.run_root,
+            )
+            if not directory.exists()
+        )
+        log_file_existed = log_file.exists() if log_file is not None else False
+        logger = logging.getLogger(f"base_cli.{self.name}")
+        context = Context(
             cli_name=self.name,
             run_id=run_id,
             runtime_owner=runtime_owner,
@@ -303,9 +444,121 @@ class App:
             history_scope=runtime.history_scope,
             history_parent_run_id=runtime.history_parent_run_id,
         )
+        context._run_metadata_path = run_metadata_path
+
+        logger_activation_started = False
+        try:
+            if owns_run_metadata:
+                create_runtime_directory(layout.run_root, cache_root)
+            if dry_run or not self.log_to_file:
+                if log_file is not None:
+                    create_runtime_directory(log_file.parent, cache_root)
+            else:
+                for directory in (layout.log_dir, layout.cache_dir, layout.temp_dir):
+                    create_runtime_directory(directory, cache_root)
+                if log_file is not None:
+                    create_runtime_directory(log_file.parent, cache_root)
+
+            logger_activation_started = True
+            try:
+                context.log = configure_logger(self.name, log_file, debug, quiet=quiet)
+            except OSError as exc:
+                target = f"persistent log file '{log_file}'" if log_file is not None else "stderr logging"
+                raise RuntimeDirectoryError(f"Unable to configure {target}: {exc}") from exc
+            context.log.debug("cli=%s run_id=%s environment=%s", self.name, run_id, environment)
+            if self.max_log_files is not None and uses_default_log_file and log_file is not None:
+                prune_log_files(layout.owner_root / "runs", log_file, self.max_log_files, context.log)
+
+            if runtime.write_identity and selected_project_root is not None and not dry_run and self.log_to_file:
+                try:
+                    create_runtime_directory(layout.owner_root, cache_root)
+                    identity_path = layout.owner_root / "identity.json"
+                    if not identity_path.exists():
+                        write_private_json(
+                            identity_path,
+                            {
+                                "schema_version": 1,
+                                "project": selected_project_name,
+                                "project_root": str(selected_project_root),
+                                "manifest": str(manifest_path) if manifest_path is not None else None,
+                                "checkout_id": layout.owner_root.name,
+                            },
+                        )
+                except OSError:
+                    pass
+            return context
+        except BaseException:
+            remove_owned_log = bool(
+                uses_default_log_file
+                and log_file is not None
+                and not log_file_existed
+                and run_root_was_new
+                and _path_is_within(log_file, layout.run_root)
+            )
+            _rollback_context_creation(
+                context,
+                logger_activation_started=logger_activation_started,
+                remove_owned_log=remove_owned_log,
+                remove_new_temp=(
+                    temp_dir_was_new
+                    and _path_is_within(layout.temp_dir, layout.run_root, strict=True)
+                ),
+                empty_directories=rollback_empty_directories,
+            )
+            raise
 
 
-def run_app(app: App, argv: list[str] | None = None) -> int:
+def _rollback_context_creation(
+    context: Context,
+    *,
+    logger_activation_started: bool,
+    remove_owned_log: bool,
+    remove_new_temp: bool,
+    empty_directories: tuple[Path, ...],
+) -> None:
+    if logger_activation_started:
+        keep_temp = context.keep_temp
+        context.keep_temp = True
+        try:
+            try:
+                context.cleanup()
+            except BaseException:  # pylint: disable=broad-exception-caught
+                pass
+        finally:
+            context.keep_temp = keep_temp
+
+    if remove_new_temp:
+        _remove_new_temp_directory(context.temp_dir)
+
+    if remove_owned_log and context.log_file is not None:
+        try:
+            context.log_file.unlink()
+        except BaseException:  # pylint: disable=broad-exception-caught
+            pass
+    for directory in sorted(set(empty_directories), key=lambda path: len(path.parts), reverse=True):
+        try:
+            directory.rmdir()
+        except BaseException:  # pylint: disable=broad-exception-caught
+            pass
+
+
+def _remove_new_temp_directory(temp_dir: Path) -> None:
+    try:
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+    except BaseException:  # pylint: disable=broad-exception-caught
+        pass
+
+
+def _path_is_within(path: Path, root: Path, *, strict: bool = False) -> bool:
+    try:
+        relative = path.resolve().relative_to(root.resolve())
+    except BaseException:  # pylint: disable=broad-exception-caught
+        return False
+    return not strict or relative != Path(".")
+
+
+def run_app(app: App, argv: list[str] | None = None, *, reraise_unexpected: bool = False) -> int:
     """Run an :class:`App` and return its normalized process exit code."""
 
     try:
@@ -316,26 +569,74 @@ def run_app(app: App, argv: list[str] | None = None) -> int:
 
     explicit_argv = argv is not None
     args = list(sys.argv[1:] if argv is None else argv)
+    leading_debug, leading_quiet = _leading_output_flags(args)
+    state = _InvocationState(debug=leading_debug, quiet=leading_quiet)
+    state_token = _INVOCATION_STATE.set(state)
     try:
-        _reject_equals_option_values(click, args)
-        display_command = app.profile.display_command()
-        invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
-        invocation_token = _INVOCATION_ARGV.set(invocation_argv)
         try:
-            if display_command:
-                result = app.click_command.main(args=args, prog_name=display_command, standalone_mode=False)
+            _reject_equals_option_values(click, args)
+            display_command = app.profile.display_command()
+            invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
+            invocation_token = _INVOCATION_ARGV.set(invocation_argv)
+            try:
+                if display_command:
+                    result = app.click_command.main(args=args, prog_name=display_command, standalone_mode=False)
+                else:
+                    result = app.click_command.main(args=args, standalone_mode=False)
+            finally:
+                _reset_context_var(_INVOCATION_ARGV, invocation_token)
+        except click.Abort as exc:
+            outcome = outcome_from_exception(click, exc)
+            if outcome.kind == "interrupted":
+                print("Interrupted.", file=sys.stderr)
             else:
-                result = app.click_command.main(args=args, standalone_mode=False)
-        finally:
-            _INVOCATION_ARGV.reset(invocation_token)
-    except click.ClickException as exc:
-        exc.show()
-        return int(exc.exit_code)
-    try:
-        return _normalize_command_result(result)
-    except TypeError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return ExitCode.FAILURE
+                print("Aborted!", file=sys.stderr)
+            return outcome.exit_code
+        except click.ClickException as exc:
+            outcome = outcome_from_exception(click, exc)
+            if outcome.kind == "unexpected_error":
+                if reraise_unexpected:
+                    raise
+                _show_unexpected_error(state, exc)
+                return outcome.exit_code
+            exc.show()
+            return outcome.exit_code
+        except KeyboardInterrupt:
+            print("Interrupted.", file=sys.stderr)
+            return ExitCode.INTERRUPTED
+        except SystemExit as exc:
+            if exc.code is not None and not isinstance(exc.code, int):
+                print(str(exc.code), file=sys.stderr)
+            return system_exit_code(exc)
+        except Exception as exc:
+            if reraise_unexpected:
+                raise
+            _show_unexpected_error(state, exc)
+            return ExitCode.FAILURE
+
+        try:
+            return _normalize_command_result(result)
+        except TypeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return ExitCode.FAILURE
+    finally:
+        _reset_context_var(_INVOCATION_STATE, state_token)
+
+
+def _show_unexpected_error(state: _InvocationState, exc: Exception) -> None:
+    print("Error: Unexpected internal error.", file=sys.stderr)
+    if state.run_id is not None:
+        print(f"Run ID: {state.run_id}", file=sys.stderr)
+    if state.log_file is not None:
+        print(f"Diagnostic log: {state.log_file}", file=sys.stderr)
+    traceback_visible = state.debug and not state.quiet
+    if traceback_visible and state.run_id is None:
+        traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
+    elif not traceback_visible:
+        if state.options_parsed:
+            print("Re-run with --debug for a traceback.", file=sys.stderr)
+        else:
+            print("Diagnostic context was unavailable before option parsing completed.", file=sys.stderr)
 
 
 def _normalize_command_result(result: Any) -> int:
@@ -347,6 +648,19 @@ def _normalize_command_result(result: Any) -> int:
         "Commands must return None or an int exit code; "
         f"got {type(result).__name__}."
     )
+
+
+def _leading_output_flags(argv: list[str]) -> tuple[bool, bool]:
+    debug = False
+    quiet = False
+    for token in argv:
+        if token == "--debug":
+            debug = True
+        elif token in ("--quiet", "-q"):
+            quiet = True
+        else:
+            break
+    return debug, quiet
 
 
 def _effective_invocation_argv(

@@ -32,6 +32,7 @@ class PublicApiTests(unittest.TestCase):
     def test_facade_exports_supported_modules_functions_and_types(self) -> None:
         expected = {
             "CommandProtocolError",
+            "ConfigurationError",
             "command_filters",
             "command_matches",
             "command_protocol",
@@ -47,6 +48,7 @@ class PublicApiTests(unittest.TestCase):
         self.assertFalse(hasattr(base_cli, "UserConfig"))
         self.assertIs(base_cli.command_filters, command_filters)
         self.assertIs(base_cli.command_protocol, command_protocol)
+        self.assertTrue(issubclass(base_cli.ConfigurationError, ValueError))
 
     def test_module_all_surfaces_are_explicit(self) -> None:
         self.assertEqual(

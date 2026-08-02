@@ -19,10 +19,84 @@ def generic_app(**kwargs: object) -> base_cli.App:
 
 class RunAppTests(unittest.TestCase):
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_malformed_click_exit_code_before_context_is_an_unexpected_error(self) -> None:
+        import click
+
+        class MalformedExit(click.ClickException):
+            exit_code = object()
+
+        profile = replace(
+            base_cli.CliProfile.generic(),
+            display_command=lambda: (_ for _ in ()).throw(
+                MalformedExit("private pre-context detail")
+            ),
+        )
+        app = base_cli.App(name="malformed-pre-context", profile=profile)
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        stderr = io.StringIO()
+        with redirect_stderr(stderr):
+            status = base_cli.run_app(app, [])
+
+        output = stderr.getvalue()
+        self.assertEqual(status, 1)
+        self.assertIn("Error: Unexpected internal error.", output)
+        self.assertIn("Diagnostic context was unavailable", output)
+        self.assertNotIn("private pre-context detail", output)
+
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_profile_programming_errors_use_the_unexpected_error_boundary(self) -> None:
+        callbacks = (
+            ("discover_project", RuntimeError),
+            ("load_user_config", ValueError),
+            ("resolve_workspace_root", RuntimeError),
+            ("load_config", ValueError),
+            ("resolve_runtime", RuntimeError),
+            ("display_command", ValueError),
+        )
+        for field_name, error_type in callbacks:
+            with self.subTest(field=field_name), tempfile.TemporaryDirectory() as tmpdir:
+                detail = f"private {field_name} detail"
+
+                def fail_callback(*_args: object) -> object:
+                    raise error_type(detail)
+
+                profile = replace(base_cli.CliProfile.generic(), **{field_name: fail_callback})
+                app = base_cli.App(name=f"profile-error-{field_name}", profile=profile)
+
+                @app.command()
+                def main(ctx: base_cli.Context) -> None:
+                    del ctx
+
+                home = Path(tmpdir)
+                stderr = io.StringIO()
+                with mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(home),
+                        "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                    },
+                ), redirect_stderr(stderr):
+                    status = base_cli.run_app(app, [])
+
+                output = stderr.getvalue()
+                self.assertEqual(status, 1)
+                self.assertIn("Error: Unexpected internal error.", output)
+                if field_name == "display_command":
+                    self.assertIn("Diagnostic context was unavailable", output)
+                else:
+                    self.assertIn("Re-run with --debug for a traceback.", output)
+                self.assertNotIn(detail, output)
+                self.assertNotIn("Traceback", output)
+
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_reports_config_errors_without_traceback(self) -> None:
         profile = base_cli.CliProfile.generic(
             load_config=lambda _project, _explicit: (_ for _ in ()).throw(
-                ValueError("workspace must be a mapping when provided.")
+                base_cli.ConfigurationError("workspace must be a mapping when provided.")
             )
         )
         app = base_cli.App(profile=profile, name="bad-config", log_to_file=False)
@@ -45,13 +119,37 @@ class RunAppTests(unittest.TestCase):
             ), redirect_stderr(stderr):
                 status = base_cli.run_app(app, [])
 
-        self.assertEqual(status, 1)
+        self.assertEqual(status, 2)
         self.assertEqual(seen, {})
         self.assertIn("workspace must be a mapping", stderr.getvalue())
         self.assertNotIn("Traceback", stderr.getvalue())
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
-    def test_run_app_preserves_unexpected_command_exceptions(self) -> None:
+    def test_generic_invalid_yaml_is_a_safe_usage_error(self) -> None:
+        app = base_cli.App(name="invalid-yaml", log_to_file=False)
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            self.fail("command should not run")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            config = home / "invalid.yml"
+            config.write_text("broken: [", encoding="utf-8")
+            stderr = io.StringIO()
+            with mock.patch.dict(
+                os.environ,
+                {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(home / ".cache")},
+            ), redirect_stderr(stderr):
+                status = base_cli.run_app(app, ["--config", str(config)])
+
+        self.assertEqual(status, 2)
+        self.assertIn("contains invalid YAML", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_run_app_can_reraise_unexpected_command_exceptions(self) -> None:
         app = base_cli.App(name="boom", log_to_file=False)
 
         @app.command()
@@ -69,7 +167,7 @@ class RunAppTests(unittest.TestCase):
                 },
             ):
                 with self.assertRaisesRegex(RuntimeError, "boom"):
-                    base_cli.run_app(app, [])
+                    base_cli.run_app(app, [], reraise_unexpected=True)
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_reports_invalid_command_return_values(self) -> None:
