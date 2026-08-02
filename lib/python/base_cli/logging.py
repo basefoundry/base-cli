@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import TextIO
 
+from ._private_files import restrict_file
 from .context import get_current_context
 from .paths import current_working_dir
 from .redaction import redact_argv
@@ -77,7 +78,7 @@ def _use_color(stream: TextIO) -> bool:
 
 
 def secure_log_file_permissions(log_file: Path) -> None:
-    log_file.chmod(0o600)
+    restrict_file(log_file)
 
 
 class SecureLogFileHandler(logging.FileHandler):
@@ -85,7 +86,7 @@ class SecureLogFileHandler(logging.FileHandler):
         fd = os.open(self.baseFilename, _secure_log_file_open_flags(self.mode), 0o600)
         try:
             fchmod = getattr(os, "fchmod", None)
-            if fchmod is not None:
+            if os.name != "nt" and fchmod is not None:
                 fchmod(fd, 0o600)
             return open(fd, self.mode, encoding=self.encoding, errors=self.errors, closefd=True)
         except BaseException:

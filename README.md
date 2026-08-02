@@ -454,9 +454,11 @@ Windows uses `%LOCALAPPDATA%` (falling back to `~/AppData/Local`). Set
 `BASE_CLI_CACHE_DIR` to override the default on any platform. The generic
 profile does not prescribe a product-wide cache name or cleanup command.
 
-Each invocation is a run bundle containing private (`0600`) `run.json`,
-`logs/`, and `tmp/`, while persistent component caches live in the
-bundle's cache directory.
+Each invocation is a run bundle containing a private `run.json`, `logs/`, and
+`tmp/`, while persistent component caches live in the bundle's cache directory.
+On POSIX, base-cli enforces owner-only `0600`/`0700` modes. On Windows, the
+default user-local cache root relies on inherited user-profile ACLs; consumers
+using a custom cache root must provide the appropriate ACL themselves.
 
 Use `ctx.on_cleanup()` for cleanup work that should happen even when helper code
 does not own the main command wrapper:

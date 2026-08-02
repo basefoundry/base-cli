@@ -9,6 +9,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Keep private runtime files and directories owner-only on POSIX, use inherited
+  user-profile ACLs on Windows, and make history appends binary-safe across
+  locking backends.
 - Select platform-aware cache roots (`XDG_CACHE_HOME`, macOS Caches, and
   Windows `LOCALAPPDATA`) and normalize home-relative paths across separators.
 - Make `base_cli.App()` use the consumer-neutral profile by default.
