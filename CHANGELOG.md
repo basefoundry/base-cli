@@ -7,16 +7,19 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
-### Changed
-
-- Document the Linux, WSL2, macOS, and native Windows support tiers and add
-  matching operating-system package classifiers.
-- Add Linux distribution and WSL2 validation guidance for the generic package.
-- Make terminal detection tolerate closed streams and record `COMSPEC` when
-  Windows has no `SHELL` environment variable.
 - Keep private runtime files and directories owner-only on POSIX, use inherited
   user-profile ACLs on Windows, and make history appends binary-safe across
   locking backends.
+- Make terminal detection tolerate closed streams and record `COMSPEC` when
+  Windows has no `SHELL` environment variable.
+- Add Linux distribution and WSL2 validation guidance for the generic package.
+- Document the Linux, WSL2, macOS, and native Windows support tiers and add
+  matching operating-system package classifiers.
+
+## [0.2.0] - 2026-08-01
+
+### Changed
+
 - Select platform-aware cache roots (`XDG_CACHE_HOME`, macOS Caches, and
   Windows `LOCALAPPDATA`) and normalize home-relative paths across separators.
 - Make `base_cli.App()` use the consumer-neutral profile by default.
