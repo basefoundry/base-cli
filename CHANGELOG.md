@@ -12,6 +12,7 @@ and versions are tracked in the repo-root `VERSION` file.
   locking backends.
 - Make terminal detection tolerate closed streams and record `COMSPEC` when
   Windows has no `SHELL` environment variable.
+- Add Linux distribution and WSL2 validation guidance for the generic package.
 
 ## [0.2.0] - 2026-08-01
 
