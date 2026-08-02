@@ -493,6 +493,12 @@ lifecycle after the profile's configuration is loaded; for example,
 `--environment prod` overrides `environment: dev` from an explicit
 configuration file.
 
+An explicit `--config` value must identify an existing, readable regular file;
+invalid paths are rejected as usage errors before profile loading or runtime
+state begins. Invalid YAML reports that the file `contains invalid YAML`, while
+a non-mapping document reports that it `must contain a YAML mapping`. Each error
+includes the selected path. Quoted home-relative paths such as
+`--config "~/tool.yml"` are expanded before validation.
 
 `ctx.config` exposes the dictionary returned by the profile. `ctx.user_config`
 exposes the opaque user-configuration value returned by the profile. Consumers

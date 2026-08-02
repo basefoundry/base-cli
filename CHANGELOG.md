@@ -26,6 +26,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Reject missing, unreadable, and non-regular explicit `--config` paths before
+  profile or runtime startup while preserving optional profile-owned files.
 - Make `App.name` authoritative for single-command identity, reject duplicate
   or post-materialization registrations deterministically, stabilize inferred
   names across Click releases, and make module-level `@command()` functions
