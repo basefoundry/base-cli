@@ -26,6 +26,14 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Redact sensitive option values across every declared alias and Click value
+  form, redact sensitive positional arguments, and protect conventional secret
+  parameter names automatically before argv reaches logs or history writers.
+- Claim invocation temp leaves exclusively and refuse recursive cleanup unless
+  ownership, strict run-root containment, the run-ID marker, and a symlink-free
+  path can all be proven; content erasure uses a retained directory handle and
+  intentionally leaves the empty directory skeleton instead of reopening a
+  pathname-removal race.
 - Finalize core-owned run metadata for successful, failed, aborted, interrupted,
   and unexpected command outcomes without letting secondary persistence
   failures replace the command result.

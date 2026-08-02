@@ -62,7 +62,8 @@ class AppLifecycleTests(unittest.TestCase):
             self.assertEqual(result.exit_code, 0, result.output)
             self.assertIsNone(result.exception)
             self.assertIs(seen["cleanup_context"], seen["context"])
-            self.assertFalse(Path(seen["temp_dir"]).exists())
+            self.assertTrue(Path(seen["temp_dir"]).is_dir())
+            self.assertEqual(list(Path(seen["temp_dir"]).iterdir()), [])
             self.assertEqual(seen["logger"].handlers, [])
 
         with self.assertRaisesRegex(RuntimeError, "context is not active"):
@@ -125,7 +126,8 @@ class AppLifecycleTests(unittest.TestCase):
             self.assertIsInstance(result.exception, SystemExit)
             self.assertIsNot(result.exception, primary_failure)
             self.assertTrue(seen["cleanup_called"])
-            self.assertFalse(Path(seen["temp_dir"]).exists())
+            self.assertTrue(Path(seen["temp_dir"]).is_dir())
+            self.assertEqual(list(Path(seen["temp_dir"]).iterdir()), [])
             self.assertEqual(seen["logger"].handlers, [])
 
         with self.assertRaisesRegex(RuntimeError, "context is not active"):
@@ -164,8 +166,8 @@ class AppLifecycleTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.object(
-                context_module.shutil,
-                "rmtree",
+                context_module,
+                "remove_owned_temp_directory",
                 side_effect=RuntimeError("cleanup implementation failed"),
             ):
                 result = invoke(app, [], home=Path(tmpdir))

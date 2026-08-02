@@ -44,9 +44,32 @@ The ownership boundary intentionally excludes parser failures, help and version
 requests, inherited runtime bindings, `log_to_file=False`, and dry-run mode.
 Those invocations do not create or finalize a bundle. If context construction
 fails after creating artifacts, rollback closes partial logging handlers and
-removes new bundle-local temp/log artifacts and empty directories. It does not
-delete pre-existing content, persistent component caches, paths outside the
-selected run root, or a parent runtime's metadata.
+erases new bundle-local temp files through the retained ownership handle. It
+retains log files and empty directory boundaries rather than reopening pathname
+replacement races, and does not delete pre-existing content, persistent
+component caches, paths outside the selected run root, or a parent runtime's
+metadata.
+
+Temp cleanup uses the same fail-closed ownership proof during normal teardown
+and startup rollback. The final leaf is claimed exclusively through a stable
+parent handle, retained for the invocation, and checked against its captured
+filesystem identity. Its path must remain a strict lexical and resolved
+descendant of the selected run root, carry the invocation's run ID as its final
+component, and contain no symlinked component. Cleanup refuses roots, the run
+root itself, replaced directories, traversal paths, mounted targets, external
+paths, pre-existing directories, missing Linux mount identities, and anything
+it cannot inspect safely.
+
+Files and symlinks are erased relative to the retained directory handle and
+cleanup refuses cross-device descendants. All empty directory nodes are
+retained: portable POSIX APIs cannot atomically bind `rmdir` to an
+already-verified open directory, so pathname removal would reopen a replacement
+race at every depth. If the host lacks the required handle operations, files
+are retained with a warning. `--keep-temp` also retains files. A refusal never
+replaces the command's primary result. The ownership claim assumes the private
+per-user runtime tree is not maliciously mutated by another process with the
+same account while ownership is acquired or cleanup runs; it is not a
+cryptographic proof against a hostile same-account process.
 
 Persistent component caches live under the owner's `cache/components/` path.
 On POSIX systems, runtime directories are owner-only (`0700`) and runtime files

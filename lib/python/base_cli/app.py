@@ -3,7 +3,6 @@ from __future__ import annotations
 import functools
 import logging
 import os
-import shutil
 import sys
 import time
 import traceback
@@ -11,6 +10,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any, Callable
 
 from ._lifecycle import (
@@ -21,7 +21,12 @@ from ._lifecycle import (
     system_exit_code,
 )
 from ._private_files import write_private_json
-from ._runtime import RuntimeDirectoryError, create_runtime_directory, prune_log_files
+from ._runtime import (
+    RuntimeDirectoryError,
+    create_owned_runtime_directory,
+    create_runtime_directory,
+    prune_log_files,
+)
 from .context import Context, recover_current_context, reset_current_context, set_current_context
 from .errors import ConfigurationError
 from .exit_codes import ExitCode
@@ -32,7 +37,7 @@ from .paths import (
     normalize_cli_name,
 )
 from .profile import CliProfile
-from .redaction import parameter_name_from_decls
+from .redaction import RedactionPlan, compile_redaction_plan, parameter_name_from_decls, redact_argv
 
 _STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp", "log_file")
 _GROUP_STANDARD_OPTIONS_KEY = "base_cli_standard_options"
@@ -198,6 +203,8 @@ class App:
         # explicit profile.
         self.profile = profile or CliProfile.generic()
         self._click_command = None
+        self._redaction_plan: RedactionPlan | None = None
+        self._click_command_lock = Lock()
         self._command_func: Callable[..., Any] | None = None
         self._command_args: tuple[Any, ...] = ()
         self._command_kwargs: dict[str, Any] = {}
@@ -239,9 +246,20 @@ class App:
 
     @property
     def click_command(self) -> Any:
-        if self._click_command is None:
-            self._click_command = self._build_click_command()
-        return self._click_command
+        command = self._click_command
+        if command is not None:
+            return command
+
+        with self._click_command_lock:
+            command = self._click_command
+            if command is None:
+                command = self._build_click_command()
+                redaction_plan = compile_redaction_plan(command)
+                # Publish the command last so another thread can never invoke
+                # its wrapper before the corresponding plan is available.
+                self._redaction_plan = redaction_plan
+                self._click_command = command
+            return command
 
     def _build_click_command(self) -> Any:
         if self._command_func is None and not self._subcommands:
@@ -268,7 +286,6 @@ class App:
         func: Callable[..., Any],
         include_version: bool,
     ) -> Callable[..., Any]:
-        sensitive_options = set(getattr(func, "__base_cli_sensitive_options__", set()))
         dry_run_parameter = getattr(func, "__base_cli_dry_run_parameter__", "dry_run")
 
         @functools.wraps(func)
@@ -285,12 +302,14 @@ class App:
             recorder: RunRecorder | None = None
             outcome = outcome_from_exit_code(ExitCode.SUCCESS)
             invocation_argv: list[str] = []
+            redaction_plan = self._redaction_plan
+            if redaction_plan is None:
+                raise RuntimeError("Command redaction plan was not initialized.")
             token = None
             try:
                 try:
                     context = self._create_context(
                         standard,
-                        sensitive_options,
                         dry_run=bool(kwargs.get(dry_run_parameter)),
                     )
                 except ConfigurationError as exc:
@@ -301,9 +320,9 @@ class App:
                 recorder = RunRecorder(context, started_at, started_monotonic_ns)
                 token = set_current_context(context)
                 _capture_invocation_context(context)
-                invocation_argv = _current_invocation_argv()
+                invocation_argv = redact_argv(_current_invocation_argv(), redaction_plan)
                 _start_run_recorder(recorder)
-                log_invocation(context.log, invocation_argv, sensitive_options)
+                log_invocation(context.log, invocation_argv, None)
                 if context.project_root is not None:
                     context.log.debug("project_root=%s", context.project_root)
                 if context.manifest_path is not None:
@@ -335,7 +354,7 @@ class App:
                             self.profile.history_writer(
                                 context,
                                 invocation_argv,
-                                sensitive_options,
+                                set(redaction_plan),
                                 started_at,
                                 outcome.exit_code,
                             )
@@ -363,16 +382,21 @@ class App:
                         if token is not None:
                             _reset_active_context(context, token)
 
-        for kind, param_decls, attrs in getattr(func, "__base_cli_param_specs__", []):
+        for spec in getattr(func, "__base_cli_param_specs__", []):
+            kind, param_decls, attrs, *metadata = spec
+            sensitive = bool(metadata[0]) if metadata else False
             if kind == "option":
                 wrapper = click.option(*param_decls, **attrs)(wrapper)
             elif kind == "argument":
                 wrapper = click.argument(*param_decls, **attrs)(wrapper)
+            if sensitive:
+                click_parameters = getattr(wrapper, "__click_params__", ())
+                if click_parameters:
+                    click_parameters[-1]._base_cli_sensitive = True
         wrapper = _decorate_standard_options(click, wrapper, self.version if include_version else None)
         return wrapper
 
-    def _create_context(self, standard: dict[str, Any], sensitive_options: set[str], dry_run: bool = False) -> Context:
-        del sensitive_options
+    def _create_context(self, standard: dict[str, Any], dry_run: bool = False) -> Context:
         project = self.profile.discover_project(current_working_dir())
         manifest_path = project.manifest if project is not None else None
         explicit_config = Path(standard["config"]).expanduser() if standard.get("config") else None
@@ -402,19 +426,7 @@ class App:
 
         owns_run_metadata = inherited_path is None and not dry_run and self.log_to_file
         run_metadata_path = layout.run_root / "run.json" if owns_run_metadata else None
-        run_root_was_new = not layout.run_root.exists()
         temp_dir_was_new = not layout.temp_dir.exists()
-        rollback_empty_directories = tuple(
-            directory
-            for directory in (
-                layout.temp_dir.parent,
-                layout.temp_dir.parent.parent,
-                layout.log_dir,
-                layout.run_root,
-            )
-            if not directory.exists()
-        )
-        log_file_existed = log_file.exists() if log_file is not None else False
         logger = logging.getLogger(f"base_cli.{self.name}")
         context = Context(
             cli_name=self.name,
@@ -454,8 +466,15 @@ class App:
                 if log_file is not None:
                     create_runtime_directory(log_file.parent, cache_root)
             else:
-                for directory in (layout.log_dir, layout.cache_dir, layout.temp_dir):
+                for directory in (layout.log_dir, layout.cache_dir):
                     create_runtime_directory(directory, cache_root)
+                if temp_dir_was_new:
+                    owned_identity, owned_descriptor = create_owned_runtime_directory(layout.temp_dir, cache_root)
+                    context._owned_temp_descriptor = owned_descriptor
+                    context._owned_temp_identity = owned_identity
+                    context._owns_temp_dir = True
+                else:
+                    create_runtime_directory(layout.temp_dir, cache_root)
                 if log_file is not None:
                     create_runtime_directory(log_file.parent, cache_root)
 
@@ -488,22 +507,9 @@ class App:
                     pass
             return context
         except BaseException:
-            remove_owned_log = bool(
-                uses_default_log_file
-                and log_file is not None
-                and not log_file_existed
-                and run_root_was_new
-                and _path_is_within(log_file, layout.run_root)
-            )
             _rollback_context_creation(
                 context,
                 logger_activation_started=logger_activation_started,
-                remove_owned_log=remove_owned_log,
-                remove_new_temp=(
-                    temp_dir_was_new
-                    and _path_is_within(layout.temp_dir, layout.run_root, strict=True)
-                ),
-                empty_directories=rollback_empty_directories,
             )
             raise
 
@@ -512,50 +518,22 @@ def _rollback_context_creation(
     context: Context,
     *,
     logger_activation_started: bool,
-    remove_owned_log: bool,
-    remove_new_temp: bool,
-    empty_directories: tuple[Path, ...],
 ) -> None:
     if logger_activation_started:
         keep_temp = context.keep_temp
         context.keep_temp = True
         try:
             try:
-                context.cleanup()
+                context._cleanup_preserving_temp_ownership()
             except BaseException:  # pylint: disable=broad-exception-caught
                 pass
         finally:
             context.keep_temp = keep_temp
 
-    if remove_new_temp:
-        _remove_new_temp_directory(context.temp_dir)
-
-    if remove_owned_log and context.log_file is not None:
-        try:
-            context.log_file.unlink()
-        except BaseException:  # pylint: disable=broad-exception-caught
-            pass
-    for directory in sorted(set(empty_directories), key=lambda path: len(path.parts), reverse=True):
-        try:
-            directory.rmdir()
-        except BaseException:  # pylint: disable=broad-exception-caught
-            pass
-
-
-def _remove_new_temp_directory(temp_dir: Path) -> None:
     try:
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
+        context._cleanup_owned_temp_dir()
     except BaseException:  # pylint: disable=broad-exception-caught
         pass
-
-
-def _path_is_within(path: Path, root: Path, *, strict: bool = False) -> bool:
-    try:
-        relative = path.resolve().relative_to(root.resolve())
-    except BaseException:  # pylint: disable=broad-exception-caught
-        return False
-    return not strict or relative != Path(".")
 
 
 def run_app(app: App, argv: list[str] | None = None, *, reraise_unexpected: bool = False) -> int:
@@ -694,12 +672,8 @@ def command(*args: Any, **kwargs: Any):
 def option(*param_decls: str, sensitive: bool = False, dry_run: bool = False, **attrs: Any):
     def decorator(func: Callable[..., Any]):
         specs = list(getattr(func, "__base_cli_param_specs__", []))
-        specs.append(("option", param_decls, attrs))
+        specs.append(("option", param_decls, attrs, sensitive))
         func.__base_cli_param_specs__ = specs
-        if sensitive:
-            options = set(getattr(func, "__base_cli_sensitive_options__", set()))
-            options.add(parameter_name_from_decls(param_decls))
-            func.__base_cli_sensitive_options__ = options
         if dry_run:
             dry_run_parameter = parameter_name_from_decls(param_decls)
             existing_dry_run_parameter = getattr(func, "__base_cli_dry_run_parameter__", None)
@@ -714,10 +688,10 @@ def option(*param_decls: str, sensitive: bool = False, dry_run: bool = False, **
     return decorator
 
 
-def argument(*param_decls: str, **attrs: Any):
+def argument(*param_decls: str, sensitive: bool = False, **attrs: Any):
     def decorator(func: Callable[..., Any]):
         specs = list(getattr(func, "__base_cli_param_specs__", []))
-        specs.append(("argument", param_decls, attrs))
+        specs.append(("argument", param_decls, attrs, sensitive))
         func.__base_cli_param_specs__ = specs
         return func
 

@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import logging
 import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
-from ._private_files import restrict_directory, write_private_json
+from ._private_files import PRIVATE_DIRECTORY_MODE, restrict_directory, write_private_json
 from .paths import runtime_run_directory_name, runtime_slug
 
 
@@ -67,6 +68,133 @@ def create_runtime_directory(path: Path, cache_root: Path) -> None:
                 restrict_directory(directory)
     except OSError as exc:
         raise RuntimeDirectoryError(_runtime_directory_error(path, cache_root, exc)) from exc
+
+
+def create_owned_runtime_directory(
+    path: Path,
+    cache_root: Path,
+) -> tuple[tuple[int, int], int | None]:
+    """Exclusively create one invocation-owned leaf and retain its stable handle."""
+
+    create_runtime_directory(path.parent, cache_root)
+    if not _supports_secure_owned_directory_creation():
+        return _create_owned_runtime_directory_portable(path, cache_root)
+
+    try:
+        parent_fd = _open_absolute_directory(path.parent)
+    except OSError as exc:
+        raise RuntimeDirectoryError(_runtime_directory_error(path, cache_root, exc)) from exc
+
+    leaf_fd: int | None = None
+    try:
+        try:
+            os.mkdir(path.name, PRIVATE_DIRECTORY_MODE, dir_fd=parent_fd)
+        except FileExistsError as exc:
+            raise RuntimeDirectoryError(_owned_directory_collision_error(path)) from exc
+
+        leaf_fd = os.open(path.name, _directory_open_flags(), dir_fd=parent_fd)
+        created_stat = os.fstat(leaf_fd)
+        _require_current_owned_entry(parent_fd, path.name, created_stat, path)
+        if _is_within(path, cache_root) and os.name != "nt":
+            os.fchmod(leaf_fd, PRIVATE_DIRECTORY_MODE)
+            _require_current_owned_entry(parent_fd, path.name, created_stat, path)
+        return (created_stat.st_dev, created_stat.st_ino), leaf_fd
+    except RuntimeDirectoryError:
+        if leaf_fd is not None:
+            os.close(leaf_fd)
+        raise
+    except OSError as exc:
+        if leaf_fd is not None:
+            os.close(leaf_fd)
+        raise RuntimeDirectoryError(_runtime_directory_error(path, cache_root, exc)) from exc
+    except BaseException:
+        if leaf_fd is not None:
+            os.close(leaf_fd)
+        raise
+    finally:
+        os.close(parent_fd)
+
+
+def _supports_secure_owned_directory_creation() -> bool:
+    return bool(
+        hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+        and os.mkdir in os.supports_dir_fd
+        and os.open in os.supports_dir_fd
+        and os.stat in os.supports_dir_fd
+        and os.stat in os.supports_follow_symlinks
+        and hasattr(os, "fchmod")
+    )
+
+
+def _create_owned_runtime_directory_portable(
+    path: Path,
+    cache_root: Path,
+) -> tuple[tuple[int, int], int | None]:
+    """Use the strongest available binding where directory-relative APIs are absent."""
+
+    try:
+        path.mkdir(mode=PRIVATE_DIRECTORY_MODE)
+    except FileExistsError as exc:
+        raise RuntimeDirectoryError(_owned_directory_collision_error(path)) from exc
+    except OSError as exc:
+        raise RuntimeDirectoryError(_runtime_directory_error(path, cache_root, exc)) from exc
+
+    try:
+        created_stat = os.stat(path, follow_symlinks=False)
+        if not stat.S_ISDIR(created_stat.st_mode):
+            raise RuntimeDirectoryError(
+                f"Unable to claim invocation temp directory '{path}': it changed during creation."
+            )
+        if _is_within(path, cache_root) and os.name != "nt":
+            restrict_directory(path)
+        return (created_stat.st_dev, created_stat.st_ino), None
+    except RuntimeDirectoryError:
+        raise
+    except OSError as exc:
+        raise RuntimeDirectoryError(_runtime_directory_error(path, cache_root, exc)) from exc
+
+
+def _open_absolute_directory(path: Path) -> int:
+    absolute = path.resolve(strict=True)
+    anchor = Path(absolute.anchor)
+    descriptor = os.open(anchor, _directory_open_flags())
+    try:
+        for component in absolute.relative_to(anchor).parts:
+            next_descriptor = os.open(component, _directory_open_flags(), dir_fd=descriptor)
+            os.close(descriptor)
+            descriptor = next_descriptor
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _directory_open_flags() -> int:
+    return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
+
+
+def _require_current_owned_entry(
+    parent_fd: int,
+    name: str,
+    created_stat: os.stat_result,
+    path: Path,
+) -> None:
+    current_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    if (
+        not stat.S_ISDIR(current_stat.st_mode)
+        or (current_stat.st_dev, current_stat.st_ino) != (created_stat.st_dev, created_stat.st_ino)
+    ):
+        raise RuntimeDirectoryError(
+            f"Unable to claim invocation temp directory '{path}': it changed during creation."
+        )
+
+
+def _owned_directory_collision_error(path: Path) -> str:
+    return (
+        f"Unable to claim invocation temp directory '{path}': it appeared concurrently. "
+        "Refusing to treat pre-existing content as framework-owned."
+    )
 
 
 def runtime_namespace_root(cache_root: Path, namespace: str) -> Path:

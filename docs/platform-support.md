@@ -20,6 +20,15 @@ Base or `basectl` natively Windows-compatible; those consumers have their own
 Unix-tooling and shell boundaries. The package does not provide package-manager
 integration, shell startup management, or WSL/Windows path translation.
 
+Recursive invocation-temp content erasure requires descriptor-relative,
+no-follow directory operations. Linux, macOS, and WSL2 provide those
+primitives; the empty leaf is retained on every platform because portable
+POSIX has no identity-bound `rmdir`. Empty nested directories and ancestors are
+retained for the same reason. Linux additionally requires readable mount IDs
+and fails closed if they are unavailable. Native Windows currently uses the
+secure fallback: it retains both directories and files and emits a cleanup
+warning rather than perform race-prone pathname recursion.
+
 The supported Python range is Python 3.10 through 3.14. Bug reports should
 include the operating system, distribution or WSL version when relevant,
 Python version, and whether paths live on the native filesystem or a mounted
