@@ -18,6 +18,11 @@ class _Stream(io.StringIO):
         return self.terminal
 
 
+class _ClosedStream(io.StringIO):
+    def isatty(self) -> bool:
+        raise ValueError("stream is closed")
+
+
 RECORDS = (
     {"name": "base", "path": "/work/base"},
     {"name": "demo,one", "path": "/work/demo\tone"},
@@ -26,6 +31,9 @@ COLUMNS = (("PROJECT", "name"), ("PATH", "path"))
 
 
 class OutputTest(unittest.TestCase):
+    def test_closed_stream_is_not_treated_as_terminal(self) -> None:
+        self.assertEqual(resolve_output_format("text", stream=_ClosedStream()), "tsv")
+
     def test_text_is_pretty_on_terminal(self) -> None:
         stream = _Stream(terminal=True)
 

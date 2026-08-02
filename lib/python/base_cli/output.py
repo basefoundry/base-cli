@@ -30,7 +30,7 @@ def is_terminal(stream: TextIO | None = None) -> bool:
     candidate = stream if stream is not None else sys.stdout
     try:
         return bool(candidate.isatty())
-    except (AttributeError, OSError):
+    except (AttributeError, OSError, ValueError):
         return False
 
 

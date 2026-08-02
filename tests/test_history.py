@@ -22,6 +22,18 @@ class _FakeMsvcrt:
 
 
 class HistoryAppendTests(unittest.TestCase):
+    def test_current_shell_falls_back_to_comspec(self) -> None:
+        with mock.patch.dict("os.environ", {"COMSPEC": r"C:\Windows\System32\cmd.exe"}, clear=True):
+            self.assertEqual(history.current_shell(), r"C:\Windows\System32\cmd.exe")
+
+    def test_current_shell_prefers_shell(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {"SHELL": "/bin/zsh", "COMSPEC": r"C:\Windows\System32\cmd.exe"},
+            clear=True,
+        ):
+            self.assertEqual(history.current_shell(), "/bin/zsh")
+
     def test_concurrent_appends_produce_complete_records(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"

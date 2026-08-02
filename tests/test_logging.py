@@ -105,6 +105,20 @@ class ConfigureLoggerTests(unittest.TestCase):
 
         self.assertNotIn("\033[", stream.getvalue())
 
+    def test_configure_logger_handles_streams_that_reject_isatty(self) -> None:
+        class ClosedStream(io.StringIO):
+            def isatty(self) -> bool:
+                raise ValueError("stream is closed")
+
+        stream = ClosedStream()
+
+        with mock.patch.dict(os.environ, {}, clear=True):
+            logger = base_cli.configure_logger("closed-stream", None, debug=False, stream=stream)
+            logger.info("hello closed stream")
+
+        self.assertNotIn("\033[", stream.getvalue())
+        self.assertIn("hello closed stream", stream.getvalue())
+
     def test_configure_logger_uses_custom_formatter_for_file_handler(self) -> None:
         formatter = logging.Formatter("%(levelname)s:%(message)s")
         user_stream = io.StringIO()

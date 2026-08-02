@@ -499,8 +499,9 @@ def test_command(tmp_path: Path) -> None:
     assert "hello Ada" in result.stdout
 ```
 
-The helper wraps Click's `CliRunner`, sets `HOME` when requested, and supplies
-`cwd` to the invocation for the duration of the test. Calls that use
+The helper wraps Click's `CliRunner`, sets `HOME` plus the relevant
+`USERPROFILE`, `LOCALAPPDATA`, and `XDG_CACHE_HOME` values when requested, and
+supplies `cwd` to the invocation for the duration of the test. Calls that use
 `cwd` are serialized and the caller's cwd is restored afterward, but this
 remains process-global: do not use it concurrently with code that changes cwd
 outside `invoke()` or from threads spawned by the invoked command. A
