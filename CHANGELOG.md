@@ -13,6 +13,8 @@ No unreleased changes yet.
 
 ### Changed
 
+- Select platform-aware cache roots (`XDG_CACHE_HOME`, macOS Caches, and
+  Windows `LOCALAPPDATA`) and normalize home-relative paths across separators.
 - Make `base_cli.App()` use the consumer-neutral profile by default.
 - Move manifest discovery, implicit configuration, owner-aware runtime layout,
   and history persistence out of the generic package. Consumers now provide

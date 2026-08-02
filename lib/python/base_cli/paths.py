@@ -2,16 +2,50 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import os
 import re
+import sys
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
 
 _WORKING_DIRECTORY_OVERRIDE: contextvars.ContextVar[Path | None] = contextvars.ContextVar(
     "base_cli_working_directory_override",
     default=None,
 )
+
+
+def default_cache_root(
+    *,
+    environ: Mapping[str, str] | None = None,
+    home: Path | None = None,
+    platform_name: str | None = None,
+) -> Path:
+    """Return the platform-default cache root for the generic profile.
+
+    ``BASE_CLI_CACHE_DIR`` always wins so consumers and tests can provide an
+    explicit location. Linux follows ``XDG_CACHE_HOME`` when it is set,
+    macOS uses ``Library/Caches``, and Windows uses ``LOCALAPPDATA``.
+    """
+
+    environment = os.environ if environ is None else environ
+    configured = environment.get("BASE_CLI_CACHE_DIR")
+    if configured:
+        return Path(configured).expanduser()
+
+    root = home.expanduser() if home is not None else Path.home()
+    system = platform_name or sys.platform
+    if system == "darwin":
+        return root / "Library" / "Caches"
+    if system.startswith("win"):
+        local_app_data = environment.get("LOCALAPPDATA")
+        return Path(local_app_data).expanduser() if local_app_data else root / "AppData" / "Local"
+
+    xdg_cache_home = environment.get("XDG_CACHE_HOME")
+    if xdg_cache_home:
+        return Path(xdg_cache_home).expanduser()
+    return root / ".cache"
 
 
 def current_working_dir() -> Path:

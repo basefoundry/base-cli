@@ -33,6 +33,9 @@ def invoke(
     invoke_env = dict(env or {})
     if home is not None:
         invoke_env.setdefault("HOME", str(home))
+        invoke_env.setdefault("USERPROFILE", str(home))
+        invoke_env.setdefault("LOCALAPPDATA", str(home / "AppData" / "Local"))
+        invoke_env.setdefault("XDG_CACHE_HOME", str(home / ".cache"))
         invoke_env.setdefault("BASE_CLI_CACHE_DIR", str(home / ".cache"))
     runner_kwargs = {}
     if "mix_stderr" in inspect.signature(CliRunner).parameters:
