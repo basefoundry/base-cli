@@ -122,7 +122,8 @@ class AppLifecycleTests(unittest.TestCase):
             result = invoke(app, [], home=Path(tmpdir))
 
             self.assertEqual(result.exit_code, 1)
-            self.assertIs(result.exception, primary_failure)
+            self.assertIsInstance(result.exception, SystemExit)
+            self.assertIsNot(result.exception, primary_failure)
             self.assertTrue(seen["cleanup_called"])
             self.assertFalse(Path(seen["temp_dir"]).exists())
             self.assertEqual(seen["logger"].handlers, [])
@@ -130,6 +131,28 @@ class AppLifecycleTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "context is not active"):
             base_cli.get_current_context()
         self.assertIn("History finalization failed: history unavailable", result.stderr)
+        self.assertIn("Error: Unexpected internal error.", result.stderr)
+        self.assertNotIn("command failed", result.stderr)
+
+    def test_invoke_can_capture_original_unexpected_exception_for_debugging(self) -> None:
+        app = base_cli.App(name="lifecycle-reraise", log_to_file=False)
+        primary_failure = _CommandFailure("command failed")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            raise primary_failure
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(
+                app,
+                [],
+                home=Path(tmpdir),
+                reraise_unexpected=True,
+            )
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIs(result.exception, primary_failure)
 
     def test_non_os_temp_cleanup_failure_still_closes_handlers(self) -> None:
         app = base_cli.App(name="cleanup-runtime-failure")

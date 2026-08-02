@@ -20,6 +20,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Treat plain profile-callback exceptions as private internal failures. Profiles
   that used `ValueError` for expected configuration problems should raise
   `ConfigurationError` instead.
+- Route `base_cli.testing.invoke()` through the production `run_app()` boundary
+  and add a keyword-only `reraise_unexpected` opt-in for tests that need the
+  original exception.
 
 ### Fixed
 
@@ -34,6 +37,8 @@ and versions are tracked in the repo-root `VERSION` file.
   command outcome or skip cleanup, context reset, and logger shutdown.
 - Allow finished history records to omit `log_path` when file logging is
   disabled.
+- Restore Click-native `--option=value` parsing, including redaction of
+  sensitive equals-form values.
 
 ## [0.3.0] - 2026-08-01
 

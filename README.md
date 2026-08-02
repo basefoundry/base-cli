@@ -139,11 +139,10 @@ hello --keep-temp --name Ada
 hello --log-file /tmp/hello.log --name Ada
 ```
 
-Long options with values use space-separated syntax. `base_cli.run_app()` rejects
-equals-form values such as `--name=Ada` before Click parses arguments.
-These options belong to the application-level lifecycle. A consumer may expose
-them through its own launcher or compose them with a higher-level command
-wrapper.
+Long options use Click's native syntax, so both `--name Ada` and `--name=Ada`
+are accepted. These options belong to the application-level lifecycle. A
+consumer may expose them through its own launcher or compose them with a
+higher-level command wrapper.
 
 ## Command Registration
 
@@ -230,9 +229,8 @@ def main(ctx: base_cli.Context, token: str) -> None:
     ...
 ```
 
-Both `--token secret` and an externally supplied `--token=secret` token are
-redacted in debug logs. The lifecycle rejects equals-form option values before
-Click parses them.
+Both `--token secret` and `--token=secret` are accepted and redacted in debug
+logs.
 
 Use `dry_run=True` when a nonstandard option should drive `ctx.dry_run` and
 the lifecycle's default durable-write suppression:
@@ -300,8 +298,8 @@ available. The traceback is kept in the persistent log when enabled and is
 shown on stderr with an effective `--debug` setting. A failure before option
 parsing can provide a traceback only when `--debug` is an unambiguous leading
 flag; otherwise the message says that diagnostic context was unavailable.
-Tests or embedding code that need the original exception can pass
-`reraise_unexpected=True`.
+Embedding code that needs the original exception can pass the keyword-only
+`reraise_unexpected=True` argument to `run_app()`.
 
 | Command result or exception | `outcome` | Exit code | Default message |
 | --- | --- | ---: | --- |
@@ -555,15 +553,34 @@ def test_command(tmp_path: Path) -> None:
     assert "hello Ada" in result.stdout
 ```
 
-The helper wraps Click's `CliRunner`, sets `HOME` plus the relevant
-`USERPROFILE`, `LOCALAPPDATA`, and `XDG_CACHE_HOME` values when requested, and
-supplies `cwd` to the invocation for the duration of the test. Calls that use
-`cwd` are serialized and the caller's cwd is restored afterward, but this
-remains process-global: do not use it concurrently with code that changes cwd
-outside `invoke()` or from threads spawned by the invoked command. A
-generic profile should receive project fixtures through its
-`discover_project` callback. The helper does not create or interpret any
-product-specific manifest fixture.
+The helper wraps Click's `CliRunner` but routes the invocation through the same
+`run_app()` boundary used by production entry points. Option parsing (including
+native forms such as `--name=Ada`), effective and logged argv, exit-code and
+error normalization, lifecycle behavior, and command-group dispatch therefore
+follow the production path.
+
+By default, unexpected exceptions receive the production-safe rendering and
+exit code. Pass the keyword-only `reraise_unexpected=True` argument when a test
+needs the original unexpected exception in `result.exception`:
+
+```python
+result = invoke(app, [], home=tmp_path, reraise_unexpected=True)
+assert isinstance(result.exception, RuntimeError)
+```
+
+As with direct `CliRunner` use, a handled nonzero exit normally also gives
+`Result.exception` a `SystemExit` carrying that exit code. That does not by
+itself indicate an unexpected crash; assert `result.exit_code` and the rendered
+stdout or stderr for expected usage or application failures.
+
+`invoke()` sets `HOME` plus the relevant `USERPROFILE`, `LOCALAPPDATA`, and
+`XDG_CACHE_HOME` values when requested, and supplies `cwd` to the invocation for
+the duration of the test. Calls that use `cwd` are serialized and the caller's
+cwd is restored afterward, but this remains process-global: do not use it
+concurrently with code that changes cwd outside `invoke()` or from threads
+spawned by the invoked command. A generic profile should receive project
+fixtures through its `discover_project` callback. The helper does not create or
+interpret any product-specific manifest fixture.
 
 When `home` is supplied, `invoke()` provides an isolated default cache
 environment for tests. Pass `env={"BASE_CLI_CACHE_DIR": str(path)}` when a test
