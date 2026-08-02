@@ -460,6 +460,11 @@ On POSIX, base-cli enforces owner-only `0600`/`0700` modes. On Windows, the
 default user-local cache root relies on inherited user-profile ACLs; consumers
 using a custom cache root must provide the appropriate ACL themselves.
 
+See [Platform support](docs/platform-support.md) for the supported Linux,
+WSL2, macOS, and native Windows boundaries. Native Windows support covers the
+generic `base-cli` framework; it does not imply native Windows support for
+Base or `basectl`.
+
 Use `ctx.on_cleanup()` for cleanup work that should happen even when helper code
 does not own the main command wrapper:
 

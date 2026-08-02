@@ -9,6 +9,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Document the Linux, WSL2, macOS, and native Windows support tiers and add
+  matching operating-system package classifiers.
 - Add Linux distribution and WSL2 validation guidance for the generic package.
 - Make terminal detection tolerate closed streams and record `COMSPEC` when
   Windows has no `SHELL` environment variable.
