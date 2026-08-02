@@ -10,7 +10,7 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from threading import Lock
+from threading import RLock
 from typing import Any, Callable
 
 from ._lifecycle import (
@@ -43,6 +43,12 @@ _STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp",
 _GROUP_STANDARD_OPTIONS_KEY = "base_cli_standard_options"
 DISPLAY_COMMAND_ENV = "BASE_CLI_DISPLAY_COMMAND"
 _INVOCATION_ARGV: ContextVar[list[str] | None] = ContextVar("base_cli_invocation_argv", default=None)
+_COMMAND_APP_ATTRIBUTE = "__base_cli_command_app__"
+_COMMAND_APP_LOCK = RLock()
+_REGISTRATION_OPEN = "open"
+_REGISTRATION_MATERIALIZING = "materializing"
+_REGISTRATION_FROZEN = "frozen"
+_COMMAND_NAME_SUFFIXES = frozenset({"command", "cmd", "group", "grp"})
 
 
 @dataclass
@@ -52,6 +58,14 @@ class _InvocationState:
     debug: bool = False
     quiet: bool = False
     options_parsed: bool = False
+
+
+@dataclass(frozen=True)
+class _SubcommandRegistration:
+    func: Callable[..., Any]
+    args: tuple[Any, ...]
+    kwargs: dict[str, Any]
+    name: str
 
 
 _INVOCATION_STATE: ContextVar[_InvocationState | None] = ContextVar("base_cli_invocation_state", default=None)
@@ -177,6 +191,64 @@ def _require_click():
     return click
 
 
+def _explicit_command_name(
+    command_args: tuple[Any, ...],
+    command_kwargs: dict[str, Any],
+) -> str | None:
+    if command_args and "name" in command_kwargs:
+        raise TypeError("Command name cannot be provided both positionally and by keyword.")
+    name = command_args[0] if command_args else command_kwargs.get("name")
+    if name is None:
+        return None
+    if not isinstance(name, str):
+        raise TypeError("Command name must be a string or None.")
+    return name
+
+
+def _inferred_command_name(func: Callable[..., Any]) -> str:
+    name = func.__name__.lower().replace("_", "-")
+    prefix, separator, suffix = name.rpartition("-")
+    if separator and suffix in _COMMAND_NAME_SUFFIXES:
+        return prefix
+    return name
+
+
+def _resolved_command_name(
+    func: Callable[..., Any],
+    command_args: tuple[Any, ...],
+    command_kwargs: dict[str, Any],
+) -> str:
+    return _explicit_command_name(command_args, command_kwargs) or _inferred_command_name(func)
+
+
+def _click_command_decorator(
+    click: Any,
+    name: str,
+    command_args: tuple[Any, ...],
+    command_kwargs: dict[str, Any],
+) -> Callable[[Callable[..., Any]], Any]:
+    # ``name`` is resolved by base-cli so naming and duplicate behavior do not
+    # drift across supported Click versions. Preserve the optional positional
+    # command class and all non-name attributes.
+    args_after_name = command_args[1:] if command_args else ()
+    attrs = dict(command_kwargs)
+    attrs.pop("name", None)
+    return click.command(name, *args_after_name, **attrs)
+
+
+def _require_materialized_command_name(
+    command: Any,
+    expected_name: str,
+    app_name: str,
+) -> None:
+    actual_name = getattr(command, "name", None)
+    if actual_name != expected_name:
+        raise RuntimeError(
+            f"App '{app_name}' expected Click command name '{expected_name}', "
+            f"but the configured command class produced {actual_name!r}."
+        )
+
+
 # pylint: disable=too-many-statements
 class App:
     """Define a Click-backed command with a shared runtime lifecycle."""
@@ -193,7 +265,9 @@ class App:
     ) -> None:
         if max_log_files is not None and max_log_files < 1:
             raise ValueError("max_log_files must be greater than 0 when set.")
-        self.name = normalize_cli_name(name or sys.argv[0])
+        self._registration_lock = RLock()
+        self._registration_state = _REGISTRATION_OPEN
+        self._name = normalize_cli_name(name or sys.argv[0])
         self.version = version
         self.help = help
         self.log_to_file = log_to_file
@@ -204,60 +278,148 @@ class App:
         self.profile = profile or CliProfile.generic()
         self._click_command = None
         self._redaction_plan: RedactionPlan | None = None
-        self._click_command_lock = Lock()
         self._command_func: Callable[..., Any] | None = None
         self._command_args: tuple[Any, ...] = ()
         self._command_kwargs: dict[str, Any] = {}
-        self._subcommands: list[tuple[Callable[..., Any], tuple[Any, ...], dict[str, Any]]] = []
+        self._subcommands: list[_SubcommandRegistration] = []
+        self._subcommand_names: set[str] = set()
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @name.setter
+    def name(self, value: str) -> None:
+        normalized = normalize_cli_name(value)
+        with self._registration_lock:
+            self._ensure_registration_open()
+            explicit_name = _explicit_command_name(
+                self._command_args,
+                self._command_kwargs,
+            )
+            if (
+                self._command_func is not None
+                and explicit_name is not None
+                and normalize_cli_name(explicit_name) != normalized
+            ):
+                raise RuntimeError(
+                    f"App '{self.name}' cannot be renamed to '{normalized}' because "
+                    f"its registered command explicitly uses '{explicit_name}'."
+                )
+            self._name = normalized
+
+    def _ensure_registration_open(self) -> None:
+        if self._registration_state == _REGISTRATION_MATERIALIZING:
+            raise RuntimeError(
+                f"App '{self.name}' registration is unavailable while its Click command "
+                "is being materialized."
+            )
+        if self._registration_state == _REGISTRATION_FROZEN:
+            raise RuntimeError(
+                f"App '{self.name}' registration is frozen because its Click command "
+                "has already been materialized."
+            )
+
+    def _validate_single_command_name(
+        self,
+        command_args: tuple[Any, ...],
+        command_kwargs: dict[str, Any],
+    ) -> None:
+        explicit_name = _explicit_command_name(command_args, command_kwargs)
+        if explicit_name is not None and normalize_cli_name(explicit_name) != self.name:
+            raise RuntimeError(
+                f"App '{self.name}' is the authoritative command name; "
+                f"the registered command cannot use '{explicit_name}'."
+            )
 
     def command(self, *command_args: Any, **command_kwargs: Any):
+        with self._registration_lock:
+            self._ensure_registration_open()
+            self._validate_single_command_name(command_args, command_kwargs)
+
         def decorator(func: Callable[..., Any]):
-            if self._subcommands:
-                raise RuntimeError(
-                    f"App '{self.name}' already has registered subcommands. "
-                    "Use @app.subcommand() for additional entry points."
-                )
-            if self._command_func is not None:
-                raise RuntimeError(
-                    f"App '{self.name}' already has a registered command. "
-                    "Use subcommands for multiple entry points."
-                )
-            self._command_func = func
-            self._command_args = command_args
-            self._command_kwargs = command_kwargs
+            with self._registration_lock:
+                self._ensure_registration_open()
+                self._validate_single_command_name(command_args, command_kwargs)
+                if self._subcommands:
+                    raise RuntimeError(
+                        f"App '{self.name}' already has registered subcommands. "
+                        "Use @app.subcommand() for additional entry points."
+                    )
+                if self._command_func is not None:
+                    raise RuntimeError(
+                        f"App '{self.name}' already has a registered command. "
+                        "Use subcommands for multiple entry points."
+                    )
+                self._command_func = func
+                self._command_args = tuple(command_args)
+                self._command_kwargs = dict(command_kwargs)
             return func
 
         return decorator
 
     def subcommand(self, *command_args: Any, **command_kwargs: Any):
+        with self._registration_lock:
+            self._ensure_registration_open()
+            _explicit_command_name(command_args, command_kwargs)
+
         def decorator(func: Callable[..., Any]):
-            if self._command_func is not None:
-                raise RuntimeError(
-                    f"App '{self.name}' already has a registered command. "
-                    "Use either @app.command() or @app.subcommand(), not both."
+            with self._registration_lock:
+                self._ensure_registration_open()
+                if self._command_func is not None:
+                    raise RuntimeError(
+                        f"App '{self.name}' already has a registered command. "
+                        "Use either @app.command() or @app.subcommand(), not both."
+                    )
+                name = _resolved_command_name(func, command_args, command_kwargs)
+                if name in self._subcommand_names:
+                    raise RuntimeError(
+                        f"App '{self.name}' already has a registered subcommand named '{name}'."
+                    )
+                self._subcommands.append(
+                    _SubcommandRegistration(
+                        func=func,
+                        args=tuple(command_args),
+                        kwargs=dict(command_kwargs),
+                        name=name,
+                    )
                 )
-            self._subcommands.append((func, command_args, command_kwargs))
+                self._subcommand_names.add(name)
             return func
 
         return decorator
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        if len(args) < 2 and "prog_name" not in kwargs:
+            kwargs["prog_name"] = self.profile.display_command() or self.name
         return self.click_command(*args, **kwargs)
 
     @property
     def click_command(self) -> Any:
-        command = self._click_command
-        if command is not None:
-            return command
-
-        with self._click_command_lock:
+        with self._registration_lock:
             command = self._click_command
-            if command is None:
+            if command is not None:
+                return command
+            if self._registration_state == _REGISTRATION_MATERIALIZING:
+                raise RuntimeError(
+                    f"App '{self.name}' Click command materialization is already in progress."
+                )
+
+            self._registration_state = _REGISTRATION_MATERIALIZING
+            try:
                 command = self._build_click_command()
                 redaction_plan = compile_redaction_plan(command)
+            except BaseException:
+                # A missing dependency, invalid custom Click class, or plan
+                # compilation failure must not strand an otherwise repairable
+                # application in a half-materialized state.
+                self._registration_state = _REGISTRATION_OPEN
+                raise
+            else:
                 # Publish the command last so another thread can never invoke
                 # its wrapper before the corresponding plan is available.
                 self._redaction_plan = redaction_plan
+                self._registration_state = _REGISTRATION_FROZEN
                 self._click_command = command
             return command
 
@@ -271,13 +433,33 @@ class App:
             command_kwargs = dict(self._command_kwargs)
             if self.help is not None:
                 command_kwargs.setdefault("help", self.help)
-            return click.command(*self._command_args, **command_kwargs)(wrapper)
+            command = _click_command_decorator(
+                click,
+                self.name,
+                self._command_args,
+                command_kwargs,
+            )(wrapper)
+            _require_materialized_command_name(command, self.name, self.name)
+            return command
 
         group_wrapper = _decorate_standard_options(click, _build_group_wrapper(click), self.version)
         group = click.group(name=self.name, help=self.help)(group_wrapper)
-        for func, command_args, command_kwargs in self._subcommands:
-            wrapper = self._build_command_wrapper(click, func, include_version=False)
-            group.add_command(click.command(*command_args, **command_kwargs)(wrapper))
+        for registration in self._subcommands:
+            wrapper = self._build_command_wrapper(click, registration.func, include_version=False)
+            command = _click_command_decorator(
+                click,
+                registration.name,
+                registration.args,
+                registration.kwargs,
+            )(wrapper)
+            _require_materialized_command_name(command, registration.name, self.name)
+            # Supplying the canonical name explicitly also prevents a custom
+            # Command implementation from changing the group key between the
+            # validation above and Click's registration step.
+            group.add_command(
+                command,
+                name=registration.name,
+            )
         return group
 
     def _build_command_wrapper(
@@ -536,8 +718,30 @@ def _rollback_context_creation(
         pass
 
 
-def run_app(app: App, argv: list[str] | None = None, *, reraise_unexpected: bool = False) -> int:
-    """Run an :class:`App` and return its normalized process exit code."""
+def get_command_app(command_func: Callable[..., Any]) -> App:
+    """Return the isolated :class:`App` owned by ``@base_cli.command``."""
+
+    with _COMMAND_APP_LOCK:
+        owner = getattr(command_func, _COMMAND_APP_ATTRIBUTE, None)
+        if isinstance(owner, App):
+            with owner._registration_lock:  # pylint: disable=protected-access
+                if owner._command_func is command_func:  # pylint: disable=protected-access
+                    return owner
+    raise TypeError(
+        "Expected a base_cli.App or a function registered with @base_cli.command()."
+    )
+
+
+def run_app(
+    app: App | Callable[..., Any],
+    argv: list[str] | None = None,
+    *,
+    reraise_unexpected: bool = False,
+) -> int:
+    """Run an :class:`App` or registered command and return its process exit code."""
+
+    if not isinstance(app, App):
+        app = get_command_app(app)
 
     try:
         click = _require_click()
@@ -556,10 +760,11 @@ def run_app(app: App, argv: list[str] | None = None, *, reraise_unexpected: bool
             invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
-                if display_command:
-                    result = app.click_command.main(args=args, prog_name=display_command, standalone_mode=False)
-                else:
-                    result = app.click_command.main(args=args, standalone_mode=False)
+                result = app.click_command.main(
+                    args=args,
+                    prog_name=display_command or app.name,
+                    standalone_mode=False,
+                )
             finally:
                 _reset_context_var(_INVOCATION_ARGV, invocation_token)
         except click.Abort as exc:
@@ -666,7 +871,26 @@ def delegated_display_command(default: str | None = None) -> str | None:
 
 
 def command(*args: Any, **kwargs: Any):
-    return App().command(*args, **kwargs)
+    explicit_name = _explicit_command_name(args, kwargs)
+
+    def decorator(func: Callable[..., Any]):
+        with _COMMAND_APP_LOCK:
+            if getattr(func, _COMMAND_APP_ATTRIBUTE, None) is not None:
+                raise RuntimeError(
+                    f"Function '{func.__name__}' is already registered with "
+                    "@base_cli.command()."
+                )
+            owner = App(name=explicit_name or _inferred_command_name(func))
+            registered = owner.command(*args, **kwargs)(func)
+            try:
+                setattr(func, _COMMAND_APP_ATTRIBUTE, owner)
+            except (AttributeError, TypeError) as exc:
+                raise TypeError(
+                    "@base_cli.command() requires a function that can retain its owning App."
+                ) from exc
+            return registered
+
+    return decorator
 
 
 def option(*param_decls: str, sensitive: bool = False, dry_run: bool = False, **attrs: Any):

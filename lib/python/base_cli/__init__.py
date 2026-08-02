@@ -31,7 +31,15 @@ def _resolve_version() -> str:
 __version__ = _resolve_version()
 
 from . import command_filters, command_protocol, history, testing
-from .app import App, argument, command, delegated_display_command, option, run_app
+from .app import (
+    App,
+    argument,
+    command,
+    delegated_display_command,
+    get_command_app,
+    option,
+    run_app,
+)
 from .command_filters import CommandFilterNormalizer, command_matches, normalize_command_filter, normalize_command_filters
 from .command_protocol import (
     BOOLEAN,
@@ -86,6 +94,7 @@ __all__ = [
     "command",
     "configure_logger",
     "delegated_display_command",
+    "get_command_app",
     "get_current_context",
     "log_critical",
     "log_debug",
