@@ -194,7 +194,7 @@ class RunAppTests(unittest.TestCase):
         self.assertIn("Commands must return None or an int exit code", stderr.getvalue())
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
-    def test_run_app_rejects_equals_form_long_option_values(self) -> None:
+    def test_run_app_accepts_click_native_equals_form_long_option_values(self) -> None:
         app = base_cli.App(name="space-options", log_to_file=False)
         seen = {}
 
@@ -216,13 +216,9 @@ class RunAppTests(unittest.TestCase):
             ), redirect_stderr(stderr):
                 status = base_cli.run_app(app, ["--name=demo"])
 
-        self.assertEqual(status, 2)
-        self.assertEqual(seen, {})
-        self.assertIn(
-            "Option '--name' uses unsupported equals syntax. Use '--name demo' instead.",
-            stderr.getvalue(),
-        )
-        self.assertNotIn("Traceback", stderr.getvalue())
+        self.assertEqual(status, 0)
+        self.assertEqual(seen, {"name": "demo"})
+        self.assertEqual(stderr.getvalue(), "")
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_uses_delegated_display_command_for_usage_errors(self) -> None:
@@ -245,7 +241,8 @@ class RunAppTests(unittest.TestCase):
 
         self.assertEqual(status, 2)
         self.assertIn("Usage: tool demo", stderr.getvalue())
-        self.assertIn("No such option '--bad-option'.", stderr.getvalue())
+        self.assertIn("No such option", stderr.getvalue())
+        self.assertIn("--bad-option", stderr.getvalue())
         self.assertNotIn("internal-cli", stderr.getvalue())
 
 

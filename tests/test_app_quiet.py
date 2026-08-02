@@ -68,7 +68,7 @@ class AppQuietTests(unittest.TestCase):
             result = invoke(app, ["--debug", "--quiet"], home=home)
 
         self.assertEqual(result.exit_code, 2, result.output)
-        self.assertIn("--debug and --quiet cannot be used together", result.output)
+        self.assertIn("--debug and --quiet cannot be used together", result.stderr)
 
     def test_quiet_before_subcommand_uses_warning_user_stream(self) -> None:
         app = base_cli.App(name="quiet-subcommand", log_to_file=False)

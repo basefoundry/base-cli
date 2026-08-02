@@ -9,8 +9,10 @@ import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 from unittest import mock
+
 import base_cli
 from base_cli.testing import invoke
 
@@ -60,6 +62,31 @@ class InvokeTests(unittest.TestCase):
 
         self.assertNotEqual(return_annotation, inspect.Signature.empty)
         self.assertIn("Result", str(return_annotation))
+
+    def test_invoke_exposes_keyword_only_unexpected_exception_debugging(self) -> None:
+        parameter = inspect.signature(invoke).parameters["reraise_unexpected"]
+
+        self.assertIs(parameter.kind, inspect.Parameter.KEYWORD_ONLY)
+        self.assertIs(parameter.default, False)
+
+    def test_invoke_reraise_preserves_click_special_exception_identity(self) -> None:
+        import click
+
+        original = click.exceptions.Exit(9)
+        profile = replace(
+            base_cli.CliProfile.generic(),
+            display_command=lambda: (_ for _ in ()).throw(original),
+        )
+        app = base_cli.App(name="testing-reraise-click-exit", profile=profile)
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        result = invoke(app, [], reraise_unexpected=True)
+
+        self.assertEqual(result.exit_code, 1)
+        self.assertIs(result.exception, original)
 
     def test_invoke_writes_manifest_fixture_into_cwd(self) -> None:
         app = manifest_app(name="testing-manifest", log_to_file=False)

@@ -574,7 +574,6 @@ def run_app(app: App, argv: list[str] | None = None, *, reraise_unexpected: bool
     state_token = _INVOCATION_STATE.set(state)
     try:
         try:
-            _reject_equals_option_values(click, args)
             display_command = app.profile.display_command()
             invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
@@ -766,21 +765,6 @@ def _merge_standard_options(group_standard: dict[str, Any], command_standard: di
 def _validate_standard_options(click: Any, standard: dict[str, Any]) -> None:
     if standard.get("debug") and standard.get("quiet"):
         raise click.UsageError("--debug and --quiet cannot be used together.")
-
-
-def _reject_equals_option_values(click: Any, argv: list[str]) -> None:
-    for token in argv:
-        if token == "--":
-            return
-        if token.startswith("--") and "=" in token and len(token) > 2:
-            option_name, value = token.split("=", 1)
-            if value:
-                raise click.UsageError(
-                    f"Option '{option_name}' uses unsupported equals syntax. Use '{option_name} {value}' instead."
-                )
-            raise click.UsageError(
-                f"Option '{option_name}' uses unsupported equals syntax. Pass its value as the next argument."
-            )
 
 
 def _group_standard_options(click: Any) -> dict[str, Any]:
