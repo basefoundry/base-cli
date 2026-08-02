@@ -42,7 +42,7 @@ class AppRuntimeErrorTests(unittest.TestCase):
                 invoke(app, [])
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
-    def test_run_app_reports_unwritable_cache_root_without_traceback(self) -> None:
+    def test_run_app_reports_unusable_cache_root_without_traceback(self) -> None:
         app = generic_app(name="cache-failure", version="0.1.0")
 
         @app.command()
@@ -55,18 +55,17 @@ class AppRuntimeErrorTests(unittest.TestCase):
             home = root / "home"
             cache_root = root / "cache-root"
             home.mkdir()
-            cache_root.mkdir()
-            cache_root.chmod(0o500)
+            # A regular file is unusable as a cache root on every platform and
+            # also behaves consistently when the test suite runs as root in a
+            # Linux distribution container (where mode bits are bypassed).
+            cache_root.write_text("not a directory", encoding="utf-8")
             stderr = io.StringIO()
-            try:
-                with mock.patch.dict(os.environ, {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(cache_root)}):
-                    with redirect_stderr(stderr):
-                        try:
-                            exit_code = base_cli.run_app(app, [])
-                        except PermissionError as exc:
-                            self.fail(f"run_app should handle context creation permission errors: {exc}")
-            finally:
-                cache_root.chmod(0o700)
+            with mock.patch.dict(os.environ, {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(cache_root)}):
+                with redirect_stderr(stderr):
+                    try:
+                        exit_code = base_cli.run_app(app, [])
+                    except PermissionError as exc:
+                        self.fail(f"run_app should handle context creation permission errors: {exc}")
 
         error = stderr.getvalue()
         self.assertEqual(exit_code, 1)
