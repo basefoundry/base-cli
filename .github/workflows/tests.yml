@@ -13,7 +13,14 @@ concurrency:
 
 jobs:
   validate:
-    runs-on: macos-latest
+    name: Validate (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,3 +34,43 @@ jobs:
         run: python -m pip install ".[dev]"
       - name: Run Python tests
         run: python -m pytest
+
+  linux-distributions:
+    name: Validate (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Debian 12
+            image: debian:12-slim
+            family: debian
+          - name: Fedora latest
+            image: fedora:latest
+            family: fedora
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Run distribution validation in Docker
+        env:
+          DISTRO_IMAGE: ${{ matrix.image }}
+          DISTRO_FAMILY: ${{ matrix.family }}
+        run: |
+          docker run --rm \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace \
+            --env DISTRO_FAMILY \
+            "$DISTRO_IMAGE" \
+            sh -lc '
+              set -eu
+              if [ "$DISTRO_FAMILY" = debian ]; then
+                apt-get update
+                DEBIAN_FRONTEND=noninteractive apt-get install -y bash python3 python3-pip python3-venv
+              else
+                dnf install -y python3 python3-pip
+              fi
+              ./tests/validate.sh
+              python3 -m venv /tmp/base-cli-venv
+              /tmp/base-cli-venv/bin/python -m pip install ".[dev]"
+              /tmp/base-cli-venv/bin/python -m pytest
+              /tmp/base-cli-venv/bin/python -c "import base_cli; print(base_cli.__version__)"
+            '
