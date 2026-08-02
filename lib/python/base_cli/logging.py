@@ -171,8 +171,13 @@ def _active_application_home() -> Path | None:
     return context.application_home
 
 
-def log_invocation(logger: logging.Logger, argv: list[str], sensitive_options: set[str]) -> None:
-    logger.debug("argv=%s", redact_argv(argv, sensitive_options))
+def log_invocation(
+    logger: logging.Logger,
+    argv: list[str],
+    sensitive_options: set[str] | None,
+) -> None:
+    safe_argv = list(argv) if sensitive_options is None else redact_argv(argv, sensitive_options)
+    logger.debug("argv=%s", safe_argv)
     logger.debug("platform=%s %s", platform.system(), platform.machine())
     logger.debug("python=%s", sys.version.replace("\n", " "))
 

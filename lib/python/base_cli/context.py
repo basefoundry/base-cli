@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import contextvars
 import logging
-import shutil
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+
+from ._cleanup import remove_owned_temp_directory
 
 
 _current_context: contextvars.ContextVar[Context | None] = contextvars.ContextVar(
@@ -50,6 +52,9 @@ class Context:
     owner_root: Path | None = None
     run_root: Path | None = None
     _run_metadata_path: Path | None = field(default=None, init=False, repr=False, compare=False)
+    _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
+    _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)
+    _owned_temp_descriptor: int | None = field(default=None, init=False, repr=False, compare=False)
 
     def on_cleanup(self, hook: Callable[[], None]) -> None:
         self.cleanup_hooks.append(hook)
@@ -66,22 +71,61 @@ class Context:
         except BaseException:  # pylint: disable=broad-exception-caught
             pass
 
+    def _cleanup_owned_temp_dir(self) -> None:
+        if not self._owns_temp_dir:
+            self._close_owned_temp_descriptor()
+            return
+        expected_identity = self._owned_temp_identity
+        owned_descriptor = self._owned_temp_descriptor
+        self._owns_temp_dir = False
+        self._owned_temp_identity = None
+        self._owned_temp_descriptor = None
+        try:
+            if expected_identity is None:
+                raise RuntimeError("temp directory ownership identity is unavailable")
+            remove_owned_temp_directory(
+                self.temp_dir,
+                self.run_root,
+                self.run_id,
+                expected_identity=expected_identity,
+                owned_descriptor=owned_descriptor,
+            )
+        except BaseException as exc:  # pylint: disable=broad-exception-caught
+            self._warn_cleanup_failure("Temp directory cleanup failed for '%s': %s", self.temp_dir, exc)
+        finally:
+            if owned_descriptor is not None:
+                try:
+                    os.close(owned_descriptor)
+                except OSError as exc:
+                    self._warn_cleanup_failure("Temp directory handle close failed: %s", exc)
+
+    def _close_owned_temp_descriptor(self) -> None:
+        owned_descriptor = self._owned_temp_descriptor
+        self._owned_temp_descriptor = None
+        self._owned_temp_identity = None
+        self._owns_temp_dir = False
+        if owned_descriptor is not None:
+            try:
+                os.close(owned_descriptor)
+            except OSError as exc:
+                self._warn_cleanup_failure("Temp directory handle close failed: %s", exc)
+
     def cleanup(self) -> None:
+        self._cleanup_resources(preserve_temp_ownership=False)
+
+    def _cleanup_preserving_temp_ownership(self) -> None:
+        self._cleanup_resources(preserve_temp_ownership=True)
+
+    def _cleanup_resources(self, *, preserve_temp_ownership: bool) -> None:
         for hook in self.cleanup_hooks:
             try:
                 hook()
             except BaseException as exc:  # pylint: disable=broad-exception-caught
                 self._warn_cleanup_failure("Cleanup hook failed: %s", exc)
-        if not self.keep_temp and self.temp_dir.exists():
-            try:
-                shutil.rmtree(self.temp_dir)
-                for parent in (self.temp_dir.parent, self.temp_dir.parent.parent):
-                    try:
-                        parent.rmdir()
-                    except OSError:
-                        break
-            except BaseException as exc:  # pylint: disable=broad-exception-caught
-                self._warn_cleanup_failure("Temp directory cleanup failed for '%s': %s", self.temp_dir, exc)
+        if not self.keep_temp:
+            self._cleanup_owned_temp_dir()
+        elif not preserve_temp_ownership:
+            self._close_owned_temp_descriptor()
         for handler in list(self.log.handlers):
             try:
                 handler.flush()

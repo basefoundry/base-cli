@@ -220,8 +220,8 @@ def main(ctx: base_cli.Context, project: str, workspace: str | None) -> None:
     ...
 ```
 
-Use `sensitive=True` for options whose values should not appear in invocation
-logs:
+Use `sensitive=True` for options or arguments whose values must not reach
+invocation logs or history writers:
 
 ```python
 @base_cli.option("--token", sensitive=True, required=True)
@@ -229,8 +229,23 @@ def main(ctx: base_cli.Context, token: str) -> None:
     ...
 ```
 
-Both `--token secret` and `--token=secret` are accepted and redacted in debug
-logs.
+All aliases declared for a sensitive option are protected, including short and
+alternate long forms. Spaced values, equals forms, and attached short-option
+values are redacted. Sensitive positional arguments are redacted according to
+the Click command schema:
+
+```python
+@app.command()
+@base_cli.argument("credential", sensitive=True)
+def login(ctx: base_cli.Context, credential: str) -> None:
+    ...
+```
+
+Parameters whose names contain `token`, `password`, `secret`, `api-key`
+(`api_key`), or `authorization` are protected automatically. Use
+`sensitive=True` for domain-specific secret names. Custom history writers
+receive already-redacted argv, so raw secret-bearing argv never crosses the
+framework's persistence boundary.
 
 Use `dry_run=True` when a nonstandard option should drive `ctx.dry_run` and
 the lifecycle's default durable-write suppression:
@@ -501,9 +516,31 @@ owns a bundle and therefore do not create one. Neither do inherited runtimes,
 `log_to_file=False`, or dry-run invocations; an explicit log path can still
 receive diagnostics in the latter two modes. Context startup is transactional:
 if directory creation, logger setup, or retention fails, base-cli closes
-partially installed handlers and removes new bundle-local temp/log artifacts
-and empty directories. Pre-existing content, persistent component caches, and
-parent-runtime data are preserved.
+partially installed handlers and erases new bundle-local temp files through the
+same retained handle used by normal teardown. It retains log files and empty
+directory boundaries rather than attempting race-prone pathname removal.
+Pre-existing content, persistent component caches, and parent-runtime data are
+preserved.
+
+Recursive temp cleanup is fail-closed. Base-cli erases contents only when
+its leaf was claimed exclusively for the invocation, its retained directory
+handle and creation-time filesystem identity still match, and the path remains
+a strict, run-ID-marked descendant of the selected run root with no symlinked
+component. Filesystem roots, the run root itself, replaced directories,
+traversal paths, mounted targets, external paths, and paths whose ownership or
+mount identity cannot be proven are kept and reported as cleanup warnings.
+Content erasure is descriptor-relative. Empty directory nodes—including the
+leaf and its ancestors—are intentionally retained because portable POSIX APIs
+cannot atomically remove an already-verified open directory; avoiding pathname
+`rmdir` closes the final replacement race. Platforms without the required
+handle operations retain files too and warn. `--keep-temp` preserves both the
+directory tree and files.
+
+This boundary assumes the per-user runtime tree is not maliciously mutated by
+another process running with the same account while ownership is acquired or
+cleanup runs. Processes with the same filesystem authority can otherwise
+rename or replace any user-owned runtime path; base-cli still verifies the
+retained handle against the published path before erasing contents.
 
 On POSIX, base-cli enforces owner-only `0600`/`0700` modes. On Windows, the
 default user-local cache root relies on inherited user-profile ACLs; consumers
@@ -525,7 +562,7 @@ def close_connection() -> None:
 ctx.on_cleanup(close_connection)
 ```
 
-Cleanup hooks run before temp directory removal. Hook failures are logged as
+Cleanup hooks run before temp-content erasure. Hook failures are logged as
 warnings and do not prevent later hooks from running.
 
 ## Testing

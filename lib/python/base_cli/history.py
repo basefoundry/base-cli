@@ -62,13 +62,14 @@ def build_finished_record(
     exit_code: int,
 ) -> dict[str, Any]:
     ended_at = utc_now()
+    safe_argv = redact_history_argv(argv, sensitive_options)
     record: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "run_id": context.run_id,
         "event": "finished",
-        "command": context.history_display_command(context.cli_name, argv),
+        "command": redact_history_text(context.history_display_command(context.cli_name, safe_argv)),
         "raw_command": context.cli_name,
-        "argv": redact_history_argv(argv, sensitive_options),
+        "argv": safe_argv,
         "started_at": format_timestamp(started_at),
         "ended_at": format_timestamp(ended_at),
         "duration_ms": duration_ms(started_at, ended_at),
@@ -116,7 +117,7 @@ def write_primary_record(
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id,
         "event": "finished",
-        "command": command,
+        "command": redact_history_text(command),
         "raw_command": raw_command,
         "argv": redact_history_argv(argv, sensitive_options=set()),
         "started_at": format_timestamp(started_at),
@@ -293,31 +294,12 @@ def current_shell() -> str | None:
 
 
 def redact_history_argv(argv: list[str], sensitive_options: set[str]) -> list[str]:
-    redacted = redact_argv(argv, sensitive_options)
-    result: list[str] = []
-    redact_next = False
-    for arg in redacted:
-        if redact_next:
-            result.append(REDACTED)
-            redact_next = False
-            continue
-
-        option, separator, _value = arg.partition("=")
-        normalized = option_name_to_parameter(option) if option.startswith("--") else option
-        if option.startswith("--") and is_secret_key(normalized):
-            if separator:
-                result.append(f"{option}={REDACTED}")
-            else:
-                result.append(option)
-                redact_next = True
-            continue
-        result.append(redact_history_text(arg))
-    return result
+    return [redact_history_text(arg) for arg in redact_argv(argv, sensitive_options)]
 
 
 def redact_history_text(value: str) -> str:
     key, separator, _value = value.partition("=")
-    if separator and is_secret_key(key):
+    if separator and is_secret_key(option_name_to_parameter(key)):
         return f"{key}={REDACTED}"
     return compact_home_text(redact_text_value(value))
 
