@@ -69,12 +69,12 @@ def _handler_formatter(formatter: logging.Formatter | None, *, use_color: bool) 
 
 
 def _use_color(stream: TextIO) -> bool:
-    return (
-        os.environ.get("BASE_CLI_COLOR") != "0"
-        and "NO_COLOR" not in os.environ
-        and hasattr(stream, "isatty")
-        and stream.isatty()
-    )
+    if os.environ.get("BASE_CLI_COLOR") == "0" or "NO_COLOR" in os.environ:
+        return False
+    try:
+        return bool(stream.isatty())
+    except (AttributeError, OSError, ValueError):
+        return False
 
 
 def secure_log_file_permissions(log_file: Path) -> None:

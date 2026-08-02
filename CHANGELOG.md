@@ -10,6 +10,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Keep private runtime files and directories owner-only on POSIX, use inherited
   user-profile ACLs on Windows, and make history appends binary-safe across
   locking backends.
+- Make terminal detection tolerate closed streams and record `COMSPEC` when
+  Windows has no `SHELL` environment variable.
 
 ## [0.2.0] - 2026-08-01
 

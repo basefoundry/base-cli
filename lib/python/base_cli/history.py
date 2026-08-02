@@ -84,7 +84,7 @@ def build_finished_record(
         "project_root": compact_optional_path(context.project_root),
         "manifest": compact_optional_path(context.manifest_path),
         "workspace_root": compact_optional_path(context.workspace_root),
-        "shell": os.environ.get("SHELL"),
+        "shell": current_shell(),
         "scope": context.history_scope,
         "parent_run_id": context.history_parent_run_id,
     }
@@ -284,6 +284,12 @@ def normalized_os() -> str:
     if system == "darwin":
         return "macos"
     return system or platform.platform()
+
+
+def current_shell() -> str | None:
+    """Return the active shell identifier across POSIX and Windows."""
+
+    return os.environ.get("SHELL") or os.environ.get("COMSPEC")
 
 
 def redact_history_argv(argv: list[str], sensitive_options: set[str]) -> list[str]:
