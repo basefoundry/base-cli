@@ -5,6 +5,26 @@ and is validated on Ubuntu, Debian, and Fedora-family environments. The
 package does not install or manage operating-system packages; consumers remain
 responsible for Python and any external tools their commands need.
 
+## Support matrix
+
+| Environment | Support level | Boundary |
+| --- | --- | --- |
+| macOS | Supported | Generic Python CLI framework and runtime helpers |
+| Ubuntu/Debian | Supported | Representative Linux distributions in CI |
+| Fedora/RHEL family | Supported | Representative Fedora-family validation in CI |
+| WSL2 | Supported | Python runs inside the Linux distribution |
+| Native Windows 10/11 | Supported for `base-cli` core | Click apps, runtime state, logging, history, and test helpers |
+
+Native Windows support applies to the generic Python package. It does not make
+Base or `basectl` natively Windows-compatible; those consumers have their own
+Unix-tooling and shell boundaries. The package does not provide package-manager
+integration, shell startup management, or WSL/Windows path translation.
+
+The supported Python range is Python 3.10 through 3.14. Bug reports should
+include the operating system, distribution or WSL version when relevant,
+Python version, and whether paths live on the native filesystem or a mounted
+filesystem.
+
 ## WSL2
 
 WSL2 is supported when Python runs inside the Linux distribution. Validate a
