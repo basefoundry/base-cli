@@ -9,6 +9,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Add `App.attach()` and `base_cli.attach()` for applying one lifecycle to
+  existing nested, aliased, chained, and lazy Click command trees while
+  preserving their native callbacks, contexts, and result values.
+- Add public `sensitive_parameters` attachment policy for existing and lazy
+  Click parameters with domain-specific secret names.
 - Add `ConfigurationError` so consumer profiles can explicitly mark
   user-correctable configuration messages as safe usage errors.
 

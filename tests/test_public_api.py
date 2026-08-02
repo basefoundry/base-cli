@@ -33,6 +33,7 @@ class PublicApiTests(unittest.TestCase):
         expected = {
             "CommandProtocolError",
             "ConfigurationError",
+            "attach",
             "command_filters",
             "command_matches",
             "command_protocol",
@@ -77,6 +78,7 @@ class PublicApiTests(unittest.TestCase):
     def test_entry_points_have_docstrings(self) -> None:
         self.assertTrue(base_cli.App.__doc__)
         self.assertTrue(base_cli.Context.__doc__)
+        self.assertTrue(base_cli.attach.__doc__)
         self.assertTrue(base_cli.get_command_app.__doc__)
         self.assertTrue(base_cli.run_app.__doc__)
 

@@ -35,6 +35,7 @@ class _CommandSpec:
     allow_interspersed_args: bool
     ignore_unknown_options: bool
     token_normalize_func: Callable[[str], str] | None
+    chain: bool
 
 
 @dataclass(frozen=True)
@@ -97,7 +98,13 @@ def parameter_name_from_decls(param_decls: tuple[str, ...]) -> str:
     return possible_names[0][1].replace("-", "_").lower()
 
 
-def compile_redaction_plan(command: Any, sensitive_names: Iterable[str] = ()) -> RedactionPlan:
+def compile_redaction_plan(
+    command: Any,
+    sensitive_names: Iterable[str] = (),
+    *,
+    selected_path: Sequence[tuple[str, Any]] | None = None,
+    selected_paths: Sequence[Sequence[tuple[str, Any]]] | None = None,
+) -> RedactionPlan:
     """Compile a recursively Click-aware redaction plan for ``command``.
 
     Parameters may be marked with the private ``_base_cli_sensitive`` flag.
@@ -106,6 +113,15 @@ def compile_redaction_plan(command: Any, sensitive_names: Iterable[str] = ()) ->
     protected automatically as defense in depth.
     """
 
+    if selected_path is not None and selected_paths is not None:
+        raise TypeError("selected_path and selected_paths are mutually exclusive.")
+    effective_paths = (
+        (tuple(selected_path),)
+        if selected_path is not None
+        else tuple(tuple(path) for path in selected_paths)
+        if selected_paths is not None
+        else None
+    )
     explicit = _sensitive_forms(sensitive_names)
     compatible_names: set[str] = set(sensitive_names)
     root = _compile_command(
@@ -114,6 +130,8 @@ def compile_redaction_plan(command: Any, sensitive_names: Iterable[str] = ()) ->
         compatible_names,
         active=set(),
         inherited_token_normalize_func=None,
+        selected_paths=effective_paths,
+        force_no_interspersed=False,
     )
     return RedactionPlan(compatible_names, root=root)
 
@@ -141,6 +159,8 @@ def _compile_command(
     *,
     active: set[int],
     inherited_token_normalize_func: Callable[[str], str] | None,
+    selected_paths: tuple[tuple[tuple[str, Any], ...], ...] | None,
+    force_no_interspersed: bool,
 ) -> _CommandSpec:
     identity = id(command)
     if identity in active:
@@ -152,6 +172,7 @@ def _compile_command(
             allow_interspersed_args=True,
             ignore_unknown_options=False,
             token_normalize_func=inherited_token_normalize_func,
+            chain=False,
         )
     active.add(identity)
     try:
@@ -176,10 +197,14 @@ def _compile_command(
                 if is_option
                 else ()
             )
-            sensitive = bool(getattr(parameter, "_base_cli_sensitive", False)) or _parameter_is_sensitive(
-                name,
-                raw_aliases,
-                explicit,
+            sensitive = (
+                bool(getattr(parameter, "_base_cli_sensitive", False))
+                or bool(getattr(parameter, "hide_input", False))
+                or _parameter_is_sensitive(
+                    name,
+                    raw_aliases,
+                    explicit,
+                )
             )
             nargs = _parameter_nargs(parameter)
             if raw_aliases:
@@ -201,21 +226,51 @@ def _compile_command(
                     compatible_names.add(name)
 
         subcommands: dict[str, _CommandSpec] = {}
-        raw_subcommands = getattr(command, "commands", None)
-        if isinstance(raw_subcommands, Mapping):
-            for command_name, child in raw_subcommands.items():
-                if child is not None:
-                    subcommands[str(command_name)] = _compile_command(
-                        child,
-                        explicit,
-                        compatible_names,
-                        active=active,
-                        inherited_token_normalize_func=token_normalize_func,
+        chain = bool(getattr(command, "chain", False))
+        if selected_paths is not None:
+            selected_children: dict[str, tuple[Any, list[tuple[tuple[str, Any], ...]]]] = {}
+            for path in selected_paths:
+                if not path:
+                    continue
+                command_name, child = path[0]
+                key = str(command_name)
+                if key not in selected_children:
+                    selected_children[key] = (child, [])
+                elif selected_children[key][0] is not child:
+                    raise RuntimeError(
+                        f"Selected command name '{key}' resolved to multiple Click commands."
                     )
+                selected_children[key][1].append(path[1:])
+            for command_name, (child, child_paths) in selected_children.items():
+                subcommands[command_name] = _compile_command(
+                    child,
+                    explicit,
+                    compatible_names,
+                    active=active,
+                    inherited_token_normalize_func=token_normalize_func,
+                    selected_paths=tuple(child_paths),
+                    force_no_interspersed=chain,
+                )
+        else:
+            raw_subcommands = getattr(command, "commands", None)
+            if isinstance(raw_subcommands, Mapping):
+                for command_name, child in raw_subcommands.items():
+                    if child is not None:
+                        subcommands[str(command_name)] = _compile_command(
+                            child,
+                            explicit,
+                            compatible_names,
+                            active=active,
+                            inherited_token_normalize_func=token_normalize_func,
+                            selected_paths=None,
+                            force_no_interspersed=chain,
+                        )
 
         allow_interspersed_args = context_settings.get("allow_interspersed_args")
         if allow_interspersed_args is None:
             allow_interspersed_args = getattr(command, "allow_interspersed_args", True)
+        if force_no_interspersed:
+            allow_interspersed_args = False
         ignore_unknown_options = context_settings.get("ignore_unknown_options")
         if ignore_unknown_options is None:
             ignore_unknown_options = getattr(command, "ignore_unknown_options", False)
@@ -227,6 +282,7 @@ def _compile_command(
             allow_interspersed_args=bool(allow_interspersed_args),
             ignore_unknown_options=bool(ignore_unknown_options),
             token_normalize_func=token_normalize_func,
+            chain=chain,
         )
     finally:
         active.remove(identity)
@@ -315,7 +371,7 @@ def _redact_command(
     token_indices: list[int],
     command: _CommandSpec,
     result: list[str],
-) -> None:
+) -> list[int]:
     positional_indices = _scan_options(argv, token_indices, command, result)
     argument_spans, extra_indices = _allocate_argument_spans(positional_indices, command.arguments)
     for argument, span in zip(command.arguments, argument_spans):
@@ -324,14 +380,21 @@ def _redact_command(
                 result[index] = REDACTED
 
     if not command.subcommands or not extra_indices:
-        return
-    command_index = extra_indices[0]
-    command_name = argv[command_index]
-    child = command.subcommands.get(command_name)
-    if child is None and command.token_normalize_func is not None:
-        child = command.subcommands.get(command.token_normalize_func(command_name))
-    if child is not None:
-        _redact_command(argv, extra_indices[1:], child, result)
+        return extra_indices
+
+    remaining = extra_indices
+    while remaining:
+        command_index = remaining[0]
+        command_name = argv[command_index]
+        child = command.subcommands.get(command_name)
+        if child is None and command.token_normalize_func is not None:
+            child = command.subcommands.get(command.token_normalize_func(command_name))
+        if child is None:
+            return remaining
+        remaining = _redact_command(argv, remaining[1:], child, result)
+        if not command.chain:
+            return remaining
+    return remaining
 
 
 def _scan_options(

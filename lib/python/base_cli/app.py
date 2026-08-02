@@ -7,6 +7,7 @@ import stat
 import sys
 import time
 import traceback
+from collections.abc import Iterable
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import datetime
@@ -38,14 +39,27 @@ from .paths import (
     normalize_cli_name,
 )
 from .profile import CliProfile
-from .redaction import RedactionPlan, compile_redaction_plan, parameter_name_from_decls, redact_argv
+from .redaction import REDACTED, RedactionPlan, compile_redaction_plan, parameter_name_from_decls, redact_argv
 
 _STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp", "log_file")
 _GROUP_STANDARD_OPTIONS_KEY = "base_cli_standard_options"
+_ATTACHED_STANDARD_OPTIONS_KEY = object()
 DISPLAY_COMMAND_ENV = "BASE_CLI_DISPLAY_COMMAND"
 _INVOCATION_ARGV: ContextVar[list[str] | None] = ContextVar("base_cli_invocation_argv", default=None)
+_INVOCATION_MAIN_BYPASS: ContextVar[Any | None] = ContextVar(
+    "base_cli_invocation_main_bypass",
+    default=None,
+)
 _COMMAND_APP_ATTRIBUTE = "__base_cli_command_app__"
 _COMMAND_APP_LOCK = RLock()
+_CLICK_ATTACHMENT_ATTRIBUTE = "__base_cli_attachment__"
+_CLICK_INSTRUMENTED_ATTRIBUTE = "__base_cli_lifecycle_instrumented__"
+_CLICK_MAIN_INSTRUMENTED_ATTRIBUTE = "__base_cli_main_instrumented__"
+_CLICK_ORIGINAL_INVOKE_ATTRIBUTE = "__base_cli_original_invoke__"
+_CLICK_ORIGINAL_RESOLVE_ATTRIBUTE = "__base_cli_original_resolve__"
+_CLICK_ORIGINAL_MAIN_ATTRIBUTE = "__base_cli_original_main__"
+_CLICK_APP_OWNER_ATTRIBUTE = "__base_cli_app_owner__"
+_CLICK_ATTACHMENT_LOCK = RLock()
 _REGISTRATION_OPEN = "open"
 _REGISTRATION_MATERIALIZING = "materializing"
 _REGISTRATION_FROZEN = "frozen"
@@ -54,11 +68,13 @@ _COMMAND_NAME_SUFFIXES = frozenset({"command", "cmd", "group", "grp"})
 
 @dataclass
 class _InvocationState:
+    owner_app: Any = None
     run_id: str | None = None
     log_file: Path | None = None
     debug: bool = False
     quiet: bool = False
     options_parsed: bool = False
+    attached_completion: bool = False
 
 
 @dataclass(frozen=True)
@@ -69,7 +85,118 @@ class _SubcommandRegistration:
     name: str
 
 
+@dataclass(frozen=True)
+class _ClickAttachment:
+    app: Any
+    command: Any
+    context_factory: Callable[[Context], Any] | None
+    service_factory: Callable[[Context], Any] | None
+    sensitive_parameters: frozenset[str]
+    standard_bindings: dict[str, str]
+
+
+class _AttachedInvocation:
+    """One attachment invocation whose schema is completed lazily."""
+
+    def __init__(
+        self,
+        attachment: _ClickAttachment,
+        root_click_context: Any,
+        context: Context,
+        recorder: RunRecorder,
+    ) -> None:
+        self.attachment = attachment
+        self.root_click_context = root_click_context
+        self.context = context
+        self.recorder = recorder
+        self.redaction_plan = RedactionPlan()
+        self.invocation_argv: list[str] = []
+        self.started = False
+        self._resolved_children: dict[int, list[tuple[str, Any, Any]]] = {}
+        self._resolution_parents: dict[int, Any] = {}
+        self._has_chain = bool(getattr(attachment.command, "chain", False))
+        self._selected_boundary_seen = False
+
+    def note_resolution(
+        self,
+        parent_context: Any,
+        command_name: str,
+        child_command: Any,
+    ) -> None:
+        if getattr(getattr(parent_context, "command", None), "chain", False):
+            self._has_chain = True
+        self._resolution_parents[id(parent_context)] = parent_context
+        self._resolved_children.setdefault(id(parent_context), []).append(
+            (command_name, child_command, None)
+        )
+
+    def note_child_context(self, child_context: Any) -> None:
+        parent = getattr(child_context, "parent", None)
+        if parent is None:
+            return
+        resolutions = self._resolved_children.get(id(parent), [])
+        for index in range(len(resolutions) - 1, -1, -1):
+            name, command, recorded_context = resolutions[index]
+            if recorded_context is None and command is getattr(child_context, "command", None):
+                resolutions[index] = (name, command, child_context)
+                break
+
+    def start(
+        self,
+        selected_context: Any | None = None,
+        *,
+        force: bool = False,
+    ) -> None:
+        if self.started:
+            return
+        if selected_context is not None:
+            self._selected_boundary_seen = True
+        if self._has_chain and not force:
+            # Click resolves all chain members before invoking the first one.
+            # Wait until root teardown so every selected command can contribute
+            # its sensitive option names to the conservative chain scan.
+            return
+        # Mark first so a schema failure cannot trigger a second logging
+        # attempt during teardown and mask the original exception.
+        self.started = True
+        opaque_teardown = force and not self._selected_boundary_seen
+        if opaque_teardown:
+            self.redaction_plan = RedactionPlan()
+        elif self._has_chain:
+            self.redaction_plan = compile_redaction_plan(
+                self.attachment.command,
+                self.attachment.sensitive_parameters,
+                selected_paths=_selected_click_paths(
+                    self.root_click_context,
+                    self._resolved_children,
+                    self._resolution_parents,
+                ),
+            )
+        else:
+            selected_path = _selected_click_path(
+                self.root_click_context,
+                selected_context,
+                self._resolved_children,
+            )
+            self.redaction_plan = compile_redaction_plan(
+                self.attachment.command,
+                self.attachment.sensitive_parameters,
+                selected_path=selected_path,
+            )
+        raw_argv = _current_invocation_argv()
+        self.invocation_argv = (
+            [raw_argv[0], *([REDACTED] * (len(raw_argv) - 1))]
+            if opaque_teardown and raw_argv
+            else redact_argv(raw_argv, self.redaction_plan)
+        )
+        log_invocation(self.context.log, self.invocation_argv, None)
+
+
 _INVOCATION_STATE: ContextVar[_InvocationState | None] = ContextVar("base_cli_invocation_state", default=None)
+_ATTACHED_INVOCATION: ContextVar[_AttachedInvocation | None] = ContextVar(
+    "base_cli_attached_invocation",
+    default=None,
+)
 
 
 def _reset_context_var(variable: ContextVar[Any], token: Any) -> None:
@@ -96,9 +223,9 @@ def _warn_lifecycle_failure(context: Context, message: str, exc: BaseException) 
         pass
 
 
-def _capture_invocation_context(context: Context) -> None:
+def _capture_invocation_context(context: Context, owner_app: App) -> None:
     state = _INVOCATION_STATE.get()
-    if state is None:
+    if state is None or state.owner_app is not owner_app:
         return
     state.run_id = context.run_id
     state.log_file = context.log_file
@@ -106,18 +233,23 @@ def _capture_invocation_context(context: Context) -> None:
     state.quiet = context.quiet
 
 
-def _capture_standard_options(standard: dict[str, Any]) -> None:
+def _capture_standard_options(standard: dict[str, Any], owner_app: App) -> None:
     state = _INVOCATION_STATE.get()
-    if state is None:
+    if state is None or state.owner_app is not owner_app:
         return
     state.debug = bool(standard.get("debug"))
     state.quiet = bool(standard.get("quiet"))
     state.options_parsed = True
 
 
-def _capture_effective_output_options(*, debug: bool, quiet: bool) -> None:
+def _capture_effective_output_options(
+    *,
+    owner_app: App,
+    debug: bool,
+    quiet: bool,
+) -> None:
     state = _INVOCATION_STATE.get()
-    if state is None:
+    if state is None or state.owner_app is not owner_app:
         return
     state.debug = debug
     state.quiet = quiet
@@ -284,6 +416,7 @@ class App:
         self._command_kwargs: dict[str, Any] = {}
         self._subcommands: list[_SubcommandRegistration] = []
         self._subcommand_names: set[str] = set()
+        self._attached_command: Any | None = None
 
     @property
     def name(self) -> str:
@@ -390,6 +523,154 @@ class App:
 
         return decorator
 
+    def attach(
+        self,
+        command: Any,
+        *,
+        context_factory: Callable[[Context], Any] | None = None,
+        service_factory: Callable[[Context], Any] | None = None,
+        sensitive_parameters: Iterable[str] = (),
+    ) -> Any:
+        """Attach this app's lifecycle to an existing Click command tree.
+
+        The same command object is returned rather than copied. Click continues
+        to own callbacks, contexts, aliases, and lazy command resolution while
+        base-cli extends its root parameters and adds one lifecycle boundary.
+        """
+
+        click = _require_click()
+        if not isinstance(command, click.Command):
+            raise TypeError("App.attach() requires a click.Command instance.")
+        if context_factory is not None and not callable(context_factory):
+            raise TypeError("context_factory must be callable or None.")
+        if service_factory is not None and not callable(service_factory):
+            raise TypeError("service_factory must be callable or None.")
+        normalized_sensitive_parameters = _normalize_sensitive_parameters(
+            sensitive_parameters
+        )
+
+        with _CLICK_ATTACHMENT_LOCK, self._registration_lock:
+            existing = getattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, None)
+            if isinstance(existing, _ClickAttachment):
+                if (
+                    existing.app is self
+                    and existing.command is command
+                    and existing.context_factory is context_factory
+                    and existing.service_factory is service_factory
+                    and existing.sensitive_parameters == normalized_sensitive_parameters
+                    and self._attached_command is command
+                    and self._click_command is command
+                    and self._registration_state == _REGISTRATION_FROZEN
+                ):
+                    return command
+                raise RuntimeError(
+                    f"Click command '{getattr(command, 'name', None) or '<unnamed>'}' "
+                    "is already attached to a base_cli.App."
+                )
+            native_owner = getattr(command, _CLICK_APP_OWNER_ATTRIBUTE, None)
+            if isinstance(native_owner, App):
+                raise RuntimeError(
+                    f"Click command '{getattr(command, 'name', None) or '<unnamed>'}' "
+                    "already belongs to a native base_cli.App and cannot be attached."
+                )
+            self._ensure_registration_open()
+            if self._command_func is not None or self._subcommands:
+                raise RuntimeError(
+                    f"App '{self.name}' already has registered commands and cannot "
+                    "attach an existing Click tree."
+                )
+            if self._attached_command is not None:
+                raise RuntimeError(
+                    f"App '{self.name}' is already attached to a Click command."
+                )
+            command_name = getattr(command, "name", None)
+            if not isinstance(command_name, str) or not command_name:
+                raise RuntimeError("App.attach() requires a named Click command.")
+            if command_name != self.name:
+                raise RuntimeError(
+                    f"App '{self.name}' is the authoritative command name; "
+                    f"the attached Click command cannot use '{command_name}'."
+                )
+
+            added_parameters: list[Any] = []
+            command_was_instrumented = bool(
+                getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, False)
+            )
+            main_was_instrumented = bool(
+                getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, False)
+            )
+            missing_marker = object()
+            previous_marker = getattr(
+                command,
+                _CLICK_ATTACHMENT_ATTRIBUTE,
+                missing_marker,
+            )
+            previous_redaction_plan = self._redaction_plan
+            previous_attached_command = self._attached_command
+            previous_click_command = self._click_command
+            previous_registration_state = self._registration_state
+            try:
+                self._registration_state = _REGISTRATION_MATERIALIZING
+                standard_bindings = _add_attached_standard_options(
+                    click,
+                    command,
+                    version=self.version,
+                    added_parameters=added_parameters,
+                )
+                redaction_plan = compile_redaction_plan(
+                    command,
+                    normalized_sensitive_parameters,
+                    selected_path=(),
+                )
+                attachment = _ClickAttachment(
+                    app=self,
+                    command=command,
+                    context_factory=context_factory,
+                    service_factory=service_factory,
+                    sensitive_parameters=normalized_sensitive_parameters,
+                    standard_bindings=standard_bindings,
+                )
+                _instrument_attached_click_command(click, command)
+                _instrument_attached_click_main(command)
+                self._redaction_plan = redaction_plan
+                self._attached_command = command
+                self._click_command = command
+                self._registration_state = _REGISTRATION_FROZEN
+                # Publish ownership last. Invoke wrappers synchronize on this
+                # lock, so neither the marker nor partial App state can become
+                # observable before every attachment invariant is established.
+                setattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, attachment)
+            except BaseException:
+                if previous_marker is missing_marker:
+                    try:
+                        delattr(command, _CLICK_ATTACHMENT_ATTRIBUTE)
+                    except (AttributeError, TypeError):
+                        pass
+                else:
+                    try:
+                        setattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, previous_marker)
+                    except (AttributeError, TypeError):
+                        pass
+                if not main_was_instrumented:
+                    _restore_attached_click_main(command)
+                if not command_was_instrumented:
+                    _restore_attached_click_command(command)
+                for parameter in added_parameters:
+                    try:
+                        command.params.remove(parameter)
+                    except (AttributeError, ValueError):
+                        pass
+                object.__setattr__(self, "_redaction_plan", previous_redaction_plan)
+                object.__setattr__(self, "_attached_command", previous_attached_command)
+                object.__setattr__(self, "_click_command", previous_click_command)
+                object.__setattr__(
+                    self,
+                    "_registration_state",
+                    previous_registration_state,
+                )
+                raise
+            return command
+
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         if len(args) < 2 and "prog_name" not in kwargs:
             kwargs["prog_name"] = self.profile.display_command() or self.name
@@ -441,10 +722,12 @@ class App:
                 command_kwargs,
             )(wrapper)
             _require_materialized_command_name(command, self.name, self.name)
+            setattr(command, _CLICK_APP_OWNER_ATTRIBUTE, self)
             return command
 
         group_wrapper = _decorate_standard_options(click, _build_group_wrapper(click), self.version)
         group = click.group(name=self.name, help=self.help)(group_wrapper)
+        setattr(group, _CLICK_APP_OWNER_ATTRIBUTE, self)
         for registration in self._subcommands:
             wrapper = self._build_command_wrapper(click, registration.func, include_version=False)
             command = _click_command_decorator(
@@ -454,6 +737,7 @@ class App:
                 registration.kwargs,
             )(wrapper)
             _require_materialized_command_name(command, registration.name, self.name)
+            setattr(command, _CLICK_APP_OWNER_ATTRIBUTE, self)
             # Supplying the canonical name explicitly also prevents a custom
             # Command implementation from changing the group key between the
             # validation above and Click's registration step.
@@ -473,12 +757,17 @@ class App:
 
         @functools.wraps(func)
         def wrapper(**kwargs: Any):
+            if _ATTACHED_INVOCATION.get() is not None:
+                raise RuntimeError(
+                    f"base_cli command '{self.name}' cannot run inside an attached "
+                    "Click tree because that would create a second lifecycle."
+                )
             standard = _merge_standard_options(
                 _group_standard_options(click),
                 _pop_standard_options(kwargs),
             )
             _validate_standard_options(click, standard)
-            _capture_standard_options(standard)
+            _capture_standard_options(standard, self)
             started_at = utc_now()
             started_monotonic_ns = time.monotonic_ns()
             context: Context | None = None
@@ -502,7 +791,7 @@ class App:
 
                 recorder = RunRecorder(context, started_at, started_monotonic_ns)
                 token = set_current_context(context)
-                _capture_invocation_context(context)
+                _capture_invocation_context(context, self)
                 invocation_argv = redact_argv(_current_invocation_argv(), redaction_plan)
                 _start_run_recorder(recorder)
                 log_invocation(context.log, invocation_argv, None)
@@ -591,7 +880,11 @@ class App:
         debug = bool(standard.get("debug") or str(config.get("log_level", "")).lower() == "debug")
         quiet = bool(standard.get("quiet"))
         keep_temp = bool(standard.get("keep_temp") or config.get("keep_temp"))
-        _capture_effective_output_options(debug=debug, quiet=quiet)
+        _capture_effective_output_options(
+            owner_app=self,
+            debug=debug,
+            quiet=quiet,
+        )
 
         runtime = self.profile.resolve_runtime(self.name, project)
         cache_root = runtime.cache_root
@@ -719,9 +1012,809 @@ def _rollback_context_creation(
         pass
 
 
-def get_command_app(command_func: Callable[..., Any]) -> App:
-    """Return the isolated :class:`App` owned by ``@base_cli.command``."""
+class _AttachedLifecycleResource:
+    """Lifecycle resource retained by Click's root Context exit stack."""
 
+    def __init__(
+        self,
+        click: Any,
+        attachment: _ClickAttachment,
+        click_context: Any,
+        standard: dict[str, Any],
+    ) -> None:
+        self.click = click
+        self.attachment = attachment
+        self.click_context = click_context
+        self.standard = standard
+        self.started_at = utc_now()
+        self.started_monotonic_ns = time.monotonic_ns()
+        self.context: Context | None = None
+        self.invocation: _AttachedInvocation | None = None
+        self.context_token: Any = None
+        self.invocation_token: Any = None
+        self.original_click_exit: Callable[..., Any] | None = None
+        self.click_exit_wrapper: Callable[..., Any] | None = None
+        self.outcome = outcome_from_exit_code(ExitCode.SUCCESS)
+        self._closed = False
+
+    def __enter__(self) -> _AttachedLifecycleResource:
+        try:
+            try:
+                context = self.attachment.app._create_context(  # pylint: disable=protected-access
+                    self.standard,
+                    dry_run=False,
+                )
+            except ConfigurationError as exc:
+                raise self.click.UsageError(str(exc)) from exc
+            except RuntimeDirectoryError as exc:
+                raise self.click.ClickException(str(exc)) from exc
+
+            self.context = context
+            self.context_token = set_current_context(context)
+            _capture_invocation_context(context, self.attachment.app)
+            recorder = RunRecorder(context, self.started_at, self.started_monotonic_ns)
+            self.invocation = _AttachedInvocation(
+                self.attachment,
+                self.click_context,
+                context,
+                recorder,
+            )
+            self.invocation_token = _ATTACHED_INVOCATION.set(self.invocation)
+            _start_run_recorder(recorder)
+
+            original_click_exit = self.click_context.exit
+
+            @functools.wraps(original_click_exit)
+            def lifecycle_aware_exit(code: int = 0) -> Any:
+                # Context.exit() closes the Context before it raises. When it
+                # is called from a close hook, that recursive close can unwind
+                # this resource with no exception information, so capture the
+                # terminal outcome before delegating.
+                self.record_exception(self.click.exceptions.Exit(code))
+                return original_click_exit(code)
+
+            self.original_click_exit = original_click_exit
+            self.click_exit_wrapper = lifecycle_aware_exit
+            self.click_context.exit = lifecycle_aware_exit
+            return self
+        except BaseException as exc:
+            if self.context is not None:
+                self.outcome = outcome_from_exception(self.click, exc)
+                _record_unexpected_traceback(self.context, self.outcome)
+                self._finalize()
+            raise
+
+    def initialize_factories(self) -> None:
+        """Run extension factories after Click retains this resource.
+
+        A factory may use Click's ``with_resource`` or ``call_on_close`` APIs.
+        Running it only after our own ``__exit__`` is on Click's stack keeps
+        those resources inside the base-cli lifecycle boundary.
+        """
+
+        context = self.context
+        if context is None:
+            raise RuntimeError("The attached lifecycle has not been entered.")
+        try:
+            if self.attachment.context_factory is not None:
+                context.application_context = self.attachment.context_factory(context)
+            if self.attachment.service_factory is not None:
+                context.services = self.attachment.service_factory(context)
+        except ConfigurationError as exc:
+            error = self.click.UsageError(str(exc))
+            self.record_exception(error)
+            raise error from exc
+        except RuntimeDirectoryError as exc:
+            error = self.click.ClickException(str(exc))
+            self.record_exception(error)
+            raise error from exc
+        except BaseException as exc:
+            self.record_exception(exc)
+            raise
+
+    def record_result(self, _result: Any) -> None:
+        # Arbitrary Click return values are application data, not process exit
+        # codes. A normally completed attached tree is always successful.
+        self.outcome = outcome_from_exit_code(ExitCode.SUCCESS)
+        state = _INVOCATION_STATE.get()
+        if state is not None and state.owner_app is self.attachment.app:
+            state.attached_completion = True
+
+    def record_exception(self, exc: BaseException) -> None:
+        state = _INVOCATION_STATE.get()
+        if state is not None and state.owner_app is self.attachment.app:
+            state.attached_completion = False
+        if self.context is not None:
+            self.outcome = outcome_from_exception(self.click, exc)
+            _record_unexpected_traceback(self.context, self.outcome)
+
+    def __exit__(
+        self,
+        _exc_type: Any,
+        exc_value: Any,
+        _traceback: Any,
+    ) -> None:
+        # Click 8.1 closes Context resources without forwarding exception
+        # details, so the invoke wrapper records the outcome explicitly.
+        if exc_value is not None and self.outcome.kind == "success":
+            self.record_exception(exc_value)
+        self._finalize()
+
+    def _finalize(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        context = self.context
+        invocation = self.invocation
+        if context is None:
+            return
+
+        if invocation is None:
+            try:
+                context.cleanup()
+            except BaseException as exc:  # pylint: disable=broad-exception-caught
+                _warn_lifecycle_failure(context, "Lifecycle cleanup failed", exc)
+            finally:
+                if self.context_token is not None:
+                    _reset_active_context(context, self.context_token)
+            return
+
+        try:
+            if not invocation.started:
+                invocation.start(force=True)
+        except BaseException as exc:  # pylint: disable=broad-exception-caught
+            _warn_lifecycle_failure(context, "Invocation redaction or logging failed", exc)
+
+        try:
+            ended_at = utc_now()
+            ended_monotonic_ns = time.monotonic_ns()
+        except BaseException as exc:  # pylint: disable=broad-exception-caught
+            ended_at = self.started_at
+            ended_monotonic_ns = self.started_monotonic_ns
+            _warn_lifecycle_failure(context, "Terminal clock capture failed", exc)
+
+        try:
+            if self.attachment.app.profile.history_writer is not None:
+                self.attachment.app.profile.history_writer(
+                    context,
+                    invocation.invocation_argv,
+                    set(invocation.redaction_plan),
+                    self.started_at,
+                    self.outcome.exit_code,
+                )
+        except BaseException as exc:  # pylint: disable=broad-exception-caught
+            _warn_lifecycle_failure(context, "History finalization failed", exc)
+
+        _finish_run_recorder(
+            invocation.recorder,
+            self.outcome,
+            ended_at=ended_at,
+            ended_monotonic_ns=ended_monotonic_ns,
+        )
+        try:
+            context.cleanup()
+        except BaseException as exc:  # pylint: disable=broad-exception-caught
+            _warn_lifecycle_failure(context, "Lifecycle cleanup failed", exc)
+        finally:
+            if (
+                self.original_click_exit is not None
+                and getattr(self.click_context, "exit", None) is self.click_exit_wrapper
+            ):
+                try:
+                    self.click_context.exit = self.original_click_exit
+                except (AttributeError, TypeError):
+                    pass
+            if self.invocation_token is not None:
+                _reset_context_var(_ATTACHED_INVOCATION, self.invocation_token)
+            if self.context_token is not None:
+                _reset_active_context(context, self.context_token)
+
+
+def _normalize_sensitive_parameters(values: Iterable[str]) -> frozenset[str]:
+    if isinstance(values, str):
+        values = (values,)
+    try:
+        normalized = frozenset(values)
+    except TypeError as exc:
+        raise TypeError("sensitive_parameters must be an iterable of strings.") from exc
+    if not all(isinstance(value, str) and value for value in normalized):
+        raise TypeError("sensitive_parameters must contain only non-empty strings.")
+    return normalized
+
+
+def _add_attached_standard_options(
+    click: Any,
+    command: Any,
+    *,
+    version: str | None,
+    added_parameters: list[Any],
+) -> dict[str, str]:
+    option_specs: tuple[tuple[str, tuple[str, ...], dict[str, Any]], ...] = (
+        (
+            "log_file",
+            ("--log-file",),
+            {
+                "type": click.Path(dir_okay=False),
+                "help": "Override the persistent log file.",
+            },
+        ),
+        (
+            "keep_temp",
+            ("--keep-temp",),
+            {
+                "is_flag": True,
+                "default": None,
+                "help": "Preserve this run's temp directory.",
+            },
+        ),
+        (
+            "config",
+            ("--config",),
+            {
+                "type": _explicit_config_path_type(click),
+                "help": "Load an additional config file.",
+            },
+        ),
+        ("environment", ("--environment",), {"help": "Set the CLI environment."}),
+        (
+            "debug",
+            ("--debug",),
+            {
+                "is_flag": True,
+                "default": None,
+                "help": "Enable DEBUG logging on the user-facing stream.",
+            },
+        ),
+        (
+            "quiet",
+            ("--quiet", "-q"),
+            {
+                "is_flag": True,
+                "default": None,
+                "help": "Suppress INFO logs on the user-facing stream.",
+            },
+        ),
+    )
+    parameters = getattr(command, "params", None)
+    if not isinstance(parameters, list):
+        raise TypeError("Attached Click commands must expose a mutable params list.")
+    existing_options = [
+        parameter
+        for parameter in parameters
+        if getattr(parameter, "param_type_name", None) == "option"
+    ]
+    context_settings = dict(getattr(command, "context_settings", None) or {})
+    token_normalize_func = context_settings.get("token_normalize_func")
+    used_declarations = {
+        _normalize_attached_option_declaration(
+            str(declaration),
+            token_normalize_func,
+        )
+        for parameter in existing_options
+        for declaration in (
+            *tuple(getattr(parameter, "opts", ())),
+            *tuple(getattr(parameter, "secondary_opts", ())),
+        )
+    }
+    bindings: dict[str, str] = {}
+    bound_existing_parameters: dict[int, str] = {}
+
+    for key, declarations, attrs in option_specs:
+        normalized_primary = _normalize_attached_option_declaration(
+            declarations[0],
+            token_normalize_func,
+        )
+        existing = next(
+            (
+                parameter
+                for parameter in existing_options
+                if normalized_primary
+                in {
+                    _normalize_attached_option_declaration(
+                        str(declaration),
+                        token_normalize_func,
+                    )
+                    for declaration in (
+                        *tuple(getattr(parameter, "opts", ())),
+                        *tuple(getattr(parameter, "secondary_opts", ())),
+                    )
+                }
+            ),
+            None,
+        )
+        if existing is not None:
+            previous_key = bound_existing_parameters.get(id(existing))
+            if previous_key is not None:
+                raise RuntimeError(
+                    f"Existing Click option combines lifecycle aliases "
+                    f"'{previous_key}' and '{key}' in one parameter; each "
+                    "base-cli lifecycle option must use a distinct parameter."
+                )
+            expected_flag = key in {"debug", "quiet", "keep_temp"}
+            is_flag = bool(
+                getattr(existing, "is_flag", False)
+                or getattr(existing, "count", False)
+            )
+            positive_declarations = {
+                _normalize_attached_option_declaration(
+                    str(declaration),
+                    token_normalize_func,
+                )
+                for declaration in tuple(getattr(existing, "opts", ()))
+            }
+            secondary_declarations = {
+                _normalize_attached_option_declaration(
+                    str(declaration),
+                    token_normalize_func,
+                )
+                for declaration in tuple(getattr(existing, "secondary_opts", ()))
+            }
+            incompatible = (
+                is_flag != expected_flag
+                or not getattr(existing, "expose_value", True)
+                or bool(getattr(existing, "multiple", False))
+                or getattr(existing, "nargs", 1) != 1
+                or normalized_primary in secondary_declarations
+                or (
+                    expected_flag
+                    and (
+                        normalized_primary not in positive_declarations
+                        or not bool(getattr(existing, "flag_value", False))
+                    )
+                )
+            )
+            if incompatible:
+                raise RuntimeError(
+                    f"Existing '{declarations[0]}' option is incompatible with "
+                    "the base-cli lifecycle option of the same name."
+                )
+            bound_existing_parameters[id(existing)] = key
+            parameter_name = getattr(existing, "name", None)
+            if parameter_name:
+                bindings[key] = str(parameter_name)
+            continue
+
+        available = tuple(
+            declaration
+            for declaration in declarations
+            if _normalize_attached_option_declaration(
+                declaration,
+                token_normalize_func,
+            )
+            not in used_declarations
+        )
+        if not available:
+            continue
+
+        def capture(click_context: Any, _parameter: Any, value: Any, *, option_key: str = key) -> Any:
+            values = click_context.meta.setdefault(_ATTACHED_STANDARD_OPTIONS_KEY, {})
+            values[option_key] = value
+            return value
+
+        option_attrs = dict(attrs)
+        auto_envvar_prefix = context_settings.get("auto_envvar_prefix")
+        if isinstance(auto_envvar_prefix, str) and auto_envvar_prefix:
+            option_attrs.setdefault(
+                "envvar",
+                f"{auto_envvar_prefix}_{key.upper()}",
+            )
+        option_attrs.update(callback=capture, expose_value=False)
+        parameter = click.Option(
+            [*available, f"_base_cli_{key}"],
+            **option_attrs,
+        )
+        parameters.append(parameter)
+        added_parameters.append(parameter)
+        existing_options.append(parameter)
+        used_declarations.update(
+            _normalize_attached_option_declaration(
+                declaration,
+                token_normalize_func,
+            )
+            for declaration in available
+        )
+
+    if (
+        version is not None
+        and _normalize_attached_option_declaration("--version", token_normalize_func)
+        not in used_declarations
+    ):
+        def version_parameter_source() -> None:
+            return None
+
+        decorated = click.version_option(
+            version,
+            "--version",
+            "_base_cli_version",
+        )(version_parameter_source)
+        click_parameters = list(getattr(decorated, "__click_params__", ()))
+        if not click_parameters:
+            raise RuntimeError("Click did not create the requested version option.")
+        parameter = click_parameters[-1]
+        parameters.append(parameter)
+        added_parameters.append(parameter)
+
+    return bindings
+
+
+def _normalize_attached_option_declaration(
+    declaration: str,
+    normalize: Callable[[str], str] | None,
+) -> str:
+    if normalize is None:
+        return declaration
+    first = declaration[:1]
+    if not first or first.isalnum() or first == "_":
+        return declaration
+    prefix = declaration[:2] if declaration[1:2] == first else first
+    return f"{prefix}{normalize(declaration[len(prefix):])}"
+
+
+def _attached_standard_options(
+    click_context: Any,
+    attachment: _ClickAttachment,
+) -> dict[str, Any]:
+    captured = getattr(click_context, "meta", {}).get(
+        _ATTACHED_STANDARD_OPTIONS_KEY,
+        {},
+    )
+    standard: dict[str, Any] = {}
+    params = getattr(click_context, "params", {})
+    for key in _STANDARD_OPTION_KEYS:
+        parameter_name = attachment.standard_bindings.get(key)
+        if parameter_name:
+            standard[key] = params.get(parameter_name)
+        else:
+            standard[key] = captured.get(key)
+    return standard
+
+
+def _validate_attached_standard_values(click: Any, standard: dict[str, Any]) -> None:
+    for key in ("config", "log_file"):
+        value = standard.get(key)
+        if value is None:
+            continue
+        try:
+            raw_path = os.fspath(value)
+        except TypeError:
+            raw_path = None
+        if not isinstance(raw_path, str):
+            declaration = "--config" if key == "config" else "--log-file"
+            raise click.UsageError(
+                f"Existing '{declaration}' option produced an incompatible value; "
+                "expected a string or path-like object."
+            )
+    environment = standard.get("environment")
+    if environment is not None and not isinstance(environment, str):
+        raise click.UsageError(
+            "Existing '--environment' option produced an incompatible value; "
+            "expected a string."
+        )
+
+
+def _selected_click_path(
+    root_context: Any,
+    selected_context: Any | None,
+    resolved_children: dict[int, list[tuple[str, Any, Any]]],
+) -> tuple[tuple[str, Any], ...]:
+    if selected_context is not None:
+        contexts: list[Any] = []
+        current = selected_context
+        while current is not None:
+            contexts.append(current)
+            if current is root_context:
+                contexts.reverse()
+                selected: list[tuple[str, Any]] = []
+                for parent, child in zip(contexts, contexts[1:]):
+                    resolutions = resolved_children.get(id(parent), [])
+                    recorded = next(
+                        (
+                            resolution
+                            for resolution in reversed(resolutions)
+                            if resolution[2] is child
+                        ),
+                        None,
+                    )
+                    invoked_name = (
+                        recorded[0]
+                        if recorded is not None
+                        else getattr(child, "info_name", None)
+                        or getattr(child.command, "name", "")
+                    )
+                    selected.append((str(invoked_name), child.command))
+                return tuple(selected)
+            current = getattr(current, "parent", None)
+
+    path: list[tuple[str, Any]] = []
+    parent = root_context
+    seen: set[int] = set()
+    while id(parent) not in seen:
+        seen.add(id(parent))
+        resolutions = resolved_children.get(id(parent), [])
+        if not resolutions:
+            break
+        name, command, child_context = resolutions[-1]
+        path.append((str(name), command))
+        if child_context is None:
+            break
+        parent = child_context
+    return tuple(path)
+
+
+def _selected_click_paths(
+    root_context: Any,
+    resolved_children: dict[int, list[tuple[str, Any, Any]]],
+    resolution_parents: dict[int, Any],
+) -> tuple[tuple[tuple[str, Any], ...], ...]:
+    paths: list[tuple[tuple[str, Any], ...]] = []
+    seen: set[tuple[tuple[str, int], ...]] = set()
+    for parent_identity, resolutions in resolved_children.items():
+        for name, command, child_context in resolutions:
+            if child_context is not None:
+                path = _selected_click_path(
+                    root_context,
+                    child_context,
+                    resolved_children,
+                )
+            else:
+                parent_context = resolution_parents.get(parent_identity)
+                parent_path = (
+                    _selected_click_path(
+                        root_context,
+                        parent_context,
+                        resolved_children,
+                    )
+                    if parent_context is not None
+                    else ()
+                )
+                path = (*parent_path, (name, command))
+            identity = tuple((name, id(command)) for name, command in path)
+            if path and identity not in seen:
+                paths.append(path)
+                seen.add(identity)
+    if not paths:
+        fallback = _selected_click_path(root_context, None, resolved_children)
+        if fallback:
+            paths.append(fallback)
+    return tuple(paths)
+
+
+def _click_command_has_pending_children(click_context: Any, command: Any) -> bool:
+    if not callable(getattr(command, "resolve_command", None)):
+        return False
+    protected = getattr(click_context, "_protected_args", None)
+    if protected is None:
+        protected = getattr(click_context, "protected_args", ())
+    return bool(protected or getattr(click_context, "args", ()))
+
+
+def _with_attached_lifecycle_resource(
+    click_context: Any,
+    resource: _AttachedLifecycleResource,
+) -> None:
+    # Parameter callbacks can register close hooks while Click parses the root
+    # context, before Command.invoke gives us a lifecycle boundary. Move those
+    # already-entered resources into a nested ExitStack so they unwind while
+    # the base-cli Context is still active and can influence the final outcome.
+    exit_stack = getattr(click_context, "_exit_stack", None)
+    pop_all = getattr(exit_stack, "pop_all", None)
+    if not callable(pop_all):
+        click_context.with_resource(resource)
+        resource.initialize_factories()
+        return
+    earlier_resources = pop_all()
+    try:
+        click_context.with_resource(resource)
+    finally:
+        click_context.with_resource(earlier_resources)
+    resource.initialize_factories()
+
+
+def _instrument_attached_click_command(click: Any, command: Any) -> None:
+    with _CLICK_ATTACHMENT_LOCK:
+        if getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, False):
+            return
+        original_invoke = command.invoke
+        original_resolve = getattr(command, "resolve_command", None)
+
+        @functools.wraps(original_invoke)
+        def invoke(click_context: Any) -> Any:
+            active = _ATTACHED_INVOCATION.get()
+            with _CLICK_ATTACHMENT_LOCK:
+                attachment = getattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, None)
+            if (
+                active is not None
+                and isinstance(attachment, _ClickAttachment)
+                and attachment is not active.attachment
+            ):
+                raise RuntimeError(
+                    f"Click command '{getattr(command, 'name', None) or '<unnamed>'}' "
+                    "is attached to a different base_cli.App and cannot be nested "
+                    "inside another attached tree."
+                )
+            if active is None and isinstance(attachment, _ClickAttachment):
+                standard = _attached_standard_options(click_context, attachment)
+                _validate_attached_standard_values(click, standard)
+                _validate_standard_options(click, standard)
+                _capture_standard_options(standard, attachment.app)
+                resource = _AttachedLifecycleResource(
+                    click,
+                    attachment,
+                    click_context,
+                    standard,
+                )
+                _with_attached_lifecycle_resource(click_context, resource)
+                if not _click_command_has_pending_children(click_context, command):
+                    if resource.invocation is not None:
+                        resource.invocation.start(click_context)
+                try:
+                    result = original_invoke(click_context)
+                except BaseException as exc:
+                    resource.record_exception(exc)
+                    raise
+                resource.record_result(result)
+                return result
+
+            if active is not None:
+                active.note_child_context(click_context)
+                if not _click_command_has_pending_children(click_context, command):
+                    active.start(click_context)
+            return original_invoke(click_context)
+
+        try:
+            setattr(command, _CLICK_ORIGINAL_INVOKE_ATTRIBUTE, original_invoke)
+            setattr(command, _CLICK_ORIGINAL_RESOLVE_ATTRIBUTE, original_resolve)
+            command.invoke = invoke
+
+            if callable(original_resolve):
+
+                @functools.wraps(original_resolve)
+                def resolve_command(click_context: Any, args: list[str]) -> Any:
+                    invoked_name = str(args[0]) if args else ""
+                    command_name, child, remaining = original_resolve(click_context, args)
+                    if child is not None:
+                        active = _ATTACHED_INVOCATION.get()
+                        with _CLICK_ATTACHMENT_LOCK:
+                            child_attachment = getattr(
+                                child,
+                                _CLICK_ATTACHMENT_ATTRIBUTE,
+                                None,
+                            )
+                        child_owner = getattr(child, _CLICK_APP_OWNER_ATTRIBUTE, None)
+                        if (
+                            active is not None
+                            and isinstance(child_attachment, _ClickAttachment)
+                            and child_attachment is not active.attachment
+                        ):
+                            raise RuntimeError(
+                                f"Click command '{getattr(child, 'name', None) or '<unnamed>'}' "
+                                "is attached to a different base_cli.App and cannot be nested "
+                                "inside another attached tree."
+                            )
+                        if active is not None and isinstance(child_owner, App):
+                            raise RuntimeError(
+                                f"Click command '{getattr(child, 'name', None) or '<unnamed>'}' "
+                                "already belongs to a native base_cli.App and cannot be nested "
+                                "inside an attached tree because that would create a second lifecycle."
+                            )
+                        _instrument_attached_click_command(click, child)
+                        if active is not None:
+                            active.note_resolution(
+                                click_context,
+                                invoked_name or str(command_name),
+                                child,
+                            )
+                    return command_name, child, remaining
+
+                command.resolve_command = resolve_command
+
+            setattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, True)
+        except BaseException:
+            _restore_attached_click_command(command)
+            raise
+
+
+def _restore_attached_click_command(command: Any) -> None:
+    original_invoke = getattr(command, _CLICK_ORIGINAL_INVOKE_ATTRIBUTE, None)
+    original_resolve = getattr(command, _CLICK_ORIGINAL_RESOLVE_ATTRIBUTE, None)
+    if original_invoke is not None:
+        try:
+            command.invoke = original_invoke
+        except (AttributeError, TypeError):
+            pass
+    if callable(original_resolve):
+        try:
+            command.resolve_command = original_resolve
+        except (AttributeError, TypeError):
+            pass
+    for attribute in (
+        _CLICK_INSTRUMENTED_ATTRIBUTE,
+        _CLICK_ORIGINAL_INVOKE_ATTRIBUTE,
+        _CLICK_ORIGINAL_RESOLVE_ATTRIBUTE,
+    ):
+        try:
+            delattr(command, attribute)
+        except (AttributeError, TypeError):
+            pass
+
+
+def _instrument_attached_click_main(command: Any) -> None:
+    if getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, False):
+        return
+    original_main = command.main
+
+    @functools.wraps(original_main)
+    def main(*args: Any, **kwargs: Any) -> Any:
+        if _INVOCATION_MAIN_BYPASS.get() is command:
+            bypass_token = _INVOCATION_MAIN_BYPASS.set(None)
+            try:
+                return original_main(*args, **kwargs)
+            finally:
+                _reset_context_var(_INVOCATION_MAIN_BYPASS, bypass_token)
+        explicit_args = kwargs.get("args", args[0] if args else None)
+        prog_name = kwargs.get("prog_name", args[1] if len(args) > 1 else None)
+        if explicit_args is None:
+            invocation_argv = list(sys.argv)
+        else:
+            materialized_args = list(explicit_args)
+            invocation_argv = [
+                prog_name or getattr(command, "name", None) or "cli",
+                *materialized_args,
+            ]
+            if "args" in kwargs or not args:
+                kwargs = {**kwargs, "args": materialized_args}
+            else:
+                args = (materialized_args, *args[1:])
+        token = _INVOCATION_ARGV.set(invocation_argv)
+        try:
+            return original_main(*args, **kwargs)
+        finally:
+            _reset_context_var(_INVOCATION_ARGV, token)
+
+    try:
+        setattr(command, _CLICK_ORIGINAL_MAIN_ATTRIBUTE, original_main)
+        command.main = main
+        setattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, True)
+    except BaseException:
+        _restore_attached_click_main(command)
+        raise
+
+
+def _restore_attached_click_main(command: Any) -> None:
+    original_main = getattr(command, _CLICK_ORIGINAL_MAIN_ATTRIBUTE, None)
+    if original_main is not None:
+        try:
+            command.main = original_main
+        except (AttributeError, TypeError):
+            pass
+    for attribute in (
+        _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE,
+        _CLICK_ORIGINAL_MAIN_ATTRIBUTE,
+    ):
+        try:
+            delattr(command, attribute)
+        except (AttributeError, TypeError):
+            pass
+
+
+def get_command_app(command_func: Callable[..., Any]) -> App:
+    """Return the :class:`App` owning a registered function or attached tree."""
+
+    with _CLICK_ATTACHMENT_LOCK:
+        attachment = getattr(command_func, _CLICK_ATTACHMENT_ATTRIBUTE, None)
+        if (
+            isinstance(attachment, _ClickAttachment)
+            and attachment.command is command_func
+            and isinstance(attachment.app, App)
+        ):
+            owner = attachment.app
+            with owner._registration_lock:  # pylint: disable=protected-access
+                if (
+                    owner._attached_command is command_func  # pylint: disable=protected-access
+                    and owner._click_command is command_func  # pylint: disable=protected-access
+                    and owner._registration_state == _REGISTRATION_FROZEN  # pylint: disable=protected-access
+                ):
+                    return owner
     with _COMMAND_APP_LOCK:
         owner = getattr(command_func, _COMMAND_APP_ATTRIBUTE, None)
         if isinstance(owner, App):
@@ -729,7 +1822,67 @@ def get_command_app(command_func: Callable[..., Any]) -> App:
                 if owner._command_func is command_func:  # pylint: disable=protected-access
                     return owner
     raise TypeError(
-        "Expected a base_cli.App or a function registered with @base_cli.command()."
+        "Expected a base_cli.App, an attached Click command, or a function "
+        "registered with @base_cli.command()."
+    )
+
+
+def attach(
+    command: Any,
+    *,
+    app: App | None = None,
+    context_factory: Callable[[Context], Any] | None = None,
+    service_factory: Callable[[Context], Any] | None = None,
+    sensitive_parameters: Iterable[str] = (),
+    **app_kwargs: Any,
+) -> Any:
+    """Attach lifecycle middleware and return the same Click command object.
+
+    Attachment ownership, factories, and sensitivity policy are immutable;
+    repeating the same attachment (or omitting its existing policy through
+    this helper) is idempotent.
+    """
+
+    normalized_sensitive_parameters = _normalize_sensitive_parameters(
+        sensitive_parameters
+    )
+    existing = getattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, None)
+    if app is not None and app_kwargs:
+        unexpected = ", ".join(sorted(app_kwargs))
+        raise TypeError(
+            f"App constructor arguments cannot be used with app= ({unexpected})."
+        )
+    if isinstance(existing, _ClickAttachment) and (
+        app is None or app is existing.app
+    ):
+        existing_app = get_command_app(command)
+        if app_kwargs:
+            unexpected = ", ".join(sorted(app_kwargs))
+            raise TypeError(
+                f"Click command is already attached; app arguments cannot be changed ({unexpected})."
+            )
+        if not normalized_sensitive_parameters:
+            normalized_sensitive_parameters = existing.sensitive_parameters
+        if (
+            context_factory is None
+            and service_factory is None
+            and normalized_sensitive_parameters == existing.sensitive_parameters
+        ):
+            return command
+        app = existing_app
+    if app is None:
+        command_name = getattr(command, "name", None)
+        if not isinstance(command_name, str) or not command_name:
+            raise TypeError("attach() requires a named Click command.")
+        name = app_kwargs.pop("name", None) or command_name
+        app = App(name=name, **app_kwargs)
+    if not isinstance(app, App):
+        raise TypeError("app must be a base_cli.App instance or None.")
+    return app.attach(
+        command,
+        context_factory=context_factory,
+        service_factory=service_factory,
+        sensitive_parameters=normalized_sensitive_parameters,
     )
 
 
@@ -739,7 +1892,7 @@ def run_app(
     *,
     reraise_unexpected: bool = False,
 ) -> int:
-    """Run an :class:`App` or registered command and return its process exit code."""
+    """Run an App, registered command, or attached Click tree and return its status."""
 
     if not isinstance(app, App):
         app = get_command_app(app)
@@ -753,19 +1906,28 @@ def run_app(
     explicit_argv = argv is not None
     args = list(sys.argv[1:] if argv is None else argv)
     leading_debug, leading_quiet = _leading_output_flags(args)
-    state = _InvocationState(debug=leading_debug, quiet=leading_quiet)
+    state = _InvocationState(
+        owner_app=app,
+        debug=leading_debug,
+        quiet=leading_quiet,
+    )
     state_token = _INVOCATION_STATE.set(state)
     try:
         try:
             display_command = app.profile.display_command()
             invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
+            command = app.click_command
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
-                result = app.click_command.main(
-                    args=args,
-                    prog_name=display_command or app.name,
-                    standalone_mode=False,
-                )
+                bypass_token = _INVOCATION_MAIN_BYPASS.set(command)
+                try:
+                    result = command.main(
+                        args=args,
+                        prog_name=display_command or app.name,
+                        standalone_mode=False,
+                    )
+                finally:
+                    _reset_context_var(_INVOCATION_MAIN_BYPASS, bypass_token)
             finally:
                 _reset_context_var(_INVOCATION_ARGV, invocation_token)
         except click.Abort as exc:
@@ -798,6 +1960,8 @@ def run_app(
             return ExitCode.FAILURE
 
         try:
+            if state.attached_completion:
+                return ExitCode.SUCCESS
             return _normalize_command_result(result)
         except TypeError as exc:
             print(f"ERROR: {exc}", file=sys.stderr)

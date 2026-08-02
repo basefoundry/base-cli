@@ -34,6 +34,7 @@ from . import command_filters, command_protocol, history, testing
 from .app import (
     App,
     argument,
+    attach,
     command,
     delegated_display_command,
     get_command_app,
@@ -91,6 +92,7 @@ __all__ = [
     "render_inspection_json",
     "testing",
     "argument",
+    "attach",
     "command",
     "configure_logger",
     "delegated_display_command",

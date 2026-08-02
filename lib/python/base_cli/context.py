@@ -51,6 +51,8 @@ class Context:
     runtime_owner: str = "default"
     owner_root: Path | None = None
     run_root: Path | None = None
+    application_context: Any = field(default=None, repr=False, compare=False)
+    services: Any = field(default=None, repr=False, compare=False)
     _run_metadata_path: Path | None = field(default=None, init=False, repr=False, compare=False)
     _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
     _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)
