@@ -114,7 +114,7 @@ def _empty_user_config() -> None:
 
 
 def _load_explicit_config(_project: ProjectInfo | None, explicit: Path | None) -> dict[str, Any]:
-    return load_yaml_file(explicit) if explicit is not None else {}
+    return load_yaml_file(explicit, required=True) if explicit is not None else {}
 
 
 def _generic_runtime_resolver(

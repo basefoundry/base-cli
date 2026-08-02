@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import logging
 import os
+import stat
 import sys
 import time
 import traceback
@@ -925,7 +926,11 @@ def argument(*param_decls: str, sensitive: bool = False, **attrs: Any):
 def _decorate_standard_options(click: Any, func: Callable[..., Any], version: str | None):
     func = click.option("--log-file", type=click.Path(dir_okay=False), help="Override the persistent log file.")(func)
     func = click.option("--keep-temp", is_flag=True, default=None, help="Preserve this run's temp directory.")(func)
-    func = click.option("--config", type=click.Path(dir_okay=False), help="Load an additional config file.")(func)
+    func = click.option(
+        "--config",
+        type=_explicit_config_path_type(click),
+        help="Load an additional config file.",
+    )(func)
     func = click.option("--environment", help="Set the CLI environment.")(func)
     func = click.option(
         "--debug",
@@ -943,6 +948,31 @@ def _decorate_standard_options(click: Any, func: Callable[..., Any], version: st
     if version is not None:
         func = click.version_option(version)(func)
     return func
+
+
+def _explicit_config_path_type(click: Any) -> Any:
+    class ExplicitConfigPath(click.Path):
+        def convert(self, value: Any, param: Any, ctx: Any) -> Path:
+            try:
+                expanded = Path(value).expanduser()
+            except (RuntimeError, TypeError, ValueError) as exc:
+                self.fail(f"Path {value!r} could not be expanded: {exc}", param, ctx)
+
+            converted = super().convert(expanded, param, ctx)
+            try:
+                mode = converted.stat().st_mode
+            except OSError:
+                self.fail(f"Path {str(expanded)!r} does not exist.", param, ctx)
+            if not stat.S_ISREG(mode):
+                self.fail(f"Path {str(expanded)!r} is not a regular file.", param, ctx)
+            return converted
+
+    return ExplicitConfigPath(
+        exists=True,
+        dir_okay=False,
+        readable=True,
+        path_type=Path,
+    )
 
 
 def _pop_standard_options(kwargs: dict[str, Any]) -> dict[str, Any]:
