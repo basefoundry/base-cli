@@ -378,8 +378,8 @@ Parameters whose names contain `token`, `password`, `secret`, `api-key`
 receive already-redacted argv, so raw secret-bearing argv never crosses the
 framework's persistence boundary.
 
-Use `dry_run=True` when a nonstandard option should drive `ctx.dry_run` and
-the lifecycle's default durable-write suppression:
+For native `App` commands, use `dry_run=True` when a nonstandard option should
+drive `ctx.dry_run` and the lifecycle's default durable-write suppression:
 
 ```python
 @base_cli.option("--preview", is_flag=True, dry_run=True)
@@ -388,11 +388,11 @@ def main(ctx: base_cli.Context, preview: bool) -> None:
         ctx.log.info("previewing changes")
 ```
 
-The conventional `dry_run` parameter is recognized automatically, so commands
-using `@base_cli.option("--dry-run", is_flag=True)` do not need the marker.
-Only one option on a command may be marked `dry_run=True`; duplicate dry-run
-markers fail during command registration so authors do not accidentally ship an
-option that is ignored by `ctx.dry_run`.
+The conventional `dry_run` parameter is still recognized automatically, so
+native commands using `@base_cli.option("--dry-run", is_flag=True)` do not need
+the marker. Only one option on a command may be marked `dry_run=True`; duplicate
+dry-run markers fail during command registration so authors do not accidentally
+ship an option that is ignored by `ctx.dry_run`.
 
 ## Standard Options
 
@@ -406,8 +406,126 @@ Every `base_cli.App` command gets these options:
 - `--log-file <path>`: write the persistent log to a specific file.
 - `--version`: shown when the `App` was created with a version.
 
-The command receives only its own application-specific options. Standard options
-are consumed before the command function is called.
+`LifecycleOptions()` preserves this default set. Its `debug`, `quiet`,
+`environment`, `config`, `keep_temp`, `log_file`, and `version` fields are
+enabled by default; `dry_run` is opt-in. Set one field to `None` to disable it,
+or replace it with a `LifecycleOption` to rename and configure it independently:
+
+```python
+lifecycle_options = base_cli.LifecycleOptions(
+    config=None,
+    quiet=base_cli.LifecycleOption(
+        "--silent",
+        "-s",
+        help="Suppress routine status messages.",
+    ),
+    environment=base_cli.LifecycleOption(
+        "--stage",
+        help="Select the deployment stage.",
+        metavar="NAME",
+        envvar="WORKSPACE_STAGE",
+        show_envvar=True,
+        default="dev",
+        show_default=True,
+    ),
+)
+
+app = base_cli.App(
+    name="workspace-tools",
+    version="1.2.3",
+    lifecycle_options=lifecycle_options,
+)
+```
+
+`LifecycleOption` accepts Click declarations followed by the keyword-only
+`name`, `help`, `metavar`, `envvar`, `show_envvar`, `show_default`, `hidden`,
+and `default` presentation and value-source settings. When `name` is omitted,
+Click derives the public destination from the visible declaration: the
+`--stage` option above therefore uses `stage` in a Click `default_map` and
+`WORKSPACE_STAGE` as its explicit environment variable. Use `name` only when a
+different stable Click destination is intentional. Option shapes remain owned
+by the lifecycle: flags stay scalar flags, paths retain their validation, and
+declaration or destination collisions fail when commands are materialized or
+attached.
+
+Click value sources use this precedence, from strongest to weakest:
+
+1. command-line value;
+2. explicit `envvar` or Click `auto_envvar_prefix` value;
+3. Click `default_map` value;
+4. configured option default.
+
+For native command groups, a stronger source wins across root and leaf
+placements; when both values have the same source, the leaf value wins. An
+unspecified leaf value never erases a root value. Thus an explicit root
+`--stage prod` beats a leaf `default_map`, while a leaf command-line value beats
+a root command-line value.
+
+The default placement remains compatibility-oriented and deterministic. A
+native single-command `App` installs lifecycle options on that command. A
+native subcommand `App` installs them on both the root and every leaf, so both
+`workspace-tools --debug status` and `workspace-tools status --debug` work and
+the corresponding help page shows the option. `--version` remains root-only
+for groups. An attached Click tree installs lifecycle options only on its root,
+without enumerating lazy descendants, so they must precede the first
+subcommand. Disabled and hidden options do not appear in help; renamed options
+appear only under their configured declarations.
+
+Normalized values are available as one typed `LifecycleValues` record in the
+active Click context's namespaced metadata:
+
+```python
+@click.pass_context
+def inspect(click_ctx: click.Context) -> None:
+    values = base_cli.get_lifecycle_values(click_ctx)
+    assert isinstance(values, base_cli.LifecycleValues)
+    assert values is click_ctx.meta[base_cli.LIFECYCLE_META_KEY]
+    print(values.environment, values.debug, values.dry_run)
+```
+
+The metadata record, rather than `click.Context.obj`, carries values between a
+native group and its leaf. Base-cli neither replaces nor copies `obj`; typed
+objects, dictionaries, and `None` retain their existing Click semantics. The
+command callback receives only its application-specific parameters, not the
+lifecycle fields.
+
+Attached applications also honor public Click source names. For example,
+`default_map={"stage": "test"}` supplies the renamed `--stage` option above,
+and a runtime `auto_envvar_prefix="WORKSPACE"` reads `WORKSPACE_STAGE`. Callers
+never need private `_base_cli_*` destination or environment names.
+
+Dry-run attachment is explicit because existing Click applications may already
+own that spelling. Opt it in through the same configuration:
+
+```python
+lifecycle_options = base_cli.LifecycleOptions(
+    dry_run=base_cli.LifecycleOption(
+        "--dry-run",
+        help="Run without default durable writes.",
+    ),
+)
+lifecycle = base_cli.App(
+    name=cli.name,
+    lifecycle_options=lifecycle_options,
+)
+lifecycle.attach(cli)
+```
+
+If the attached root already exposes a compatible `--dry-run` option, base-cli
+reuses it while preserving its callback and destination. Otherwise the option
+is added at the root and consumed by the lifecycle. The default
+`LifecycleOptions()` does not add attached dry-run behavior; the native
+conventional-name and `dry_run=True` decorator contracts described above remain
+supported. This preservation rule applies to every adopted vendor option: omit
+`name=` to use its existing Click destination, or choose a distinct declaration
+when an explicitly configured destination must be enforced. A conflicting
+explicit destination fails during attachment instead of being silently ignored.
+Every configured alias must already be present on an adopted option; base-cli
+never mutates the vendor declaration list. The vendor option also continues to
+own its callback, type, default, environment-variable settings, help text,
+metavar, and visibility. Those `LifecycleOption` settings configure options
+created by base-cli; choose a distinct primary declaration when base-cli should
+own those semantics.
 
 ## Exit Codes
 

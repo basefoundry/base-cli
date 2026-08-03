@@ -58,6 +58,13 @@ from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
 from .logging import configure_logger, log_critical, log_debug, log_error, log_info, log_warning
+from .lifecycle_options import (
+    LIFECYCLE_META_KEY,
+    LifecycleOption,
+    LifecycleOptions,
+    LifecycleValues,
+    get_lifecycle_values,
+)
 from .output import (
     OutputFormatError,
     PUBLIC_OUTPUT_FORMATS,
@@ -80,6 +87,10 @@ __all__ = [
     "Context",
     "ExitCode",
     "FieldSpec",
+    "LIFECYCLE_META_KEY",
+    "LifecycleOption",
+    "LifecycleOptions",
+    "LifecycleValues",
     "NULLABLE_STRING",
     "STRING",
     "command_filters",
@@ -98,6 +109,7 @@ __all__ = [
     "delegated_display_command",
     "get_command_app",
     "get_current_context",
+    "get_lifecycle_values",
     "log_critical",
     "log_debug",
     "log_error",
