@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
-from base_cli import command_filters, command_protocol, history
+from base_cli import command_filters, command_protocol, history, lifecycle_options
 
 
 class PublicApiTests(unittest.TestCase):
@@ -40,7 +40,12 @@ class PublicApiTests(unittest.TestCase):
             "dumps_record",
             "dumps_records",
             "get_command_app",
+            "get_lifecycle_values",
             "history",
+            "LIFECYCLE_META_KEY",
+            "LifecycleOption",
+            "LifecycleOptions",
+            "LifecycleValues",
             "loads_records",
             "normalize_command_filter",
             "normalize_command_filters",
@@ -69,6 +74,16 @@ class PublicApiTests(unittest.TestCase):
                 "dumps_records",
                 "loads_records",
                 "register_record_schema",
+            },
+        )
+        self.assertEqual(
+            set(lifecycle_options.__all__),
+            {
+                "LIFECYCLE_META_KEY",
+                "LifecycleOption",
+                "LifecycleOptions",
+                "LifecycleValues",
+                "get_lifecycle_values",
             },
         )
         self.assertIn("write_primary_record", history.__all__)

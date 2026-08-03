@@ -34,16 +34,48 @@ from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .history import utc_now
 from .logging import configure_logger, log_invocation
+from .lifecycle_options import (
+    LIFECYCLE_META_KEY,
+    LifecycleOption,
+    LifecycleOptions,
+    LifecycleValues,
+)
 from .paths import (
     current_working_dir,
     normalize_cli_name,
 )
 from .profile import CliProfile
-from .redaction import REDACTED, RedactionPlan, compile_redaction_plan, parameter_name_from_decls, redact_argv
+from .redaction import (
+    REDACTED,
+    RedactionPlan,
+    compile_redaction_plan,
+    option_aliases_from_decls,
+    parameter_name_from_decls,
+    redact_argv,
+)
 
 _STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp", "log_file")
-_GROUP_STANDARD_OPTIONS_KEY = "base_cli_standard_options"
-_ATTACHED_STANDARD_OPTIONS_KEY = object()
+_FLAG_LIFECYCLE_OPTION_KEYS = frozenset({"debug", "quiet", "keep_temp", "dry_run"})
+_NATIVE_LIFECYCLE_OPTION_ORDER = (
+    "quiet",
+    "debug",
+    "environment",
+    "config",
+    "keep_temp",
+    "log_file",
+    "dry_run",
+)
+_ATTACHED_LIFECYCLE_OPTION_ORDER = (
+    "log_file",
+    "keep_temp",
+    "config",
+    "environment",
+    "debug",
+    "quiet",
+    "dry_run",
+)
+_LIFECYCLE_CAPTURE_META_KEY = object()
+_LIFECYCLE_RESOLUTION_META_KEY = object()
 DISPLAY_COMMAND_ENV = "BASE_CLI_DISPLAY_COMMAND"
 _INVOCATION_ARGV: ContextVar[list[str] | None] = ContextVar("base_cli_invocation_argv", default=None)
 _INVOCATION_MAIN_BYPASS: ContextVar[Any | None] = ContextVar(
@@ -59,6 +91,7 @@ _CLICK_ORIGINAL_INVOKE_ATTRIBUTE = "__base_cli_original_invoke__"
 _CLICK_ORIGINAL_RESOLVE_ATTRIBUTE = "__base_cli_original_resolve__"
 _CLICK_ORIGINAL_MAIN_ATTRIBUTE = "__base_cli_original_main__"
 _CLICK_APP_OWNER_ATTRIBUTE = "__base_cli_app_owner__"
+_CLICK_LIFECYCLE_BINDINGS_ATTRIBUTE = "__base_cli_lifecycle_bindings__"
 _CLICK_ATTACHMENT_LOCK = RLock()
 _REGISTRATION_OPEN = "open"
 _REGISTRATION_MATERIALIZING = "materializing"
@@ -73,6 +106,7 @@ class _InvocationState:
     log_file: Path | None = None
     debug: bool = False
     quiet: bool = False
+    debug_option: str | None = "--debug"
     options_parsed: bool = False
     attached_completion: bool = False
 
@@ -86,13 +120,34 @@ class _SubcommandRegistration:
 
 
 @dataclass(frozen=True)
+class _LifecycleBinding:
+    key: str
+    parameter_name: str
+    adopted: bool
+
+
+@dataclass(frozen=True)
+class _RawLifecycleValue:
+    value: Any
+    source: Any
+    depth: int
+
+
+@dataclass(frozen=True)
+class _LifecycleResolution:
+    values: LifecycleValues
+    raw: dict[str, _RawLifecycleValue]
+
+
+@dataclass(frozen=True)
 class _ClickAttachment:
     app: Any
     command: Any
     context_factory: Callable[[Context], Any] | None
     service_factory: Callable[[Context], Any] | None
     sensitive_parameters: frozenset[str]
-    standard_bindings: dict[str, str]
+    lifecycle_options: LifecycleOptions
+    standard_bindings: dict[str, _LifecycleBinding]
 
 
 class _AttachedInvocation:
@@ -395,6 +450,7 @@ class App:
         log_to_file: bool = True,
         max_log_files: int | None = None,
         profile: CliProfile | None = None,
+        lifecycle_options: LifecycleOptions | None = None,
     ) -> None:
         if max_log_files is not None and max_log_files < 1:
             raise ValueError("max_log_files must be greater than 0 when set.")
@@ -409,6 +465,12 @@ class App:
         # conventions. Consumers with product-specific policies should pass an
         # explicit profile.
         self.profile = profile or CliProfile.generic()
+        if lifecycle_options is not None and not isinstance(
+            lifecycle_options,
+            LifecycleOptions,
+        ):
+            raise TypeError("lifecycle_options must be a LifecycleOptions instance or None.")
+        self._lifecycle_options = lifecycle_options or LifecycleOptions()
         self._click_command = None
         self._redaction_plan: RedactionPlan | None = None
         self._command_func: Callable[..., Any] | None = None
@@ -421,6 +483,18 @@ class App:
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def lifecycle_options(self) -> LifecycleOptions:
+        return self._lifecycle_options
+
+    @lifecycle_options.setter
+    def lifecycle_options(self, value: LifecycleOptions) -> None:
+        if not isinstance(value, LifecycleOptions):
+            raise TypeError("lifecycle_options must be a LifecycleOptions instance.")
+        with self._registration_lock:
+            self._ensure_registration_open()
+            self._lifecycle_options = value
 
     @name.setter
     def name(self, value: str) -> None:
@@ -558,6 +632,7 @@ class App:
                     and existing.context_factory is context_factory
                     and existing.service_factory is service_factory
                     and existing.sensitive_parameters == normalized_sensitive_parameters
+                    and existing.lifecycle_options == self.lifecycle_options
                     and self._attached_command is command
                     and self._click_command is command
                     and self._registration_state == _REGISTRATION_FROZEN
@@ -614,6 +689,7 @@ class App:
                 standard_bindings = _add_attached_standard_options(
                     click,
                     command,
+                    lifecycle_options=self.lifecycle_options,
                     version=self.version,
                     added_parameters=added_parameters,
                 )
@@ -628,6 +704,7 @@ class App:
                     context_factory=context_factory,
                     service_factory=service_factory,
                     sensitive_parameters=normalized_sensitive_parameters,
+                    lifecycle_options=self.lifecycle_options,
                     standard_bindings=standard_bindings,
                 )
                 _instrument_attached_click_command(click, command)
@@ -711,7 +788,7 @@ class App:
 
         click = _require_click()
         if self._command_func is not None:
-            wrapper = self._build_command_wrapper(click, self._command_func, include_version=True)
+            wrapper = self._build_command_wrapper(click, self._command_func)
             command_kwargs = dict(self._command_kwargs)
             if self.help is not None:
                 command_kwargs.setdefault("help", self.help)
@@ -722,14 +799,26 @@ class App:
                 command_kwargs,
             )(wrapper)
             _require_materialized_command_name(command, self.name, self.name)
+            _install_native_lifecycle_options(
+                click,
+                command,
+                self.lifecycle_options,
+                version=self.version,
+            )
             setattr(command, _CLICK_APP_OWNER_ATTRIBUTE, self)
             return command
 
-        group_wrapper = _decorate_standard_options(click, _build_group_wrapper(click), self.version)
+        group_wrapper = _build_group_wrapper(click)
         group = click.group(name=self.name, help=self.help)(group_wrapper)
+        _install_native_lifecycle_options(
+            click,
+            group,
+            self.lifecycle_options,
+            version=self.version,
+        )
         setattr(group, _CLICK_APP_OWNER_ATTRIBUTE, self)
         for registration in self._subcommands:
-            wrapper = self._build_command_wrapper(click, registration.func, include_version=False)
+            wrapper = self._build_command_wrapper(click, registration.func)
             command = _click_command_decorator(
                 click,
                 registration.name,
@@ -737,6 +826,12 @@ class App:
                 registration.kwargs,
             )(wrapper)
             _require_materialized_command_name(command, registration.name, self.name)
+            _install_native_lifecycle_options(
+                click,
+                command,
+                self.lifecycle_options,
+                version=None,
+            )
             setattr(command, _CLICK_APP_OWNER_ATTRIBUTE, self)
             # Supplying the canonical name explicitly also prevents a custom
             # Command implementation from changing the group key between the
@@ -751,9 +846,30 @@ class App:
         self,
         click: Any,
         func: Callable[..., Any],
-        include_version: bool,
     ) -> Callable[..., Any]:
-        dry_run_parameter = getattr(func, "__base_cli_dry_run_parameter__", "dry_run")
+        explicit_dry_run_parameter = getattr(
+            func,
+            "__base_cli_dry_run_parameter__",
+            None,
+        )
+        conventional_dry_run_parameter = any(
+            parameter_name_from_decls(param_decls) == "dry_run"
+            for _kind, param_decls, _attrs, *_metadata in getattr(
+                func,
+                "__base_cli_param_specs__",
+                (),
+            )
+        )
+        if self.lifecycle_options.dry_run is not None and (
+            explicit_dry_run_parameter is not None
+            or conventional_dry_run_parameter
+        ):
+            conflicting_parameter = explicit_dry_run_parameter or "dry_run"
+            raise RuntimeError(
+                f"{func.__name__} designates '{conflicting_parameter}' as dry-run, "
+                "but LifecycleOptions.dry_run is also enabled. Use only one dry-run source."
+            )
+        dry_run_parameter = explicit_dry_run_parameter or "dry_run"
 
         @functools.wraps(func)
         def wrapper(**kwargs: Any):
@@ -762,11 +878,30 @@ class App:
                     f"base_cli command '{self.name}' cannot run inside an attached "
                     "Click tree because that would create a second lifecycle."
                 )
-            standard = _merge_standard_options(
-                _group_standard_options(click),
-                _pop_standard_options(kwargs),
+            click_context = click.get_current_context()
+            bindings = getattr(
+                click_context.command,
+                _CLICK_LIFECYCLE_BINDINGS_ATTRIBUTE,
+                {},
             )
-            _validate_standard_options(click, standard)
+            extra_values: dict[str, _RawLifecycleValue] = {}
+            if (
+                self.lifecycle_options.dry_run is None
+                and dry_run_parameter in kwargs
+            ):
+                extra_values["dry_run"] = _RawLifecycleValue(
+                    value=kwargs.get(dry_run_parameter),
+                    source=click_context.get_parameter_source(dry_run_parameter),
+                    depth=_context_depth(click_context),
+                )
+            resolution = _resolve_lifecycle_values(
+                click,
+                click_context,
+                bindings,
+                extra_values=extra_values,
+            )
+            standard = _standard_options_from_values(resolution.values)
+            _validate_standard_options(click, standard, self.lifecycle_options)
             _capture_standard_options(standard, self)
             started_at = utc_now()
             started_monotonic_ns = time.monotonic_ns()
@@ -782,7 +917,7 @@ class App:
                 try:
                     context = self._create_context(
                         standard,
-                        dry_run=bool(kwargs.get(dry_run_parameter)),
+                        dry_run=resolution.values.dry_run,
                     )
                 except ConfigurationError as exc:
                     raise click.UsageError(str(exc)) from exc
@@ -865,7 +1000,6 @@ class App:
                 click_parameters = getattr(wrapper, "__click_params__", ())
                 if click_parameters:
                     click_parameters[-1]._base_cli_sensitive = True
-        wrapper = _decorate_standard_options(click, wrapper, self.version if include_version else None)
         return wrapper
 
     def _create_context(self, standard: dict[str, Any], dry_run: bool = False) -> Context:
@@ -1020,12 +1154,13 @@ class _AttachedLifecycleResource:
         click: Any,
         attachment: _ClickAttachment,
         click_context: Any,
-        standard: dict[str, Any],
+        lifecycle_values: LifecycleValues,
     ) -> None:
         self.click = click
         self.attachment = attachment
         self.click_context = click_context
-        self.standard = standard
+        self.lifecycle_values = lifecycle_values
+        self.standard = _standard_options_from_values(lifecycle_values)
         self.started_at = utc_now()
         self.started_monotonic_ns = time.monotonic_ns()
         self.context: Context | None = None
@@ -1042,7 +1177,7 @@ class _AttachedLifecycleResource:
             try:
                 context = self.attachment.app._create_context(  # pylint: disable=protected-access
                     self.standard,
-                    dry_run=False,
+                    dry_run=self.lifecycle_values.dry_run,
                 )
             except ConfigurationError as exc:
                 raise self.click.UsageError(str(exc)) from exc
@@ -1222,107 +1357,617 @@ def _normalize_sensitive_parameters(values: Iterable[str]) -> frozenset[str]:
     return normalized
 
 
-def _add_attached_standard_options(
+def _lifecycle_option_attrs(
     click: Any,
-    command: Any,
-    *,
-    version: str | None,
-    added_parameters: list[Any],
-) -> dict[str, str]:
-    option_specs: tuple[tuple[str, tuple[str, ...], dict[str, Any]], ...] = (
-        (
-            "log_file",
-            ("--log-file",),
-            {
-                "type": click.Path(dir_okay=False),
-                "help": "Override the persistent log file.",
-            },
-        ),
-        (
-            "keep_temp",
-            ("--keep-temp",),
-            {
-                "is_flag": True,
-                "default": None,
-                "help": "Preserve this run's temp directory.",
-            },
-        ),
-        (
-            "config",
-            ("--config",),
-            {
-                "type": _explicit_config_path_type(click),
-                "help": "Load an additional config file.",
-            },
-        ),
-        ("environment", ("--environment",), {"help": "Set the CLI environment."}),
-        (
-            "debug",
-            ("--debug",),
-            {
-                "is_flag": True,
-                "default": None,
-                "help": "Enable DEBUG logging on the user-facing stream.",
-            },
-        ),
-        (
-            "quiet",
-            ("--quiet", "-q"),
-            {
-                "is_flag": True,
-                "default": None,
-                "help": "Suppress INFO logs on the user-facing stream.",
-            },
-        ),
-    )
-    parameters = getattr(command, "params", None)
-    if not isinstance(parameters, list):
-        raise TypeError("Attached Click commands must expose a mutable params list.")
-    existing_options = [
-        parameter
-        for parameter in parameters
-        if getattr(parameter, "param_type_name", None) == "option"
-    ]
-    context_settings = dict(getattr(command, "context_settings", None) or {})
-    token_normalize_func = context_settings.get("token_normalize_func")
-    used_declarations = {
-        _normalize_attached_option_declaration(
-            str(declaration),
-            token_normalize_func,
+    key: str,
+    option: LifecycleOption,
+) -> dict[str, Any]:
+    attrs: dict[str, Any] = {}
+    if key in _FLAG_LIFECYCLE_OPTION_KEYS:
+        attrs.update(is_flag=True, default=option.default)
+    elif key == "config":
+        attrs.update(type=_explicit_config_path_type(click), default=option.default)
+    elif key == "log_file":
+        attrs.update(
+            type=click.Path(dir_okay=False, path_type=Path),
+            default=option.default,
         )
-        for parameter in existing_options
+    else:
+        attrs["default"] = option.default
+    if option.help is not None:
+        attrs["help"] = option.help
+    if option.metavar is not None:
+        attrs["metavar"] = option.metavar
+    if option.envvar is not None:
+        attrs["envvar"] = option.envvar
+    if option.show_envvar:
+        attrs["show_envvar"] = True
+    if option.show_default is not None:
+        attrs["show_default"] = option.show_default
+    if option.hidden:
+        attrs["hidden"] = True
+    return attrs
+
+
+def _lifecycle_param_decls(option: LifecycleOption) -> list[str]:
+    declarations = list(option.param_decls)
+    if option.name is not None:
+        declarations.append(option.name)
+    return declarations
+
+
+def _context_depth(click_context: Any) -> int:
+    depth = 0
+    current = getattr(click_context, "parent", None)
+    while current is not None:
+        depth += 1
+        current = getattr(current, "parent", None)
+    return depth
+
+
+def _capture_lifecycle_option(
+    click_context: Any,
+    parameter: Any,
+    value: Any,
+    *,
+    key: str,
+) -> Any:
+    source = click_context.get_parameter_source(parameter.name)
+    captures = click_context.meta.setdefault(_LIFECYCLE_CAPTURE_META_KEY, {})
+    context_values = captures.setdefault(id(click_context), {})
+    context_values[key] = _RawLifecycleValue(
+        value=value,
+        source=source,
+        depth=_context_depth(click_context),
+    )
+    return value
+
+
+def _make_lifecycle_value_option(
+    click: Any,
+    key: str,
+    option: LifecycleOption,
+) -> Any:
+    def capture(click_context: Any, parameter: Any, value: Any) -> Any:
+        return _capture_lifecycle_option(
+            click_context,
+            parameter,
+            value,
+            key=key,
+        )
+
+    expected_flag = key in _FLAG_LIFECYCLE_OPTION_KEYS
+    has_secondary_declaration = any(
+        (";" if declaration.startswith("/") else "/") in declaration
+        for declaration in option.param_decls
+    )
+    if not expected_flag and has_secondary_declaration:
+        raise RuntimeError(
+            f"LifecycleOptions.{key} must accept one scalar value; its configured "
+            "declarations change the lifecycle-owned Click option shape."
+        )
+    attrs = _lifecycle_option_attrs(click, key, option)
+    attrs.update(callback=capture, expose_value=False)
+    parameter = click.Option(_lifecycle_param_decls(option), **attrs)
+    if not isinstance(getattr(parameter, "name", None), str) or not parameter.name:
+        raise RuntimeError(
+            f"LifecycleOptions.{key} does not produce a stable Click destination."
+        )
+    if bool(getattr(parameter, "is_flag", False)) != expected_flag:
+        expected_shape = "a scalar flag" if expected_flag else "one scalar value"
+        raise RuntimeError(
+            f"LifecycleOptions.{key} must accept {expected_shape}; its configured "
+            "declarations change the lifecycle-owned Click option shape."
+        )
+    return parameter
+
+
+def _make_lifecycle_version_option(
+    click: Any,
+    option: LifecycleOption,
+    version: str,
+) -> Any:
+    def version_parameter_source() -> None:
+        return None
+
+    attrs: dict[str, Any] = {}
+    if option.help is not None:
+        attrs["help"] = option.help
+    if option.metavar is not None:
+        attrs["metavar"] = option.metavar
+    if option.envvar is not None:
+        attrs["envvar"] = option.envvar
+    if option.show_envvar:
+        attrs["show_envvar"] = True
+    if option.show_default is not None:
+        attrs["show_default"] = option.show_default
+    if option.hidden:
+        attrs["hidden"] = True
+    if option.default is not None:
+        attrs["default"] = option.default
+    decorated = click.version_option(
+        version,
+        *_lifecycle_param_decls(option),
+        **attrs,
+    )(version_parameter_source)
+    parameters = list(getattr(decorated, "__click_params__", ()))
+    if not parameters:
+        raise RuntimeError("Click did not create the requested version option.")
+    parameter = parameters[-1]
+    if not isinstance(getattr(parameter, "name", None), str) or not parameter.name:
+        raise RuntimeError(
+            "LifecycleOptions.version does not produce a stable Click destination."
+        )
+    return parameter
+
+
+def _normalized_parameter_declarations(
+    parameter: Any,
+    normalize: Callable[[str], str] | None,
+) -> set[str]:
+    return {
+        _normalize_attached_option_declaration(str(declaration), normalize)
         for declaration in (
             *tuple(getattr(parameter, "opts", ())),
             *tuple(getattr(parameter, "secondary_opts", ())),
         )
     }
-    bindings: dict[str, str] = {}
+
+
+def _normalized_parameter_declaration_sets(
+    parameter: Any,
+    normalize: Callable[[str], str] | None,
+) -> tuple[set[str], set[str]]:
+    return (
+        {
+            _normalize_attached_option_declaration(str(declaration), normalize)
+            for declaration in tuple(getattr(parameter, "opts", ()))
+        },
+        {
+            _normalize_attached_option_declaration(str(declaration), normalize)
+            for declaration in tuple(getattr(parameter, "secondary_opts", ()))
+        },
+    )
+
+
+def _reject_duplicate_lifecycle_declarations(
+    key: str,
+    parameter: Any,
+    normalize: Callable[[str], str] | None,
+) -> None:
+    declarations = [
+        _normalize_attached_option_declaration(str(declaration), normalize)
+        for declaration in (
+            *tuple(getattr(parameter, "opts", ())),
+            *tuple(getattr(parameter, "secondary_opts", ())),
+        )
+    ]
+    seen: set[str] = set()
+    duplicates: set[str] = set()
+    for declaration in declarations:
+        if declaration in seen:
+            duplicates.add(declaration)
+        seen.add(declaration)
+    if duplicates:
+        aliases = ", ".join(sorted(duplicates))
+        raise RuntimeError(
+            f"Lifecycle option '{key}' repeats normalized declaration(s) {aliases}. "
+            f"Give LifecycleOptions.{key} unique aliases."
+        )
+
+
+def _lifecycle_collision_details(
+    parameter: Any,
+    existing_parameters: list[Any],
+    normalize: Callable[[str], str] | None,
+) -> tuple[list[tuple[Any, set[str]]], list[Any]]:
+    declarations = _normalized_parameter_declarations(parameter, normalize)
+    alias_collisions: list[tuple[Any, set[str]]] = []
+    destination_collisions: list[Any] = []
+    for existing in existing_parameters:
+        overlapping = declarations & _normalized_parameter_declarations(
+            existing,
+            normalize,
+        )
+        if overlapping:
+            alias_collisions.append((existing, overlapping))
+        if (
+            getattr(parameter, "name", None)
+            and getattr(existing, "name", None) == parameter.name
+        ):
+            destination_collisions.append(existing)
+    return alias_collisions, destination_collisions
+
+
+def _implicit_help_declarations(
+    command: Any,
+    normalize: Callable[[str], str] | None,
+) -> set[str]:
+    if not bool(getattr(command, "add_help_option", True)):
+        return set()
+    context_settings = dict(getattr(command, "context_settings", None) or {})
+    declarations = context_settings.get("help_option_names", ("--help",))
+    if declarations is None:
+        declarations = ("--help",)
+    return {
+        _normalize_attached_option_declaration(str(declaration), normalize)
+        for declaration in declarations
+    }
+
+
+def _missing_adopted_declarations(
+    requested: Any,
+    existing: Any,
+    normalize: Callable[[str], str] | None,
+) -> set[str]:
+    """Return configured aliases absent from the requested vendor flag polarity."""
+
+    requested_positive, requested_negative = _normalized_parameter_declaration_sets(
+        requested,
+        normalize,
+    )
+    existing_positive, existing_negative = _normalized_parameter_declaration_sets(
+        existing,
+        normalize,
+    )
+    return (
+        requested_positive - existing_positive
+    ) | (
+        requested_negative - existing_negative
+    )
+
+
+def _reject_implicit_help_collision(
+    key: str,
+    parameter: Any,
+    command: Any,
+    normalize: Callable[[str], str] | None,
+) -> None:
+    collisions = _normalized_parameter_declarations(
+        parameter,
+        normalize,
+    ) & _implicit_help_declarations(command, normalize)
+    if collisions:
+        aliases = ", ".join(sorted(collisions))
+        raise RuntimeError(
+            f"Lifecycle option '{key}' conflicts with Click's implicit help "
+            f"declaration(s) {aliases}. Disable or rename LifecycleOptions.{key}."
+        )
+
+
+def _native_lifecycle_collision_error(
+    key: str,
+    parameter: Any,
+    alias_collisions: list[tuple[Any, set[str]]],
+    destination_collisions: list[Any],
+    lifecycle_parameter_keys: dict[int, str] | None = None,
+) -> RuntimeError:
+    lifecycle_parameter_keys = lifecycle_parameter_keys or {}
+    conflicting_keys = {
+        lifecycle_parameter_keys[id(existing)]
+        for existing in (
+            *(existing for existing, _declarations in alias_collisions),
+            *destination_collisions,
+        )
+        if id(existing) in lifecycle_parameter_keys
+    }
+    if conflicting_keys:
+        conflicting = ", ".join(
+            f"'{other_key}'" for other_key in sorted(conflicting_keys)
+        )
+        return RuntimeError(
+            f"Lifecycle option '{key}' conflicts with lifecycle option(s) "
+            f"{conflicting}. Give LifecycleOptions.{key} a distinct declaration "
+            "and Click destination."
+        )
+    if alias_collisions:
+        aliases = sorted(
+            declaration
+            for _existing, declarations in alias_collisions
+            for declaration in declarations
+        )
+        detail = f"option declaration(s) {', '.join(aliases)}"
+    else:
+        detail = f"Click destination '{getattr(parameter, 'name', None)}'"
+    return RuntimeError(
+        f"Lifecycle option '{key}' conflicts with an application parameter at {detail}. "
+        f"Disable or rename LifecycleOptions.{key}."
+    )
+
+
+def _install_native_lifecycle_options(
+    click: Any,
+    command: Any,
+    lifecycle_options: LifecycleOptions,
+    *,
+    version: str | None,
+) -> dict[str, _LifecycleBinding]:
+    parameters = getattr(command, "params", None)
+    if not isinstance(parameters, list):
+        raise TypeError("Click commands must expose a mutable params list.")
+    existing_parameters = list(parameters)
+    context_settings = dict(getattr(command, "context_settings", None) or {})
+    normalize = context_settings.get("token_normalize_func")
+    bindings: dict[str, _LifecycleBinding] = {}
+    lifecycle_parameter_keys: dict[int, str] = {}
+
+    lifecycle_parameters: dict[str, Any] = {}
+    version_parameter: Any | None = None
+
+    for key in _NATIVE_LIFECYCLE_OPTION_ORDER:
+        option = getattr(lifecycle_options, key)
+        if option is None:
+            continue
+        parameter = _make_lifecycle_value_option(click, key, option)
+        _reject_duplicate_lifecycle_declarations(key, parameter, normalize)
+        _reject_implicit_help_collision(key, parameter, command, normalize)
+        alias_collisions, destination_collisions = _lifecycle_collision_details(
+            parameter,
+            existing_parameters,
+            normalize,
+        )
+        if alias_collisions or destination_collisions:
+            raise _native_lifecycle_collision_error(
+                key,
+                parameter,
+                alias_collisions,
+                destination_collisions,
+                lifecycle_parameter_keys,
+            )
+        parameters.append(parameter)
+        existing_parameters.append(parameter)
+        lifecycle_parameter_keys[id(parameter)] = key
+        lifecycle_parameters[key] = parameter
+        bindings[key] = _LifecycleBinding(
+            key=key,
+            parameter_name=str(parameter.name),
+            adopted=False,
+        )
+
+    version_option = lifecycle_options.version
+    if version is not None and version_option is not None:
+        parameter = _make_lifecycle_version_option(click, version_option, version)
+        _reject_duplicate_lifecycle_declarations("version", parameter, normalize)
+        _reject_implicit_help_collision("version", parameter, command, normalize)
+        alias_collisions, destination_collisions = _lifecycle_collision_details(
+            parameter,
+            existing_parameters,
+            normalize,
+        )
+        if alias_collisions or destination_collisions:
+            raise _native_lifecycle_collision_error(
+                "version",
+                parameter,
+                alias_collisions,
+                destination_collisions,
+                lifecycle_parameter_keys,
+            )
+        parameters.append(parameter)
+        version_parameter = parameter
+
+    parameters[:] = [
+        *([version_parameter] if version_parameter is not None else []),
+        *(
+            lifecycle_parameters[key]
+            for key in _NATIVE_LIFECYCLE_OPTION_ORDER
+            if key in lifecycle_parameters
+        ),
+        *(
+            parameter
+            for parameter in existing_parameters
+            if id(parameter) not in lifecycle_parameter_keys
+        ),
+    ]
+
+    setattr(command, _CLICK_LIFECYCLE_BINDINGS_ATTRIBUTE, bindings)
+    return bindings
+
+
+def _parameter_source_rank(source: Any) -> int:
+    name = getattr(source, "name", None)
+    return {
+        "COMMANDLINE": 4,
+        "PROMPT": 4,
+        "ENVIRONMENT": 3,
+        "DEFAULT_MAP": 2,
+        "DEFAULT": 1,
+    }.get(name, 0)
+
+
+def _prefer_lifecycle_value(
+    current: _RawLifecycleValue | None,
+    candidate: _RawLifecycleValue | None,
+) -> _RawLifecycleValue | None:
+    if candidate is None:
+        return current
+    if current is None:
+        return candidate
+    current_rank = _parameter_source_rank(current.source)
+    candidate_rank = _parameter_source_rank(candidate.source)
+    if candidate_rank > current_rank:
+        return candidate
+    if candidate_rank == current_rank and candidate.depth >= current.depth:
+        return candidate
+    return current
+
+
+def _normalize_lifecycle_values(
+    click: Any,
+    raw: dict[str, _RawLifecycleValue],
+) -> LifecycleValues:
+    def raw_value(key: str) -> Any:
+        selected = raw.get(key)
+        return None if selected is None else selected.value
+
+    environment = raw_value("environment")
+    if environment is not None and not isinstance(environment, str):
+        raise click.UsageError(
+            "The configured lifecycle environment option must produce a string."
+        )
+
+    paths: dict[str, Path | None] = {}
+    for key in ("config", "log_file"):
+        value = raw_value(key)
+        if value is None:
+            paths[key] = None
+            continue
+        try:
+            raw_path = os.fspath(value)
+        except TypeError:
+            raw_path = None
+        if not isinstance(raw_path, str):
+            raise click.UsageError(
+                f"The configured lifecycle {key.replace('_', '-')} option must "
+                "produce a string or path-like object."
+            )
+        paths[key] = Path(raw_path)
+
+    return LifecycleValues(
+        debug=bool(raw_value("debug")),
+        quiet=bool(raw_value("quiet")),
+        environment=environment,
+        config=paths["config"],
+        keep_temp=bool(raw_value("keep_temp")),
+        log_file=paths["log_file"],
+        dry_run=bool(raw_value("dry_run")),
+    )
+
+
+def _resolve_lifecycle_values(
+    click: Any,
+    click_context: Any,
+    bindings: dict[str, _LifecycleBinding],
+    *,
+    extra_values: dict[str, _RawLifecycleValue] | None = None,
+) -> _LifecycleResolution:
+    existing_resolution_map = click_context.meta.get(
+        _LIFECYCLE_RESOLUTION_META_KEY,
+    )
+    if LIFECYCLE_META_KEY in click_context.meta:
+        existing_public_value = click_context.meta[LIFECYCLE_META_KEY]
+        framework_values = (
+            tuple(
+                resolution.values
+                for resolution in existing_resolution_map.values()
+                if isinstance(resolution, _LifecycleResolution)
+            )
+            if isinstance(existing_resolution_map, dict)
+            else ()
+        )
+        if not any(
+            existing_public_value is value
+            for value in framework_values
+        ):
+            raise click.UsageError(
+                f"Click context metadata key {LIFECYCLE_META_KEY!r} is reserved for "
+                "base-cli LifecycleValues. Rename the application metadata key."
+            )
+    resolution_map = click_context.meta.setdefault(
+        _LIFECYCLE_RESOLUTION_META_KEY,
+        {},
+    )
+    parent = getattr(click_context, "parent", None)
+    parent_resolution = resolution_map.get(id(parent)) if parent is not None else None
+    raw = dict(parent_resolution.raw) if isinstance(parent_resolution, _LifecycleResolution) else {}
+    captures = click_context.meta.get(_LIFECYCLE_CAPTURE_META_KEY, {})
+    context_captures = captures.get(id(click_context), {})
+    depth = _context_depth(click_context)
+
+    for key, binding in bindings.items():
+        if binding.adopted:
+            candidate = _RawLifecycleValue(
+                value=getattr(click_context, "params", {}).get(binding.parameter_name),
+                source=click_context.get_parameter_source(binding.parameter_name),
+                depth=depth,
+            )
+        else:
+            candidate = context_captures.get(key)
+        raw[key] = _prefer_lifecycle_value(raw.get(key), candidate)
+
+    for key, candidate in (extra_values or {}).items():
+        raw[key] = _prefer_lifecycle_value(raw.get(key), candidate)
+
+    resolution = _LifecycleResolution(
+        values=_normalize_lifecycle_values(click, raw),
+        raw=raw,
+    )
+    resolution_map[id(click_context)] = resolution
+    click_context.meta[LIFECYCLE_META_KEY] = resolution.values
+    return resolution
+
+
+def _standard_options_from_values(values: LifecycleValues) -> dict[str, Any]:
+    return {
+        key: getattr(values, key)
+        for key in _STANDARD_OPTION_KEYS
+    }
+
+
+def _add_attached_standard_options(
+    click: Any,
+    command: Any,
+    *,
+    lifecycle_options: LifecycleOptions,
+    version: str | None,
+    added_parameters: list[Any],
+) -> dict[str, _LifecycleBinding]:
+    parameters = getattr(command, "params", None)
+    if not isinstance(parameters, list):
+        raise TypeError("Attached Click commands must expose a mutable params list.")
+    existing_parameters = list(parameters)
+    existing_options = [
+        parameter
+        for parameter in existing_parameters
+        if getattr(parameter, "param_type_name", None) == "option"
+    ]
+    context_settings = dict(getattr(command, "context_settings", None) or {})
+    token_normalize_func = context_settings.get("token_normalize_func")
+    bindings: dict[str, _LifecycleBinding] = {}
     bound_existing_parameters: dict[int, str] = {}
 
-    for key, declarations, attrs in option_specs:
-        normalized_primary = _normalize_attached_option_declaration(
-            declarations[0],
+    for key in _ATTACHED_LIFECYCLE_OPTION_ORDER:
+        option = getattr(lifecycle_options, key)
+        if option is None:
+            continue
+        parameter = _make_lifecycle_value_option(click, key, option)
+        _reject_duplicate_lifecycle_declarations(
+            key,
+            parameter,
             token_normalize_func,
         )
-        existing = next(
-            (
-                parameter
-                for parameter in existing_options
-                if normalized_primary
-                in {
-                    _normalize_attached_option_declaration(
-                        str(declaration),
-                        token_normalize_func,
-                    )
-                    for declaration in (
-                        *tuple(getattr(parameter, "opts", ())),
-                        *tuple(getattr(parameter, "secondary_opts", ())),
-                    )
-                }
-            ),
-            None,
+        _reject_implicit_help_collision(
+            key,
+            parameter,
+            command,
+            token_normalize_func,
         )
+        normalized_primary = _normalize_attached_option_declaration(
+            str(parameter.opts[0]),
+            token_normalize_func,
+        )
+        primary_matches = [
+            existing
+            for existing in existing_options
+            if normalized_primary
+            in _normalized_parameter_declarations(
+                existing,
+                token_normalize_func,
+            )
+        ]
+        if len(primary_matches) > 1:
+            raise RuntimeError(
+                f"Lifecycle option '{key}' has ambiguous attached declaration "
+                f"'{parameter.opts[0]}'; multiple Click options already use it."
+            )
+        existing = primary_matches[0] if primary_matches else None
         if existing is not None:
+            if option.name is not None and existing.name != option.name:
+                raise RuntimeError(
+                    f"Existing '{parameter.opts[0]}' option uses Click destination "
+                    f"{existing.name!r}, but LifecycleOptions.{key} requires "
+                    f"{option.name!r}. Remove name= to adopt the vendor destination, "
+                    "or rename/disable the lifecycle option."
+                )
             previous_key = bound_existing_parameters.get(id(existing))
             if previous_key is not None:
                 raise RuntimeError(
@@ -1330,7 +1975,55 @@ def _add_attached_standard_options(
                     f"'{previous_key}' and '{key}' in one parameter; each "
                     "base-cli lifecycle option must use a distinct parameter."
                 )
-            expected_flag = key in {"debug", "quiet", "keep_temp"}
+            alias_collisions, _destination_collisions = _lifecycle_collision_details(
+                parameter,
+                existing_parameters,
+                token_normalize_func,
+            )
+            foreign_aliases = [
+                (candidate, declarations)
+                for candidate, declarations in alias_collisions
+                if candidate is not existing
+            ]
+            if foreign_aliases:
+                aliases = sorted(
+                    declaration
+                    for _candidate, declarations in foreign_aliases
+                    for declaration in declarations
+                )
+                raise RuntimeError(
+                    f"Lifecycle option '{key}' cannot adopt '{parameter.opts[0]}' "
+                    f"because its other declaration(s) collide: {', '.join(aliases)}."
+                )
+            missing_declarations = _missing_adopted_declarations(
+                parameter,
+                existing,
+                token_normalize_func,
+            )
+            if missing_declarations:
+                aliases = ", ".join(sorted(missing_declarations))
+                raise RuntimeError(
+                    f"Existing '{parameter.opts[0]}' option is incompatible with "
+                    f"LifecycleOptions.{key}; it does not expose configured "
+                    f"declaration(s) {aliases} with the required flag polarity. "
+                    "Add compatible aliases to the vendor option, or rename/disable "
+                    "the lifecycle option."
+                )
+            foreign_destinations = [
+                candidate
+                for candidate in existing_parameters
+                if candidate is not existing
+                and getattr(candidate, "name", None)
+                == getattr(existing, "name", None)
+            ]
+            if foreign_destinations:
+                raise RuntimeError(
+                    f"Lifecycle option '{key}' cannot adopt '{parameter.opts[0]}' "
+                    f"because Click destination {existing.name!r} is also used by "
+                    "another application parameter. Rename that destination or "
+                    f"disable LifecycleOptions.{key}."
+                )
+            expected_flag = key in _FLAG_LIFECYCLE_OPTION_KEYS
             is_flag = bool(
                 getattr(existing, "is_flag", False)
                 or getattr(existing, "count", False)
@@ -1351,7 +2044,9 @@ def _add_attached_standard_options(
             }
             incompatible = (
                 is_flag != expected_flag
+                or bool(getattr(existing, "count", False))
                 or not getattr(existing, "expose_value", True)
+                or getattr(existing, "prompt", None) is not None
                 or bool(getattr(existing, "multiple", False))
                 or getattr(existing, "nargs", 1) != 1
                 or normalized_primary in secondary_declarations
@@ -1365,72 +2060,143 @@ def _add_attached_standard_options(
             )
             if incompatible:
                 raise RuntimeError(
-                    f"Existing '{declarations[0]}' option is incompatible with "
-                    "the base-cli lifecycle option of the same name."
+                    f"Existing '{parameter.opts[0]}' option is incompatible with "
+                    f"LifecycleOptions.{key}; rename or disable that lifecycle option."
                 )
             bound_existing_parameters[id(existing)] = key
             parameter_name = getattr(existing, "name", None)
-            if parameter_name:
-                bindings[key] = str(parameter_name)
+            if not parameter_name:
+                raise RuntimeError(
+                    f"Existing '{parameter.opts[0]}' option has no Click destination."
+                )
+            bindings[key] = _LifecycleBinding(
+                key=key,
+                parameter_name=str(parameter_name),
+                adopted=True,
+            )
             continue
 
-        available = tuple(
-            declaration
-            for declaration in declarations
-            if _normalize_attached_option_declaration(
-                declaration,
-                token_normalize_func,
-            )
-            not in used_declarations
+        alias_collisions, destination_collisions = _lifecycle_collision_details(
+            parameter,
+            existing_parameters,
+            token_normalize_func,
         )
-        if not available:
-            continue
-
-        def capture(click_context: Any, _parameter: Any, value: Any, *, option_key: str = key) -> Any:
-            values = click_context.meta.setdefault(_ATTACHED_STANDARD_OPTIONS_KEY, {})
-            values[option_key] = value
-            return value
-
-        option_attrs = dict(attrs)
-        auto_envvar_prefix = context_settings.get("auto_envvar_prefix")
-        if isinstance(auto_envvar_prefix, str) and auto_envvar_prefix:
-            option_attrs.setdefault(
-                "envvar",
-                f"{auto_envvar_prefix}_{key.upper()}",
+        if alias_collisions or destination_collisions:
+            raise _native_lifecycle_collision_error(
+                key,
+                parameter,
+                alias_collisions,
+                destination_collisions,
+                bound_existing_parameters,
             )
-        option_attrs.update(callback=capture, expose_value=False)
-        parameter = click.Option(
-            [*available, f"_base_cli_{key}"],
-            **option_attrs,
-        )
         parameters.append(parameter)
         added_parameters.append(parameter)
+        existing_parameters.append(parameter)
         existing_options.append(parameter)
-        used_declarations.update(
-            _normalize_attached_option_declaration(
-                declaration,
-                token_normalize_func,
-            )
-            for declaration in available
+        bound_existing_parameters[id(parameter)] = key
+        bindings[key] = _LifecycleBinding(
+            key=key,
+            parameter_name=str(parameter.name),
+            adopted=False,
         )
 
-    if (
-        version is not None
-        and _normalize_attached_option_declaration("--version", token_normalize_func)
-        not in used_declarations
-    ):
-        def version_parameter_source() -> None:
-            return None
+    version_option = lifecycle_options.version
+    if version is not None and version_option is not None:
+        parameter = _make_lifecycle_version_option(click, version_option, version)
+        _reject_duplicate_lifecycle_declarations(
+            "version",
+            parameter,
+            token_normalize_func,
+        )
+        _reject_implicit_help_collision(
+            "version",
+            parameter,
+            command,
+            token_normalize_func,
+        )
+        normalized_primary = _normalize_attached_option_declaration(
+            str(parameter.opts[0]),
+            token_normalize_func,
+        )
+        primary_matches = [
+            existing
+            for existing in existing_options
+            if normalized_primary
+            in _normalized_parameter_declarations(
+                existing,
+                token_normalize_func,
+            )
+        ]
+        if len(primary_matches) > 1:
+            raise RuntimeError(
+                f"Lifecycle version declaration '{parameter.opts[0]}' is ambiguous."
+            )
+        if primary_matches:
+            existing = primary_matches[0]
+            if version_option.name is not None and existing.name != version_option.name:
+                raise RuntimeError(
+                    f"Existing '{parameter.opts[0]}' option uses Click destination "
+                    f"{existing.name!r}, but LifecycleOptions.version requires "
+                    f"{version_option.name!r}. Remove name= to adopt the vendor "
+                    "destination, or rename/disable the lifecycle version option."
+                )
+            compatible = bool(
+                getattr(existing, "is_flag", False)
+                and getattr(existing, "is_eager", False)
+            )
+            if not compatible:
+                raise RuntimeError(
+                    f"Existing '{parameter.opts[0]}' option is incompatible with "
+                    "LifecycleOptions.version; rename or disable the lifecycle version option."
+                )
+            alias_collisions, _destination_collisions = _lifecycle_collision_details(
+                parameter,
+                existing_parameters,
+                token_normalize_func,
+            )
+            if any(candidate is not existing for candidate, _aliases in alias_collisions):
+                raise RuntimeError(
+                    "LifecycleOptions.version has an alias used by another Click option."
+                )
+            missing_declarations = _missing_adopted_declarations(
+                parameter,
+                existing,
+                token_normalize_func,
+            )
+            if missing_declarations:
+                aliases = ", ".join(sorted(missing_declarations))
+                raise RuntimeError(
+                    "Existing lifecycle version option does not expose configured "
+                    f"declaration(s) {aliases} with the required flag polarity. "
+                    "Add compatible aliases to the vendor option, or rename/disable "
+                    "the lifecycle version option."
+                )
+            if any(
+                candidate is not existing
+                and getattr(candidate, "name", None)
+                == getattr(existing, "name", None)
+                for candidate in existing_parameters
+            ):
+                raise RuntimeError(
+                    "LifecycleOptions.version adopts a Click destination used by "
+                    "another application parameter. Rename that destination or "
+                    "disable the lifecycle version option."
+                )
+            return bindings
 
-        decorated = click.version_option(
-            version,
-            "--version",
-            "_base_cli_version",
-        )(version_parameter_source)
-        click_parameters = list(getattr(decorated, "__click_params__", ()))
-        if not click_parameters:
-            raise RuntimeError("Click did not create the requested version option.")
-        parameter = click_parameters[-1]
+        alias_collisions, destination_collisions = _lifecycle_collision_details(
+            parameter,
+            existing_parameters,
+            token_normalize_func,
+        )
+        if alias_collisions or destination_collisions:
+            raise _native_lifecycle_collision_error(
+                "version",
+                parameter,
+                alias_collisions,
+                destination_collisions,
+                bound_existing_parameters,
+            )
         parameters.append(parameter)
         added_parameters.append(parameter)
 
@@ -1448,48 +2214,6 @@ def _normalize_attached_option_declaration(
         return declaration
     prefix = declaration[:2] if declaration[1:2] == first else first
     return f"{prefix}{normalize(declaration[len(prefix):])}"
-
-
-def _attached_standard_options(
-    click_context: Any,
-    attachment: _ClickAttachment,
-) -> dict[str, Any]:
-    captured = getattr(click_context, "meta", {}).get(
-        _ATTACHED_STANDARD_OPTIONS_KEY,
-        {},
-    )
-    standard: dict[str, Any] = {}
-    params = getattr(click_context, "params", {})
-    for key in _STANDARD_OPTION_KEYS:
-        parameter_name = attachment.standard_bindings.get(key)
-        if parameter_name:
-            standard[key] = params.get(parameter_name)
-        else:
-            standard[key] = captured.get(key)
-    return standard
-
-
-def _validate_attached_standard_values(click: Any, standard: dict[str, Any]) -> None:
-    for key in ("config", "log_file"):
-        value = standard.get(key)
-        if value is None:
-            continue
-        try:
-            raw_path = os.fspath(value)
-        except TypeError:
-            raw_path = None
-        if not isinstance(raw_path, str):
-            declaration = "--config" if key == "config" else "--log-file"
-            raise click.UsageError(
-                f"Existing '{declaration}' option produced an incompatible value; "
-                "expected a string or path-like object."
-            )
-    environment = standard.get("environment")
-    if environment is not None and not isinstance(environment, str):
-        raise click.UsageError(
-            "Existing '--environment' option produced an incompatible value; "
-            "expected a string."
-        )
 
 
 def _selected_click_path(
@@ -1633,15 +2357,23 @@ def _instrument_attached_click_command(click: Any, command: Any) -> None:
                     "inside another attached tree."
                 )
             if active is None and isinstance(attachment, _ClickAttachment):
-                standard = _attached_standard_options(click_context, attachment)
-                _validate_attached_standard_values(click, standard)
-                _validate_standard_options(click, standard)
+                resolution = _resolve_lifecycle_values(
+                    click,
+                    click_context,
+                    attachment.standard_bindings,
+                )
+                standard = _standard_options_from_values(resolution.values)
+                _validate_standard_options(
+                    click,
+                    standard,
+                    attachment.lifecycle_options,
+                )
                 _capture_standard_options(standard, attachment.app)
                 resource = _AttachedLifecycleResource(
                     click,
                     attachment,
                     click_context,
-                    standard,
+                    resolution.values,
                 )
                 _with_attached_lifecycle_resource(click_context, resource)
                 if not _click_command_has_pending_children(click_context, command):
@@ -1905,11 +2637,17 @@ def run_app(
 
     explicit_argv = argv is not None
     args = list(sys.argv[1:] if argv is None else argv)
-    leading_debug, leading_quiet = _leading_output_flags(args)
+    leading_debug, leading_quiet = _leading_output_flags(
+        args,
+        app.lifecycle_options,
+    )
     state = _InvocationState(
         owner_app=app,
         debug=leading_debug,
         quiet=leading_quiet,
+        debug_option=_primary_lifecycle_declaration(
+            app.lifecycle_options.debug,
+        ),
     )
     state_token = _INVOCATION_STATE.set(state)
     try:
@@ -1981,7 +2719,13 @@ def _show_unexpected_error(state: _InvocationState, exc: Exception) -> None:
         traceback.print_exception(type(exc), exc, exc.__traceback__, file=sys.stderr)
     elif not traceback_visible:
         if state.options_parsed:
-            print("Re-run with --debug for a traceback.", file=sys.stderr)
+            if state.debug_option is not None:
+                print(
+                    f"Re-run with {state.debug_option} for a traceback.",
+                    file=sys.stderr,
+                )
+            else:
+                print("Enable debug logging for a traceback.", file=sys.stderr)
         else:
             print("Diagnostic context was unavailable before option parsing completed.", file=sys.stderr)
 
@@ -1997,14 +2741,61 @@ def _normalize_command_result(result: Any) -> int:
     )
 
 
-def _leading_output_flags(argv: list[str]) -> tuple[bool, bool]:
+def _lifecycle_flag_declarations(
+    option: LifecycleOption | None,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    if option is None:
+        return (), ()
+    positive: list[str] = []
+    negative: list[str] = []
+    for declaration in option.param_decls:
+        if declaration.isidentifier():
+            continue
+        split_char = ";" if declaration.startswith("/") else "/"
+        first, separator, second = declaration.partition(split_char)
+        positive.extend(option_aliases_from_decls((first.rstrip(),)))
+        if separator:
+            negative.extend(option_aliases_from_decls((second.lstrip(),)))
+    return tuple(positive), tuple(negative)
+
+
+def _primary_lifecycle_declaration(
+    option: LifecycleOption | None,
+) -> str | None:
+    declarations, _negative_declarations = _lifecycle_flag_declarations(option)
+    return next(
+        (
+            declaration
+            for declaration in declarations
+            if declaration.startswith("--")
+        ),
+        declarations[0] if declarations else None,
+    )
+
+
+def _leading_output_flags(
+    argv: list[str],
+    lifecycle_options: LifecycleOptions,
+) -> tuple[bool, bool]:
+    debug_positive, debug_negative = (
+        set(declarations)
+        for declarations in _lifecycle_flag_declarations(lifecycle_options.debug)
+    )
+    quiet_positive, quiet_negative = (
+        set(declarations)
+        for declarations in _lifecycle_flag_declarations(lifecycle_options.quiet)
+    )
     debug = False
     quiet = False
     for token in argv:
-        if token == "--debug":
+        if token in debug_positive:
             debug = True
-        elif token in ("--quiet", "-q"):
+        elif token in debug_negative:
+            debug = False
+        elif token in quiet_positive:
             quiet = True
+        elif token in quiet_negative:
+            quiet = False
         else:
             break
     return debug, quiet
@@ -2087,33 +2878,6 @@ def argument(*param_decls: str, sensitive: bool = False, **attrs: Any):
     return decorator
 
 
-def _decorate_standard_options(click: Any, func: Callable[..., Any], version: str | None):
-    func = click.option("--log-file", type=click.Path(dir_okay=False), help="Override the persistent log file.")(func)
-    func = click.option("--keep-temp", is_flag=True, default=None, help="Preserve this run's temp directory.")(func)
-    func = click.option(
-        "--config",
-        type=_explicit_config_path_type(click),
-        help="Load an additional config file.",
-    )(func)
-    func = click.option("--environment", help="Set the CLI environment.")(func)
-    func = click.option(
-        "--debug",
-        is_flag=True,
-        default=None,
-        help="Enable DEBUG logging on the user-facing stream.",
-    )(func)
-    func = click.option(
-        "--quiet",
-        "-q",
-        is_flag=True,
-        default=None,
-        help="Suppress INFO logs on the user-facing stream.",
-    )(func)
-    if version is not None:
-        func = click.version_option(version)(func)
-    return func
-
-
 def _explicit_config_path_type(click: Any) -> Any:
     class ExplicitConfigPath(click.Path):
         def convert(self, value: Any, param: Any, ctx: Any) -> Path:
@@ -2139,40 +2903,26 @@ def _explicit_config_path_type(click: Any) -> Any:
     )
 
 
-def _pop_standard_options(kwargs: dict[str, Any]) -> dict[str, Any]:
-    standard = {}
-    for key in _STANDARD_OPTION_KEYS:
-        standard[key] = kwargs.pop(key, None)
-    return standard
-
-
-def _merge_standard_options(group_standard: dict[str, Any], command_standard: dict[str, Any]) -> dict[str, Any]:
-    merged = {}
-    for key in _STANDARD_OPTION_KEYS:
-        value = command_standard.get(key)
-        merged[key] = group_standard.get(key) if value is None else value
-    return merged
-
-
-def _validate_standard_options(click: Any, standard: dict[str, Any]) -> None:
+def _validate_standard_options(
+    click: Any,
+    standard: dict[str, Any],
+    lifecycle_options: LifecycleOptions,
+) -> None:
     if standard.get("debug") and standard.get("quiet"):
-        raise click.UsageError("--debug and --quiet cannot be used together.")
-
-
-def _group_standard_options(click: Any) -> dict[str, Any]:
-    context = click.get_current_context(silent=True)
-    parent = context.parent if context is not None else None
-    if parent is None or not isinstance(parent.obj, dict):
-        return {}
-    standard = parent.obj.get(_GROUP_STANDARD_OPTIONS_KEY)
-    return dict(standard) if isinstance(standard, dict) else {}
+        debug = _primary_lifecycle_declaration(lifecycle_options.debug) or "debug"
+        quiet = _primary_lifecycle_declaration(lifecycle_options.quiet) or "quiet"
+        raise click.UsageError(f"{debug} and {quiet} cannot be used together.")
 
 
 def _build_group_wrapper(click: Any) -> Callable[..., None]:
     @click.pass_context
     def group_wrapper(context: Any, **kwargs: Any) -> None:
-        obj = dict(context.obj) if isinstance(context.obj, dict) else {}
-        obj[_GROUP_STANDARD_OPTIONS_KEY] = _pop_standard_options(kwargs)
-        context.obj = obj
+        del kwargs
+        bindings = getattr(
+            context.command,
+            _CLICK_LIFECYCLE_BINDINGS_ATTRIBUTE,
+            {},
+        )
+        _resolve_lifecycle_values(click, context, bindings)
 
     return group_wrapper

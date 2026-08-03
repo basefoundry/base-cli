@@ -9,6 +9,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Add immutable `LifecycleOptions` and `LifecycleOption` policies for enabling,
+  disabling, renaming, and configuring each standard option independently, with
+  normalized `LifecycleValues` stored in namespaced Click metadata without
+  replacing application-owned `Context.obj` state.
 - Add `App.attach()` and `base_cli.attach()` for applying one lifecycle to
   existing nested, aliased, chained, and lazy Click command trees while
   preserving their native callbacks, contexts, and result values.
