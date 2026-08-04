@@ -747,15 +747,34 @@ history writer to persist redacted command metadata, timing, exit status,
 project context, and a pointer to the raw log file. History writes should be
 best-effort and should not fail the user command when an index cannot be updated.
 
-High-frequency tools can set `base_cli.App(max_log_files=<count>)` to keep at
-most that many default persistent log files across the owner's run bundles.
+Durable applications use a bounded complete-bundle policy by default, so
+retention never splits a run's metadata, log, and temporary diagnostics.
+High-frequency tools can tune it explicitly:
+
+```python
+app = base_cli.App(
+    name="workspace-tools",
+    retention=base_cli.RetentionPolicy(
+        max_bundles=20,
+        max_age_seconds=30 * 24 * 60 * 60,
+        max_total_bytes=512 * 1024 * 1024,
+    ),
+)
+```
+
 Retention runs during startup after the current run's default log file is
-resolved, and the current run's log file is never pruned. The policy is skipped
-for `ctx.dry_run`,
-`log_to_file=False`, and explicit `--log-file` paths so no-durable-write modes
-and caller-selected log locations stay under caller control. Use this as a
-small guardrail for busy local tools; an application can provide broader
-maintenance commands for caches, logs, and retained temp files.
+resolved. The active invocation, inherited parent bundle, and bundles marked
+`preserve` (including `--keep-temp`) are never removed. A stale `running`
+bundle is eligible for crash recovery only when an age bound is configured;
+without one it is retained for diagnosis. The metadata and retention index are
+written with same-filesystem temporary files, flush/sync, and atomic
+replacement, and concurrent pruners serialize through a sidecar lock.
+
+The policy is skipped for `ctx.dry_run`, `log_to_file=False`, and explicit
+`--log-file` paths so no-durable-write modes and caller-selected log locations
+stay under caller control. The original `max_log_files=<count>` option remains
+available as a compatibility per-file policy; new applications should use
+`RetentionPolicy`.
 
 Logs use a stable, human-readable shape:
 

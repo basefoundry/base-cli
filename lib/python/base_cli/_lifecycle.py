@@ -9,6 +9,7 @@ from ._private_files import write_private_json
 from .context import Context
 from .exit_codes import ExitCode
 from .history import format_timestamp
+from ._runtime import refresh_run_bundle_index
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,9 @@ class RunRecorder:
             }
         )
         write_private_json(self.context._run_metadata_path, metadata)
+        owner_root = self.context.owner_root
+        if owner_root is not None:
+            refresh_run_bundle_index(owner_root / "runs", logger=self.context.log)
 
     def _existing_metadata(self) -> dict[str, Any]:
         path = self.context._run_metadata_path
@@ -103,6 +107,10 @@ class RunRecorder:
             "project_root": str(context.project_root) if context.project_root else None,
             "manifest": str(context.manifest_path) if context.manifest_path else None,
             "workspace_root": str(context.workspace_root) if context.workspace_root else None,
+            # ``--keep-temp`` is an explicit request to retain diagnostics;
+            # retention therefore protects the complete invocation bundle,
+            # not only its temporary directory.
+            "preserve": context.keep_temp,
         }
 
 
