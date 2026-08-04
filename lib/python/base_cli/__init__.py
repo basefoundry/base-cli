@@ -106,6 +106,7 @@ from .profile import (
     WorkspaceRootResolver,
 )
 from .runtime import RuntimeLayout
+from .typer import TyperAdapter, attach_typer, get_typer_command
 
 __all__ = [
     "App",
@@ -114,6 +115,7 @@ __all__ = [
     "AttachmentContextFactory",
     "AttachmentContract",
     "AttachmentServiceFactory",
+    "TyperAdapter",
     "BatteriesIncludedConfigLoader",
     "BOOLEAN",
     "ApplicationStateT",
@@ -150,11 +152,13 @@ __all__ = [
     "testing",
     "argument",
     "attach",
+    "attach_typer",
     "command",
     "configure_logger",
     "delegated_display_command",
     "get_command_app",
     "get_current_context",
+    "get_typer_command",
     "get_lifecycle_values",
     "log_critical",
     "log_debug",
