@@ -23,6 +23,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Add public typed runtime/profile/context contracts, generic attachment
   factories, isolated command-schema registries/codecs, and a strict consumer
   typing example.
+- Add opt-in `CliProfile.batteries_included()` layered configuration with
+  platform-aware user paths, project and environment files, provenance, and
+  validated framework settings.
 
 ### Changed
 

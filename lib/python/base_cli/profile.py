@@ -6,15 +6,22 @@ from pathlib import Path
 from typing import Any, Protocol, cast
 
 from ._runtime import runtime_layout
-from .config import load_yaml_file
+from .config import (
+    BatteriesIncludedConfigLoader,
+    ConfigSnapshot,
+    load_yaml_file,
+)
 from .context import Context
-from .paths import default_cache_root, make_run_id
+from .paths import default_cache_root, default_config_root, make_run_id, normalize_cli_name
 from .runtime import RuntimeLayout
 
 __all__ = [
     "CliProfile",
+    "BatteriesIncludedConfigLoader",
+    "ConfigSnapshot",
     "ConfigLoader",
     "DisplayCommandResolver",
+    "EnvironmentConfigLoader",
     "HistoryDisplayResolver",
     "HistoryWriter",
     "ProjectDiscovery",
@@ -72,7 +79,18 @@ class ConfigLoader(Protocol):
         self,
         project: ProjectInfo | None,
         explicit_path: Path | None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any] | ConfigSnapshot: ...
+
+
+class EnvironmentConfigLoader(Protocol):
+    """Load configuration with an explicitly selected environment."""
+
+    def __call__(
+        self,
+        project: ProjectInfo | None,
+        explicit_path: Path | None,
+        environment: str,
+    ) -> dict[str, Any] | ConfigSnapshot: ...
 
 
 class RuntimeResolver(Protocol):
@@ -147,6 +165,7 @@ class CliProfile:
         WorkspaceRootResolver,
         _no_workspace_root,
     )
+    load_config_for_environment: EnvironmentConfigLoader | None = None
 
     @classmethod
     def generic(
@@ -178,8 +197,97 @@ class CliProfile:
             or cast(WorkspaceRootResolver, _no_workspace_root),
         )
 
+    @classmethod
+    def batteries_included(
+        cls,
+        cli_name: str,
+        *,
+        cache_root: Path | None = None,
+        application_home: Path | None = None,
+        config_root: Path | None = None,
+        user_config_dir: Path | None = None,
+        user_config_name: str = "config.yaml",
+        project_config_name: str = ".base-cli.yaml",
+        environment_dir_name: str = "environments",
+        discover_project: ProjectDiscovery | None = None,
+        resolve_runtime: RuntimeResolver | None = None,
+    ) -> CliProfile:
+        """Create an opt-in profile with conventional layered YAML config.
+
+        Layers are merged from lowest to highest precedence: defaults, user,
+        project, user environment, project environment, and explicit ``--config``.
+        The generic profile remains convention-free; this method is the explicit
+        adoption point for applications that want these conventions.
+        """
+        normalized_name = normalize_cli_name(cli_name)
+        if not normalized_name:
+            raise ValueError("cli_name must contain a non-empty command name")
+        root = (config_root or default_config_root()).expanduser()
+        selected_user_dir = (
+            user_config_dir.expanduser()
+            if user_config_dir is not None
+            else root / normalized_name
+        )
+        loader = BatteriesIncludedConfigLoader(
+            normalized_name,
+            user_config_dir=selected_user_dir,
+            user_config_name=user_config_name,
+            project_config_name=project_config_name,
+            environment_dir_name=environment_dir_name,
+        )
+        project_discovery = discover_project or _conventional_project_discovery(project_config_name)
+
+        def load_user_config() -> object | None:
+            values = load_yaml_file(loader.user_config_path)
+            return values or None
+
+        def load_config(
+            project: ProjectInfo | None,
+            explicit_path: Path | None,
+        ) -> ConfigSnapshot:
+            return loader.load(
+                project.root if project is not None else None,
+                explicit_path,
+            )
+
+        def load_config_for_environment(
+            project: ProjectInfo | None,
+            explicit_path: Path | None,
+            environment: str,
+        ) -> ConfigSnapshot:
+            return loader.load(
+                project.root if project is not None else None,
+                explicit_path,
+                environment=environment,
+            )
+
+        return cls(
+            discover_project=project_discovery,
+            load_user_config=load_user_config,
+            load_config=load_config,
+            load_config_for_environment=load_config_for_environment,
+            resolve_runtime=resolve_runtime
+            or _generic_runtime_resolver(cache_root, application_home),
+        )
+
 def _discover_no_project(_cwd: Path) -> ProjectInfo | None:
     return None
+
+
+def _conventional_project_discovery(config_name: str) -> ProjectDiscovery:
+    def discover(cwd: Path) -> ProjectInfo | None:
+        current = cwd.expanduser().resolve()
+        for directory in (current, *current.parents):
+            candidate = directory / config_name
+            if candidate.is_file():
+                return ProjectInfo(
+                    root=directory,
+                    manifest=candidate,
+                    name=directory.name,
+                )
+        return None
+
+    return discover
 
 
 def _empty_user_config() -> None:

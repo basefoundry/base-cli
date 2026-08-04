@@ -3,11 +3,13 @@ from __future__ import annotations
 import contextvars
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Generic, TypeVar
 
 from ._cleanup import remove_owned_temp_directory
+from .config import FrameworkConfig
 
 
 _current_context: contextvars.ContextVar[Context[Any, Any, Any] | None] = contextvars.ContextVar(
@@ -68,6 +70,8 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
     run_root: Path | None = None
     application_context: ApplicationStateT | None = field(default=None, repr=False, compare=False)
     services: ServicesT | None = field(default=None, repr=False, compare=False)
+    framework_config: FrameworkConfig | None = field(default=None, repr=False, compare=False)
+    config_provenance: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
     _run_metadata_path: Path | None = field(default=None, init=False, repr=False, compare=False)
     _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
     _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)

@@ -48,6 +48,33 @@ def default_cache_root(
     return root / ".cache"
 
 
+def default_config_root(
+    *,
+    environ: Mapping[str, str] | None = None,
+    home: Path | None = None,
+    platform_name: str | None = None,
+) -> Path:
+    """Return the platform-default root for optional user configuration."""
+
+    environment = os.environ if environ is None else environ
+    configured = environment.get("BASE_CLI_CONFIG_DIR")
+    if configured:
+        return Path(configured).expanduser()
+
+    root = home.expanduser() if home is not None else Path.home()
+    system = platform_name or sys.platform
+    if system == "darwin":
+        return root / "Library" / "Application Support"
+    if system.startswith("win"):
+        app_data = environment.get("APPDATA")
+        return Path(app_data).expanduser() if app_data else root / "AppData" / "Roaming"
+
+    xdg_config_home = environment.get("XDG_CONFIG_HOME")
+    if xdg_config_home:
+        return Path(xdg_config_home).expanduser()
+    return root / ".config"
+
+
 def current_working_dir() -> Path:
     return _WORKING_DIRECTORY_OVERRIDE.get() or Path.cwd()
 

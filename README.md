@@ -100,6 +100,10 @@ command subtype in their return type.
 factories define the Click attachment boundary for adapters that compose or
 wrap an attached command.
 
+`ConfigSnapshot` and `FrameworkConfig` provide the typed result boundary for
+the opt-in batteries-included profile: consumer configuration, validated
+lifecycle settings, and per-key provenance remain separate.
+
 Command protocol schemas can be isolated per consumer with
 `CommandSchemaRegistry` and `CommandCodec`. The module-level registration and
 codec helpers remain compatible defaults backed by `RECORD_SCHEMAS`, but new
@@ -647,6 +651,10 @@ Important fields include:
 - `ctx.log_file`: the run's shared `logs/primary.log`, or `None` when persistent
   logging is disabled.
 - `ctx.config`: merged configuration dictionary.
+- `ctx.framework_config`: validated lifecycle settings supplied by the
+  batteries-included profile, or `None` for generic/custom dictionary loaders.
+- `ctx.config_provenance`: winning source layer for each dotted configuration
+  key when a layered snapshot is used.
 - `ctx.application_context`: optional application state returned by an
   attachment's `context_factory`, or `None`.
 - `ctx.services`: optional services returned by an attachment's
@@ -775,6 +783,21 @@ exposes the opaque user-configuration value returned by the profile. Consumers
 that need user files, project files, environment variables, or a merge
 precedence must implement those policies in `CliProfile.load_config` and
 `CliProfile.load_user_config`; `base_cli` does not define the value's fields.
+
+Applications that want a standard opt-in policy can use
+`CliProfile.batteries_included("tool")`. It discovers optional platform-aware
+user (`config.yaml`), project (`.base-cli.yaml`), and environment
+(`environments/<name>.yaml`) layers before the explicit file. The precedence is
+defaults → user → project → user environment → project environment → explicit
+file → lifecycle command-line options. The selected environment comes from
+`--environment`, then the explicit/project/user base files, and defaults to
+`dev`. Mappings merge recursively; scalar and list values replace lower layers.
+
+The batteries-included profile validates the framework keys `environment`,
+`log_level`, and `keep_temp` into `ctx.framework_config`, keeps consumer keys in
+`ctx.config`, and records winning dotted-key sources in
+`ctx.config_provenance`. Missing implicit files remain harmless; explicit
+`--config` paths retain strict validation.
 
 ## Project Discovery
 
