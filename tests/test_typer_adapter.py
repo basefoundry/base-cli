@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import tempfile
 import unittest
 from pathlib import Path
@@ -86,7 +87,8 @@ class TyperAdapterTests(unittest.TestCase):
 
         self.assertEqual(help_result.exit_code, 0, help_result.output)
         self.assertIn("Root help", help_result.stdout)
-        self.assertIn("--debug", help_result.stdout)
+        plain_help = re.sub(r"\x1b\[[0-9;]*m", "", help_result.stdout)
+        self.assertIn("--debug", plain_help)
         self.assertEqual(status_result.exit_code, 0, status_result.output)
         self.assertIn("ready", status_result.stdout)
         self.assertNotEqual(failure_result.exit_code, 0)
