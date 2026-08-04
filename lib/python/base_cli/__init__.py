@@ -31,6 +31,12 @@ def _resolve_version() -> str:
 __version__ = _resolve_version()
 
 from . import command_filters, command_protocol, history, testing
+from .attachment import (
+    AttachmentAdapter,
+    AttachmentContextFactory,
+    AttachmentContract,
+    AttachmentServiceFactory,
+)
 from .app import (
     App,
     argument,
@@ -44,16 +50,26 @@ from .app import (
 from .command_filters import CommandFilterNormalizer, command_matches, normalize_command_filter, normalize_command_filters
 from .command_protocol import (
     BOOLEAN,
+    DEFAULT_SCHEMA_REGISTRY,
+    CommandCodec,
     NULLABLE_STRING,
     STRING,
     CommandProtocolError,
+    CommandSchemaRegistry,
     FieldSpec,
+    RECORD_SCHEMAS,
     dumps_record,
     dumps_records,
     loads_records,
     register_record_schema,
 )
-from .context import Context, get_current_context
+from .context import (
+    ApplicationStateT,
+    ConfigT,
+    Context,
+    ServicesT,
+    get_current_context,
+)
 from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
@@ -74,17 +90,41 @@ from .output import (
     render_records,
     resolve_output_format,
 )
-from .profile import CliProfile, ProjectInfo, RuntimeBinding
+from .profile import (
+    CliProfile,
+    ConfigLoader,
+    DisplayCommandResolver,
+    HistoryDisplayResolver,
+    HistoryWriter,
+    ProjectDiscovery,
+    ProjectInfo,
+    RuntimeBinding,
+    RuntimeResolver,
+    UserConfigLoader,
+    WorkspaceRootResolver,
+)
+from .runtime import RuntimeLayout
 
 __all__ = [
     "App",
     "__version__",
+    "AttachmentAdapter",
+    "AttachmentContextFactory",
+    "AttachmentContract",
+    "AttachmentServiceFactory",
     "BOOLEAN",
+    "ApplicationStateT",
     "CliProfile",
+    "ConfigLoader",
     "CommandFilterNormalizer",
+    "CommandCodec",
     "CommandProtocolError",
+    "CommandSchemaRegistry",
     "ConfigurationError",
     "Context",
+    "ConfigT",
+    "DEFAULT_SCHEMA_REGISTRY",
+    "DisplayCommandResolver",
     "ExitCode",
     "FieldSpec",
     "LIFECYCLE_META_KEY",
@@ -121,6 +161,10 @@ __all__ = [
     "OutputFormatError",
     "PUBLIC_OUTPUT_FORMATS",
     "ProjectInfo",
+    "ProjectDiscovery",
+    "RECORD_SCHEMAS",
+    "RuntimeLayout",
+    "RuntimeResolver",
     "is_terminal",
     "output_format_choices",
     "option",
@@ -130,4 +174,9 @@ __all__ = [
     "resolve_output_format",
     "run_app",
     "RuntimeBinding",
+    "ServicesT",
+    "HistoryWriter",
+    "HistoryDisplayResolver",
+    "UserConfigLoader",
+    "WorkspaceRootResolver",
 ]

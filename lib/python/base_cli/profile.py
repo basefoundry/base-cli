@@ -1,14 +1,29 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
-from ._runtime import RuntimeLayout, runtime_layout
+from ._runtime import runtime_layout
 from .config import load_yaml_file
+from .context import Context
 from .paths import default_cache_root, make_run_id
+from .runtime import RuntimeLayout
+
+__all__ = [
+    "CliProfile",
+    "ConfigLoader",
+    "DisplayCommandResolver",
+    "HistoryDisplayResolver",
+    "HistoryWriter",
+    "ProjectDiscovery",
+    "ProjectInfo",
+    "RuntimeBinding",
+    "RuntimeResolver",
+    "UserConfigLoader",
+    "WorkspaceRootResolver",
+]
 
 
 @dataclass(frozen=True)
@@ -38,14 +53,63 @@ class RuntimeBinding:
     write_identity: bool = False
 
 
-ProjectDiscovery = Callable[[Path], ProjectInfo | None]
-UserConfigLoader = Callable[[], object | None]
-ConfigLoader = Callable[[ProjectInfo | None, Path | None], dict[str, Any]]
-RuntimeResolver = Callable[[str, ProjectInfo | None], RuntimeBinding]
-WorkspaceRootResolver = Callable[[object | None], Path | None]
-HistoryWriter = Callable[[Any, list[str], set[str], datetime, int], None]
-DisplayCommandResolver = Callable[[], str | None]
-HistoryDisplayResolver = Callable[[str, list[str]], str]
+class ProjectDiscovery(Protocol):
+    """Discover consumer-owned project information for the current directory."""
+
+    def __call__(self, cwd: Path) -> ProjectInfo | None: ...
+
+
+class UserConfigLoader(Protocol):
+    """Load opaque consumer-owned user configuration."""
+
+    def __call__(self) -> object | None: ...
+
+
+class ConfigLoader(Protocol):
+    """Load validated framework configuration and opaque consumer settings."""
+
+    def __call__(
+        self,
+        project: ProjectInfo | None,
+        explicit_path: Path | None,
+    ) -> dict[str, Any]: ...
+
+
+class RuntimeResolver(Protocol):
+    """Resolve the runtime directories and ownership for one invocation."""
+
+    def __call__(self, cli_name: str, project: ProjectInfo | None) -> RuntimeBinding: ...
+
+
+class WorkspaceRootResolver(Protocol):
+    """Project a consumer-owned user configuration into a workspace root."""
+
+    def __call__(self, user_config: object | None) -> Path | None: ...
+
+
+class HistoryWriter(Protocol):
+    """Persist one completed invocation using the active typed Context."""
+
+    def __call__(
+        self,
+        context: Context[Any, Any, Any],
+        argv: list[str],
+        sensitive_parameters: set[str],
+        started_at: datetime,
+        exit_code: int,
+    ) -> None: ...
+
+
+class DisplayCommandResolver(Protocol):
+    """Resolve the process-facing command label used in diagnostics."""
+
+    def __call__(self) -> str | None: ...
+
+
+class HistoryDisplayResolver(Protocol):
+    """Resolve the command label persisted in consumer history."""
+
+    def __call__(self, cli_name: str, argv: list[str]) -> str: ...
 
 
 def _no_display_command() -> str | None:
@@ -75,8 +139,14 @@ class CliProfile:
     resolve_runtime: RuntimeResolver
     history_writer: HistoryWriter | None = None
     display_command: DisplayCommandResolver = _no_display_command
-    history_display_command: HistoryDisplayResolver = _generic_history_display_command
-    resolve_workspace_root: WorkspaceRootResolver = _no_workspace_root
+    history_display_command: HistoryDisplayResolver = cast(
+        HistoryDisplayResolver,
+        _generic_history_display_command,
+    )
+    resolve_workspace_root: WorkspaceRootResolver = cast(
+        WorkspaceRootResolver,
+        _no_workspace_root,
+    )
 
     @classmethod
     def generic(
@@ -87,6 +157,7 @@ class CliProfile:
         discover_project: ProjectDiscovery | None = None,
         load_user_config: UserConfigLoader | None = None,
         load_config: ConfigLoader | None = None,
+        resolve_runtime: RuntimeResolver | None = None,
         history_display_command: HistoryDisplayResolver | None = None,
         resolve_workspace_root: WorkspaceRootResolver | None = None,
     ) -> CliProfile:
@@ -96,13 +167,15 @@ class CliProfile:
         write command history unless the caller supplies those policies.
         """
         return cls(
-            discover_project=discover_project or _discover_no_project,
+            discover_project=discover_project or cast(ProjectDiscovery, _discover_no_project),
             load_user_config=load_user_config or _empty_user_config,
-            load_config=load_config or _load_explicit_config,
-            resolve_runtime=_generic_runtime_resolver(cache_root, application_home),
+            load_config=load_config or cast(ConfigLoader, _load_explicit_config),
+            resolve_runtime=resolve_runtime or _generic_runtime_resolver(cache_root, application_home),
             display_command=_no_display_command,
-            history_display_command=history_display_command or _generic_history_display_command,
-            resolve_workspace_root=resolve_workspace_root or _no_workspace_root,
+            history_display_command=history_display_command
+            or cast(HistoryDisplayResolver, _generic_history_display_command),
+            resolve_workspace_root=resolve_workspace_root
+            or cast(WorkspaceRootResolver, _no_workspace_root),
         )
 
 def _discover_no_project(_cwd: Path) -> ProjectInfo | None:

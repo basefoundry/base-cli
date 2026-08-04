@@ -123,3 +123,30 @@ whose compatibility names still reflect one historical consumer.
 
 The package rename is deliberately separate from this refactor. Names can be
 changed after the dependency boundary is stable.
+
+## Typed extension contracts
+
+The supported callback contracts are exported from `base_cli` as typed protocols
+for static analyzers: `ProjectDiscovery`, `UserConfigLoader`,
+`ConfigLoader`, `RuntimeResolver`, `WorkspaceRootResolver`, `HistoryWriter`,
+`DisplayCommandResolver`, and `HistoryDisplayResolver`. A custom runtime
+resolver returns `RuntimeBinding`, whose immutable `layout` is the public
+`RuntimeLayout` dataclass. No consumer needs to import `_runtime`.
+
+`Context` accepts three consumer payload types:
+
+```python
+Context[ConfigT, ApplicationStateT, ServicesT]
+```
+
+`config` is the validated configuration payload; `application_context` and
+`services` are optional state and service payloads initialized by an attached
+consumer. `AttachmentAdapter` and `AttachmentContract` describe the typed
+boundary used by `App.attach()`. Attachment returns the same concrete Click
+command object, so aliases, lazy groups, and custom Click subclasses remain
+owned by the consumer.
+
+The core lifecycle is synchronous by design. Native `async def` callbacks and
+callbacks that return awaitables are rejected with an actionable error. An
+adapter that owns an event loop may run asynchronous work explicitly at its
+boundary and return a normal synchronous callback result to base-cli.

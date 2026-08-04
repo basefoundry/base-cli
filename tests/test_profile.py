@@ -117,3 +117,31 @@ class GenericProfileTests(unittest.TestCase):
         profile = base_cli.CliProfile.generic(history_display_command=formatter)
 
         self.assertIs(profile.history_display_command, formatter)
+
+    def test_generic_profile_accepts_a_public_runtime_resolver(self) -> None:
+        def resolve_runtime(
+            _cli_name: str,
+            _project: base_cli.ProjectInfo | None,
+        ) -> base_cli.RuntimeBinding:
+            layout = base_cli.RuntimeLayout(
+                owner_root=Path("owner"),
+                run_root=Path("run"),
+                state_dir=Path("state"),
+                log_dir=Path("logs"),
+                cache_dir=Path("cache"),
+                temp_dir=Path("temp"),
+            )
+            return base_cli.RuntimeBinding(
+                cache_root=Path("cache"),
+                layout=layout,
+                application_home=None,
+                runtime_owner="test",
+                project_root=None,
+                project_name=None,
+                inherited_path=None,
+                history_parent_run_id=None,
+                run_id="run",
+            )
+
+        profile = base_cli.CliProfile.generic(resolve_runtime=resolve_runtime)
+        self.assertIs(profile.resolve_runtime, resolve_runtime)

@@ -20,6 +20,9 @@ and versions are tracked in the repo-root `VERSION` file.
   Click parameters with domain-specific secret names.
 - Add `ConfigurationError` so consumer profiles can explicitly mark
   user-correctable configuration messages as safe usage errors.
+- Add public typed runtime/profile/context contracts, generic attachment
+  factories, isolated command-schema registries/codecs, and a strict consumer
+  typing example.
 
 ### Changed
 
@@ -32,6 +35,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Route `base_cli.testing.invoke()` through the production `run_app()` boundary
   and add a keyword-only `reraise_unexpected` opt-in for tests that need the
   original exception.
+- Reject native async callbacks explicitly and preserve Click command subtypes
+  through typed `attach()` decorators and adapters.
 
 ### Fixed
 

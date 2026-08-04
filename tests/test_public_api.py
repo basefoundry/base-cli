@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
-from base_cli import command_filters, command_protocol, history, lifecycle_options
+from base_cli import attachment, command_filters, command_protocol, history, lifecycle_options
 
 
 class PublicApiTests(unittest.TestCase):
@@ -32,7 +32,12 @@ class PublicApiTests(unittest.TestCase):
     def test_facade_exports_supported_modules_functions_and_types(self) -> None:
         expected = {
             "CommandProtocolError",
+            "CommandCodec",
+            "CommandSchemaRegistry",
             "ConfigurationError",
+            "AttachmentAdapter",
+            "AttachmentContract",
+            "RuntimeLayout",
             "attach",
             "command_filters",
             "command_matches",
@@ -63,12 +68,25 @@ class PublicApiTests(unittest.TestCase):
             {"CommandFilterNormalizer", "command_matches", "normalize_command_filter", "normalize_command_filters"},
         )
         self.assertEqual(
+            set(attachment.__all__),
+            {
+                "AttachmentAdapter",
+                "AttachmentContextFactory",
+                "AttachmentContract",
+                "AttachmentServiceFactory",
+            },
+        )
+        self.assertEqual(
             set(command_protocol.__all__),
             {
                 "BOOLEAN",
+                "CommandCodec",
                 "CommandProtocolError",
+                "CommandSchemaRegistry",
+                "DEFAULT_SCHEMA_REGISTRY",
                 "FieldSpec",
                 "NULLABLE_STRING",
+                "RECORD_SCHEMAS",
                 "STRING",
                 "dumps_record",
                 "dumps_records",

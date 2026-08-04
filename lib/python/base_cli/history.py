@@ -55,7 +55,7 @@ def utc_now() -> datetime:
 
 
 def build_finished_record(
-    context: Context,
+    context: Context[Any, Any, Any],
     argv: list[str],
     sensitive_options: set[str],
     started_at: datetime,

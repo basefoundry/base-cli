@@ -76,6 +76,41 @@ consumer-owned adapters should supply any product-specific policies. See
 [`docs/consumer-profiles.md`](docs/consumer-profiles.md) for the boundary and
 migration guidance.
 
+### Typed extension contracts
+
+The public profile contract includes `ProjectDiscovery`, `ConfigLoader`,
+`RuntimeResolver`, `HistoryWriter`, and the other resolver protocols exported
+from `base_cli`. `RuntimeBinding.layout` uses the public immutable
+`RuntimeLayout` type; consumers do not need to import private runtime modules.
+
+`Context` is generic over the validated configuration, application state, and
+service payloads owned by a consumer:
+
+```python
+Config = dict[str, object]
+context: base_cli.Context[Config, ApplicationState, Services]
+```
+
+`App.command()`, `App.subcommand()`, `@base_cli.command()`, `@base_cli.option()`,
+and `@base_cli.argument()` preserve the decorated callable's `ParamSpec`
+signature. `base_cli.attach()` and `App.attach()` preserve the concrete Click
+command subtype in their return type.
+
+`AttachmentAdapter`, `AttachmentContract`, and the typed context/service
+factories define the Click attachment boundary for adapters that compose or
+wrap an attached command.
+
+Command protocol schemas can be isolated per consumer with
+`CommandSchemaRegistry` and `CommandCodec`. The module-level registration and
+codec helpers remain compatible defaults backed by `RECORD_SCHEMAS`, but new
+integrations should prefer an instance-owned registry when multiple protocol
+boundaries share a process.
+
+Native async callbacks are intentionally rejected with an actionable error.
+The core lifecycle is synchronous so cleanup, Click resource unwinding, and
+outcome finalization remain deterministic; an adapter may provide an explicit
+async runner without changing the core contract.
+
 ## Public API
 
 The supported facade is `import base_cli`. It exports the command lifecycle
@@ -100,6 +135,10 @@ with legacy command names can pass a `normalizer` callback to
 Low-level implementation helpers are intentionally not included in the
 module `__all__` surfaces. Downstream code should use the documented facade or
 the explicitly supported symbols from those modules.
+
+The repository includes [`examples/typed_consumer.py`](examples/typed_consumer.py),
+a strict-typechecked consumer showing the public profile, runtime, and generic
+context contracts. CI runs `mypy --strict` against that sample.
 
 ## Minimal Command
 

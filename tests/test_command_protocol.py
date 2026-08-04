@@ -4,7 +4,10 @@ import unittest
 from unittest.mock import patch
 
 from base_cli.command_protocol import BOOLEAN
+from base_cli.command_protocol import CommandCodec
 from base_cli.command_protocol import CommandProtocolError
+from base_cli.command_protocol import CommandSchemaRegistry
+from base_cli.command_protocol import DEFAULT_SCHEMA_REGISTRY
 from base_cli.command_protocol import NULLABLE_STRING
 from base_cli.command_protocol import RECORD_SCHEMAS
 from base_cli.command_protocol import STRING
@@ -57,6 +60,25 @@ class CommandProtocolTests(unittest.TestCase):
             loads_records(payload, expected_record_type=record_type),
             (record_type, ({"name": "demo", "enabled": True, "note": None},)),
         )
+
+    def test_consumers_can_isolate_schema_registries_and_codecs(self) -> None:
+        first = CommandCodec()
+        second = CommandCodec(CommandSchemaRegistry())
+        first.register_schema("isolated", {"name": STRING})
+        second.register_schema("isolated", {"enabled": BOOLEAN})
+
+        first_payload = first.dumps_record("isolated", {"name": "first"})
+        second_payload = second.dumps_record("isolated", {"enabled": True})
+
+        self.assertEqual(first.loads_records(first_payload), ("isolated", ({"name": "first"},)))
+        self.assertEqual(second.loads_records(second_payload), ("isolated", ({"enabled": True},)))
+        with self.assertRaisesRegex(CommandProtocolError, "unknown field 'enabled'"):
+            first.loads_records(second_payload)
+        with self.assertRaisesRegex(CommandProtocolError, "unknown field 'name'"):
+            second.loads_records(first_payload)
+
+    def test_default_helpers_remain_backwards_compatible_with_registry_alias(self) -> None:
+        self.assertIs(RECORD_SCHEMAS, DEFAULT_SCHEMA_REGISTRY.schemas)
 
     def test_record_schema_registration_rejects_invalid_or_duplicate_schemas(self) -> None:
         with self.assertRaisesRegex(CommandProtocolError, "already registered"):

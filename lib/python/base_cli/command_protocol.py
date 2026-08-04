@@ -7,9 +7,13 @@ from dataclasses import dataclass
 
 __all__ = [
     "BOOLEAN",
+    "CommandCodec",
     "CommandProtocolError",
+    "CommandSchemaRegistry",
+    "DEFAULT_SCHEMA_REGISTRY",
     "FieldSpec",
     "NULLABLE_STRING",
+    "RECORD_SCHEMAS",
     "STRING",
     "dumps_record",
     "dumps_records",
@@ -36,11 +40,84 @@ STRING = FieldSpec("string")
 NULLABLE_STRING = FieldSpec("string", nullable=True)
 BOOLEAN = FieldSpec("boolean")
 
-# Consumers register their record schemas at their integration boundary.
-RECORD_SCHEMAS: dict[str, dict[str, FieldSpec]] = {}
-
 RecordValue = str | bool | None
 Record = Mapping[str, RecordValue]
+
+
+class CommandSchemaRegistry:
+    """Own an isolated set of command record schemas.
+
+    The module-level helpers below continue to use the default registry for
+    compatibility, while consumers that host more than one protocol boundary
+    can construct independent registries and codecs.
+    """
+
+    def __init__(self) -> None:
+        self.schemas: dict[str, dict[str, FieldSpec]] = {}
+
+    def register(self, record_type: str, fields: Mapping[str, FieldSpec]) -> None:
+        _validate_and_store_schema(self.schemas, record_type, fields)
+
+    def schema(self, record_type: str) -> dict[str, FieldSpec]:
+        return _lookup_schema(self.schemas, record_type)
+
+
+class CommandCodec:
+    """Encode and decode records using one isolated schema registry."""
+
+    def __init__(self, registry: CommandSchemaRegistry | None = None) -> None:
+        self.registry = registry or CommandSchemaRegistry()
+
+    def register_schema(self, record_type: str, fields: Mapping[str, FieldSpec]) -> None:
+        self.registry.register(record_type, fields)
+
+    def dumps_record(
+        self,
+        record_type: str,
+        record: Record,
+        *,
+        protocol_header: str = PROTOCOL_HEADER,
+    ) -> str:
+        return dumps_record(
+            record_type,
+            record,
+            protocol_header=protocol_header,
+            registry=self.registry,
+        )
+
+    def dumps_records(
+        self,
+        record_type: str,
+        records: tuple[Record, ...] | list[Record],
+        *,
+        protocol_header: str = PROTOCOL_HEADER,
+    ) -> str:
+        return dumps_records(
+            record_type,
+            records,
+            protocol_header=protocol_header,
+            registry=self.registry,
+        )
+
+    def loads_records(
+        self,
+        payload: str,
+        expected_record_type: str | None = None,
+        *,
+        protocol_header: str = PROTOCOL_HEADER,
+    ) -> tuple[str, tuple[dict[str, RecordValue], ...]]:
+        return loads_records(
+            payload,
+            expected_record_type,
+            protocol_header=protocol_header,
+            registry=self.registry,
+        )
+
+
+DEFAULT_SCHEMA_REGISTRY = CommandSchemaRegistry()
+# Preserve the existing mutable compatibility surface. New consumers should
+# use CommandSchemaRegistry or CommandCodec instead of process-global state.
+RECORD_SCHEMAS = DEFAULT_SCHEMA_REGISTRY.schemas
 
 
 def register_record_schema(record_type: str, fields: Mapping[str, FieldSpec]) -> None:
@@ -52,27 +129,7 @@ def register_record_schema(record_type: str, fields: Mapping[str, FieldSpec]) ->
     cannot silently change the meaning of an established record type.
     """
 
-    if not isinstance(record_type, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", record_type) is None:
-        raise CommandProtocolError(
-            "record_type must start with a letter and contain only letters, digits, and hyphens"
-        )
-    if record_type in RECORD_SCHEMAS:
-        raise CommandProtocolError(f"record_type '{record_type}' is already registered")
-    if not isinstance(fields, Mapping) or not fields:
-        raise CommandProtocolError("record schema fields must be a non-empty mapping")
-
-    normalized: dict[str, FieldSpec] = {}
-    for field_name, spec in fields.items():
-        if not isinstance(field_name, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", field_name) is None:
-            raise CommandProtocolError(
-                f"field name '{field_name}' must start with a letter and contain only letters, digits, and underscores"
-            )
-        if not isinstance(spec, FieldSpec) or spec.value_type not in {"string", "boolean"}:
-            raise CommandProtocolError(
-                f"field '{field_name}' must use a FieldSpec with value_type 'string' or 'boolean'"
-            )
-        normalized[field_name] = spec
-    RECORD_SCHEMAS[record_type] = normalized
+    DEFAULT_SCHEMA_REGISTRY.register(record_type, fields)
 
 
 def dumps_record(
@@ -80,8 +137,14 @@ def dumps_record(
     record: Record,
     *,
     protocol_header: str = PROTOCOL_HEADER,
+    registry: CommandSchemaRegistry | None = None,
 ) -> str:
-    return dumps_records(record_type, (record,), protocol_header=protocol_header)
+    return dumps_records(
+        record_type,
+        (record,),
+        protocol_header=protocol_header,
+        registry=registry,
+    )
 
 
 def dumps_records(
@@ -89,8 +152,10 @@ def dumps_records(
     records: tuple[Record, ...] | list[Record],
     *,
     protocol_header: str = PROTOCOL_HEADER,
+    registry: CommandSchemaRegistry | None = None,
 ) -> str:
-    schema = _schema(record_type)
+    active_registry = registry or DEFAULT_SCHEMA_REGISTRY
+    schema = active_registry.schema(record_type)
     if len(records) > MAX_RECORD_COUNT:
         raise CommandProtocolError(f"record_count exceeds protocol maximum of {MAX_RECORD_COUNT}")
     lines = [
@@ -114,7 +179,9 @@ def loads_records(
     expected_record_type: str | None = None,
     *,
     protocol_header: str = PROTOCOL_HEADER,
+    registry: CommandSchemaRegistry | None = None,
 ) -> tuple[str, tuple[dict[str, RecordValue], ...]]:
+    active_registry = registry or DEFAULT_SCHEMA_REGISTRY
     # The wire framing is LF-delimited. `str.splitlines()` also accepts CR,
     # vertical tab, form feed, and Unicode separators, which would make the
     # Python decoder more permissive than the Bash and Zsh readers.
@@ -136,7 +203,7 @@ def loads_records(
         raise CommandProtocolError(f"unsupported protocol header; expected {protocol_header}")
 
     record_type = _metadata_value(take("record_type"), "record_type")
-    schema = _schema(record_type)
+    schema = active_registry.schema(record_type)
     if expected_record_type is not None and record_type != expected_record_type:
         raise CommandProtocolError(f"expected record_type '{expected_record_type}', got '{record_type}'")
 
@@ -175,12 +242,43 @@ def loads_records(
     return record_type, tuple(records)
 
 
-def _schema(record_type: str) -> dict[str, FieldSpec]:
+def _lookup_schema(
+    schemas: Mapping[str, dict[str, FieldSpec]],
+    record_type: str,
+) -> dict[str, FieldSpec]:
     try:
-        return RECORD_SCHEMAS[record_type]
+        return schemas[record_type]
     except KeyError as exc:
-        supported = ", ".join(sorted(RECORD_SCHEMAS))
+        supported = ", ".join(sorted(schemas))
         raise CommandProtocolError(f"unsupported record_type '{record_type}'; expected one of: {supported}") from exc
+
+
+def _validate_and_store_schema(
+    schemas: dict[str, dict[str, FieldSpec]],
+    record_type: str,
+    fields: Mapping[str, FieldSpec],
+) -> None:
+    if not isinstance(record_type, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", record_type) is None:
+        raise CommandProtocolError(
+            "record_type must start with a letter and contain only letters, digits, and hyphens"
+        )
+    if record_type in schemas:
+        raise CommandProtocolError(f"record_type '{record_type}' is already registered")
+    if not isinstance(fields, Mapping) or not fields:
+        raise CommandProtocolError("record schema fields must be a non-empty mapping")
+
+    normalized: dict[str, FieldSpec] = {}
+    for field_name, spec in fields.items():
+        if not isinstance(field_name, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*", field_name) is None:
+            raise CommandProtocolError(
+                f"field name '{field_name}' must start with a letter and contain only letters, digits, and underscores"
+            )
+        if not isinstance(spec, FieldSpec) or spec.value_type not in {"string", "boolean"}:
+            raise CommandProtocolError(
+                f"field '{field_name}' must use a FieldSpec with value_type 'string' or 'boolean'"
+            )
+        normalized[field_name] = spec
+    schemas[record_type] = normalized
 
 
 def _validate_record(schema: Mapping[str, FieldSpec], record_type: str, record: Record) -> None:
