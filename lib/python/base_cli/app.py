@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
 import os
 import stat
@@ -13,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
-from typing import Any, Callable
+from typing import Any, Callable, ParamSpec, TypeVar
 
 from ._lifecycle import (
     InvocationOutcome,
@@ -29,6 +30,7 @@ from ._runtime import (
     create_runtime_directory,
     prune_log_files,
 )
+from .attachment import AttachmentContract
 from .context import Context, recover_current_context, reset_current_context, set_current_context
 from .errors import ConfigurationError
 from .exit_codes import ExitCode
@@ -92,11 +94,20 @@ _CLICK_ORIGINAL_RESOLVE_ATTRIBUTE = "__base_cli_original_resolve__"
 _CLICK_ORIGINAL_MAIN_ATTRIBUTE = "__base_cli_original_main__"
 _CLICK_APP_OWNER_ATTRIBUTE = "__base_cli_app_owner__"
 _CLICK_LIFECYCLE_BINDINGS_ATTRIBUTE = "__base_cli_lifecycle_bindings__"
+_CLICK_INSTRUMENTED_SENTINEL = object()
+_CLICK_MAIN_INSTRUMENTED_SENTINEL = object()
 _CLICK_ATTACHMENT_LOCK = RLock()
 _REGISTRATION_OPEN = "open"
 _REGISTRATION_MATERIALIZING = "materializing"
 _REGISTRATION_FROZEN = "frozen"
 _COMMAND_NAME_SUFFIXES = frozenset({"command", "cmd", "group", "grp"})
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+_ClickCommandT = TypeVar("_ClickCommandT")
+_ASYNC_CALLBACK_ERROR = (
+    "Native async Click callbacks are not supported by base-cli. "
+    "Use a synchronous callback or an adapter with an explicit async runner."
+)
 
 
 @dataclass
@@ -139,15 +150,7 @@ class _LifecycleResolution:
     raw: dict[str, _RawLifecycleValue]
 
 
-@dataclass(frozen=True)
-class _ClickAttachment:
-    app: Any
-    command: Any
-    context_factory: Callable[[Context], Any] | None
-    service_factory: Callable[[Context], Any] | None
-    sensitive_parameters: frozenset[str]
-    lifecycle_options: LifecycleOptions
-    standard_bindings: dict[str, _LifecycleBinding]
+_ClickAttachment = AttachmentContract
 
 
 class _AttachedInvocation:
@@ -155,9 +158,9 @@ class _AttachedInvocation:
 
     def __init__(
         self,
-        attachment: _ClickAttachment,
+        attachment: _ClickAttachment[Any],
         root_click_context: Any,
-        context: Context,
+        context: Context[Any, Any, Any],
         recorder: RunRecorder,
     ) -> None:
         self.attachment = attachment
@@ -269,7 +272,7 @@ def _default_log_file(layout: Any, configured_log_file: Path | None) -> Path:
     return configured_log_file or layout.log_dir / "primary.log"
 
 
-def _warn_lifecycle_failure(context: Context, message: str, exc: BaseException) -> None:
+def _warn_lifecycle_failure(context: Context[Any, Any, Any], message: str, exc: BaseException) -> None:
     """Report a secondary lifecycle failure without breaking teardown."""
     try:
         detail = str(exc) or type(exc).__name__
@@ -278,7 +281,7 @@ def _warn_lifecycle_failure(context: Context, message: str, exc: BaseException) 
         pass
 
 
-def _capture_invocation_context(context: Context, owner_app: App) -> None:
+def _capture_invocation_context(context: Context[Any, Any, Any], owner_app: App) -> None:
     state = _INVOCATION_STATE.get()
     if state is None or state.owner_app is not owner_app:
         return
@@ -310,7 +313,7 @@ def _capture_effective_output_options(
     state.quiet = quiet
 
 
-def _record_unexpected_traceback(context: Context, outcome: InvocationOutcome) -> None:
+def _record_unexpected_traceback(context: Context[Any, Any, Any], outcome: InvocationOutcome) -> None:
     if outcome.kind != "unexpected_error":
         return
     try:
@@ -360,7 +363,7 @@ def _discard_owned_run_record(recorder: RunRecorder) -> None:
         )
 
 
-def _reset_active_context(context: Context, token: Any) -> None:
+def _reset_active_context(context: Context[Any, Any, Any], token: Any) -> None:
     try:
         reset_current_context(token)
     except BaseException as exc:  # pylint: disable=broad-exception-caught
@@ -540,12 +543,17 @@ class App:
                 f"the registered command cannot use '{explicit_name}'."
             )
 
-    def command(self, *command_args: Any, **command_kwargs: Any):
+    def command(
+        self,
+        *command_args: Any,
+        **command_kwargs: Any,
+    ) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
         with self._registration_lock:
             self._ensure_registration_open()
             self._validate_single_command_name(command_args, command_kwargs)
 
-        def decorator(func: Callable[..., Any]):
+        def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
+            _reject_async_callback(func)
             with self._registration_lock:
                 self._ensure_registration_open()
                 self._validate_single_command_name(command_args, command_kwargs)
@@ -566,12 +574,17 @@ class App:
 
         return decorator
 
-    def subcommand(self, *command_args: Any, **command_kwargs: Any):
+    def subcommand(
+        self,
+        *command_args: Any,
+        **command_kwargs: Any,
+    ) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
         with self._registration_lock:
             self._ensure_registration_open()
             _explicit_command_name(command_args, command_kwargs)
 
-        def decorator(func: Callable[..., Any]):
+        def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
+            _reject_async_callback(func)
             with self._registration_lock:
                 self._ensure_registration_open()
                 if self._command_func is not None:
@@ -599,12 +612,12 @@ class App:
 
     def attach(
         self,
-        command: Any,
+        command: _ClickCommandT,
         *,
-        context_factory: Callable[[Context], Any] | None = None,
-        service_factory: Callable[[Context], Any] | None = None,
+        context_factory: Callable[[Context[Any, Any, Any]], Any] | None = None,
+        service_factory: Callable[[Context[Any, Any, Any]], Any] | None = None,
         sensitive_parameters: Iterable[str] = (),
-    ) -> Any:
+    ) -> _ClickCommandT:
         """Attach this app's lifecycle to an existing Click command tree.
 
         The same command object is returned rather than copied. Click continues
@@ -615,6 +628,7 @@ class App:
         click = _require_click()
         if not isinstance(command, click.Command):
             raise TypeError("App.attach() requires a click.Command instance.")
+        _reject_async_callback(getattr(command, "callback", None))
         if context_factory is not None and not callable(context_factory):
             raise TypeError("context_factory must be callable or None.")
         if service_factory is not None and not callable(service_factory):
@@ -668,17 +682,45 @@ class App:
                 )
 
             added_parameters: list[Any] = []
-            command_was_instrumented = bool(
-                getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, False)
-            )
-            main_was_instrumented = bool(
-                getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, False)
-            )
             missing_marker = object()
             previous_marker = getattr(
                 command,
                 _CLICK_ATTACHMENT_ATTRIBUTE,
                 missing_marker,
+            )
+            if previous_marker is not missing_marker and not isinstance(
+                previous_marker,
+                _ClickAttachment,
+            ):
+                raise RuntimeError(
+                    f"Click command '{command_name}' uses base-cli's reserved "
+                    "attachment marker. Remove that attribute before attaching."
+                )
+            for marker_name, sentinel, description in (
+                (
+                    _CLICK_INSTRUMENTED_ATTRIBUTE,
+                    _CLICK_INSTRUMENTED_SENTINEL,
+                    "command instrumentation",
+                ),
+                (
+                    _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE,
+                    _CLICK_MAIN_INSTRUMENTED_SENTINEL,
+                    "main instrumentation",
+                ),
+            ):
+                marker = getattr(command, marker_name, missing_marker)
+                if marker is not missing_marker and marker is not sentinel:
+                    raise RuntimeError(
+                        f"Click command '{command_name}' uses base-cli's reserved "
+                        f"{description} marker. Remove that attribute before attaching."
+                    )
+            command_was_instrumented = (
+                getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, None)
+                is _CLICK_INSTRUMENTED_SENTINEL
+            )
+            main_was_instrumented = (
+                getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, None)
+                is _CLICK_MAIN_INSTRUMENTED_SENTINEL
             )
             previous_redaction_plan = self._redaction_plan
             previous_attached_command = self._attached_command
@@ -905,7 +947,7 @@ class App:
             _capture_standard_options(standard, self)
             started_at = utc_now()
             started_monotonic_ns = time.monotonic_ns()
-            context: Context | None = None
+            context: Context[Any, Any, Any] | None = None
             recorder: RunRecorder | None = None
             outcome = outcome_from_exit_code(ExitCode.SUCCESS)
             invocation_argv: list[str] = []
@@ -934,7 +976,7 @@ class App:
                     context.log.debug("project_root=%s", context.project_root)
                 if context.manifest_path is not None:
                     context.log.debug("manifest_path=%s", context.manifest_path)
-                result = func(context, **kwargs)
+                result = _reject_async_result(func(context, **kwargs))
                 try:
                     exit_code = _normalize_command_result(result)
                 except TypeError as exc:
@@ -1002,7 +1044,11 @@ class App:
                     click_parameters[-1]._base_cli_sensitive = True
         return wrapper
 
-    def _create_context(self, standard: dict[str, Any], dry_run: bool = False) -> Context:
+    def _create_context(
+        self,
+        standard: dict[str, Any],
+        dry_run: bool = False,
+    ) -> Context[dict[str, Any], Any, Any]:
         project = self.profile.discover_project(current_working_dir())
         manifest_path = project.manifest if project is not None else None
         explicit_config = Path(standard["config"]).expanduser() if standard.get("config") else None
@@ -1125,7 +1171,7 @@ class App:
 
 
 def _rollback_context_creation(
-    context: Context,
+    context: Context[Any, Any, Any],
     *,
     logger_activation_started: bool,
 ) -> None:
@@ -1152,7 +1198,7 @@ class _AttachedLifecycleResource:
     def __init__(
         self,
         click: Any,
-        attachment: _ClickAttachment,
+        attachment: _ClickAttachment[Any],
         click_context: Any,
         lifecycle_values: LifecycleValues,
     ) -> None:
@@ -1163,7 +1209,7 @@ class _AttachedLifecycleResource:
         self.standard = _standard_options_from_values(lifecycle_values)
         self.started_at = utc_now()
         self.started_monotonic_ns = time.monotonic_ns()
-        self.context: Context | None = None
+        self.context: Context[Any, Any, Any] | None = None
         self.invocation: _AttachedInvocation | None = None
         self.context_token: Any = None
         self.invocation_token: Any = None
@@ -2336,8 +2382,14 @@ def _with_attached_lifecycle_resource(
 
 def _instrument_attached_click_command(click: Any, command: Any) -> None:
     with _CLICK_ATTACHMENT_LOCK:
-        if getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, False):
+        marker = getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, None)
+        if marker is _CLICK_INSTRUMENTED_SENTINEL:
             return
+        if marker is not None:
+            raise RuntimeError(
+                "Click command uses base-cli's reserved command instrumentation marker."
+            )
+        _reject_async_callback(getattr(command, "callback", None))
         original_invoke = command.invoke
         original_resolve = getattr(command, "resolve_command", None)
 
@@ -2380,7 +2432,7 @@ def _instrument_attached_click_command(click: Any, command: Any) -> None:
                     if resource.invocation is not None:
                         resource.invocation.start(click_context)
                 try:
-                    result = original_invoke(click_context)
+                    result = _reject_async_result(original_invoke(click_context))
                 except BaseException as exc:
                     resource.record_exception(exc)
                     raise
@@ -2391,7 +2443,7 @@ def _instrument_attached_click_command(click: Any, command: Any) -> None:
                 active.note_child_context(click_context)
                 if not _click_command_has_pending_children(click_context, command):
                     active.start(click_context)
-            return original_invoke(click_context)
+            return _reject_async_result(original_invoke(click_context))
 
         try:
             setattr(command, _CLICK_ORIGINAL_INVOKE_ATTRIBUTE, original_invoke)
@@ -2440,7 +2492,7 @@ def _instrument_attached_click_command(click: Any, command: Any) -> None:
 
                 command.resolve_command = resolve_command
 
-            setattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, True)
+            setattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, _CLICK_INSTRUMENTED_SENTINEL)
         except BaseException:
             _restore_attached_click_command(command)
             raise
@@ -2460,7 +2512,6 @@ def _restore_attached_click_command(command: Any) -> None:
         except (AttributeError, TypeError):
             pass
     for attribute in (
-        _CLICK_INSTRUMENTED_ATTRIBUTE,
         _CLICK_ORIGINAL_INVOKE_ATTRIBUTE,
         _CLICK_ORIGINAL_RESOLVE_ATTRIBUTE,
     ):
@@ -2468,11 +2519,21 @@ def _restore_attached_click_command(command: Any) -> None:
             delattr(command, attribute)
         except (AttributeError, TypeError):
             pass
+    if getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, None) is _CLICK_INSTRUMENTED_SENTINEL:
+        try:
+            delattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE)
+        except (AttributeError, TypeError):
+            pass
 
 
 def _instrument_attached_click_main(command: Any) -> None:
-    if getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, False):
+    marker = getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, None)
+    if marker is _CLICK_MAIN_INSTRUMENTED_SENTINEL:
         return
+    if marker is not None:
+        raise RuntimeError(
+            "Click command uses base-cli's reserved main instrumentation marker."
+        )
     original_main = command.main
 
     @functools.wraps(original_main)
@@ -2506,7 +2567,7 @@ def _instrument_attached_click_main(command: Any) -> None:
     try:
         setattr(command, _CLICK_ORIGINAL_MAIN_ATTRIBUTE, original_main)
         command.main = main
-        setattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, True)
+        setattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, _CLICK_MAIN_INSTRUMENTED_SENTINEL)
     except BaseException:
         _restore_attached_click_main(command)
         raise
@@ -2519,10 +2580,12 @@ def _restore_attached_click_main(command: Any) -> None:
             command.main = original_main
         except (AttributeError, TypeError):
             pass
-    for attribute in (
-        _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE,
-        _CLICK_ORIGINAL_MAIN_ATTRIBUTE,
-    ):
+    if getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, None) is _CLICK_MAIN_INSTRUMENTED_SENTINEL:
+        try:
+            delattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE)
+        except (AttributeError, TypeError):
+            pass
+    for attribute in (_CLICK_ORIGINAL_MAIN_ATTRIBUTE,):
         try:
             delattr(command, attribute)
         except (AttributeError, TypeError):
@@ -2560,14 +2623,14 @@ def get_command_app(command_func: Callable[..., Any]) -> App:
 
 
 def attach(
-    command: Any,
+    command: _ClickCommandT,
     *,
     app: App | None = None,
-    context_factory: Callable[[Context], Any] | None = None,
-    service_factory: Callable[[Context], Any] | None = None,
+    context_factory: Callable[[Context[Any, Any, Any]], Any] | None = None,
+    service_factory: Callable[[Context[Any, Any, Any]], Any] | None = None,
     sensitive_parameters: Iterable[str] = (),
     **app_kwargs: Any,
-) -> Any:
+) -> _ClickCommandT:
     """Attach lifecycle middleware and return the same Click command object.
 
     Attachment ownership, factories, and sensitivity policy are immutable;
@@ -2741,6 +2804,20 @@ def _normalize_command_result(result: Any) -> int:
     )
 
 
+def _reject_async_callback(callback: Any) -> None:
+    if callback is not None and inspect.iscoroutinefunction(callback):
+        raise RuntimeError(_ASYNC_CALLBACK_ERROR)
+
+
+def _reject_async_result(result: Any) -> Any:
+    if inspect.isawaitable(result):
+        close = getattr(result, "close", None)
+        if callable(close):
+            close()
+        raise RuntimeError(_ASYNC_CALLBACK_ERROR)
+    return result
+
+
 def _lifecycle_flag_declarations(
     option: LifecycleOption | None,
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -2826,10 +2903,14 @@ def delegated_display_command(default: str | None = None) -> str | None:
     return default
 
 
-def command(*args: Any, **kwargs: Any):
+def command(
+    *args: Any,
+    **kwargs: Any,
+) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     explicit_name = _explicit_command_name(args, kwargs)
 
-    def decorator(func: Callable[..., Any]):
+    def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
+        _reject_async_callback(func)
         with _COMMAND_APP_LOCK:
             if getattr(func, _COMMAND_APP_ATTRIBUTE, None) is not None:
                 raise RuntimeError(
@@ -2849,8 +2930,13 @@ def command(*args: Any, **kwargs: Any):
     return decorator
 
 
-def option(*param_decls: str, sensitive: bool = False, dry_run: bool = False, **attrs: Any):
-    def decorator(func: Callable[..., Any]):
+def option(
+    *param_decls: str,
+    sensitive: bool = False,
+    dry_run: bool = False,
+    **attrs: Any,
+) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
+    def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         specs = list(getattr(func, "__base_cli_param_specs__", []))
         specs.append(("option", param_decls, attrs, sensitive))
         func.__base_cli_param_specs__ = specs
@@ -2868,8 +2954,12 @@ def option(*param_decls: str, sensitive: bool = False, dry_run: bool = False, **
     return decorator
 
 
-def argument(*param_decls: str, sensitive: bool = False, **attrs: Any):
-    def decorator(func: Callable[..., Any]):
+def argument(
+    *param_decls: str,
+    sensitive: bool = False,
+    **attrs: Any,
+) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
+    def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         specs = list(getattr(func, "__base_cli_param_specs__", []))
         specs.append(("argument", param_decls, attrs, sensitive))
         func.__base_cli_param_specs__ = specs

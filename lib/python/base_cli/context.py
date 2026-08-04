@@ -5,15 +5,30 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Generic, TypeVar
 
 from ._cleanup import remove_owned_temp_directory
 
 
-_current_context: contextvars.ContextVar[Context | None] = contextvars.ContextVar(
+_current_context: contextvars.ContextVar[Context[Any, Any, Any] | None] = contextvars.ContextVar(
     "base_cli_current_context",
     default=None,
 )
+
+ConfigT = TypeVar("ConfigT")
+ApplicationStateT = TypeVar("ApplicationStateT")
+ServicesT = TypeVar("ServicesT")
+
+__all__ = [
+    "ApplicationStateT",
+    "ConfigT",
+    "Context",
+    "ServicesT",
+    "get_current_context",
+    "recover_current_context",
+    "reset_current_context",
+    "set_current_context",
+]
 
 
 def _default_history_display_command(cli_name: str, _argv: list[str]) -> str:
@@ -21,7 +36,7 @@ def _default_history_display_command(cli_name: str, _argv: list[str]) -> str:
 
 
 @dataclass
-class Context:
+class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
     """Runtime state and cleanup hooks available to an active CLI command."""
 
     cli_name: str
@@ -31,7 +46,7 @@ class Context:
     cache_dir: Path
     temp_dir: Path
     log_file: Path | None
-    config: dict[str, Any]
+    config: ConfigT
     environment: str
     debug: bool
     keep_temp: bool
@@ -51,8 +66,8 @@ class Context:
     runtime_owner: str = "default"
     owner_root: Path | None = None
     run_root: Path | None = None
-    application_context: Any = field(default=None, repr=False, compare=False)
-    services: Any = field(default=None, repr=False, compare=False)
+    application_context: ApplicationStateT | None = field(default=None, repr=False, compare=False)
+    services: ServicesT | None = field(default=None, repr=False, compare=False)
     _run_metadata_path: Path | None = field(default=None, init=False, repr=False, compare=False)
     _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
     _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)
@@ -147,23 +162,25 @@ class Context:
                     pass
 
 
-def set_current_context(context: Context | None) -> contextvars.Token[Context | None]:
+def set_current_context(
+    context: Context[Any, Any, Any] | None,
+) -> contextvars.Token[Context[Any, Any, Any] | None]:
     return _current_context.set(context)
 
 
-def reset_current_context(token: contextvars.Token[Context | None]) -> None:
+def reset_current_context(token: contextvars.Token[Context[Any, Any, Any] | None]) -> None:
     try:
         _current_context.reset(token)
     except BaseException:  # pylint: disable=broad-exception-caught
         recover_current_context(token)
 
 
-def recover_current_context(token: contextvars.Token[Context | None]) -> None:
+def recover_current_context(token: contextvars.Token[Context[Any, Any, Any] | None]) -> None:
     previous = token.old_value
     _current_context.set(None if previous is contextvars.Token.MISSING else previous)
 
 
-def get_current_context() -> Context:
+def get_current_context() -> Context[Any, Any, Any]:
     context = _current_context.get()
     if context is None:
         raise RuntimeError("base_cli context is not active. Run inside a base_cli.App command.")

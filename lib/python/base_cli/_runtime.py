@@ -4,21 +4,11 @@ import json
 import logging
 import os
 import stat
-from dataclasses import dataclass
 from pathlib import Path
 
 from ._private_files import PRIVATE_DIRECTORY_MODE, restrict_directory, write_private_json
 from .paths import runtime_run_directory_name, runtime_slug
-
-
-@dataclass(frozen=True)
-class RuntimeLayout:
-    owner_root: Path
-    run_root: Path
-    state_dir: Path
-    log_dir: Path
-    cache_dir: Path
-    temp_dir: Path
+from .runtime import RuntimeLayout
 
 
 _LOG_INDEX_NAME = ".base-cli-log-index.json"

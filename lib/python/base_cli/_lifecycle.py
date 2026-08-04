@@ -24,7 +24,7 @@ class InvocationOutcome:
 class RunRecorder:
     """Write core-owned lifecycle snapshots for one Context."""
 
-    context: Context
+    context: Context[Any, Any, Any]
     started_at: datetime
     started_monotonic_ns: int
 
