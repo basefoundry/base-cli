@@ -32,6 +32,11 @@ execution, while `base_cli` provides reusable lifecycle behavior:
 - a command context object shared by command code and helper functions
 - test helpers built on Click's `CliRunner`
 
+Typer applications can opt into the same lifecycle with the optional
+`base-cli[typer]` extra. See [`docs/typer-adapter.md`](docs/typer-adapter.md)
+for the migration path; Typer remains optional and is never imported by the
+core Click integration.
+
 ## Design Goals
 
 CLI tools should be easy to write, but not magical. A command should be

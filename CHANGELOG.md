@@ -26,6 +26,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Add opt-in `CliProfile.batteries_included()` layered configuration with
   platform-aware user paths, project and environment files, provenance, and
   validated framework settings.
+- Add the optional `base-cli[typer]` integration with `attach_typer()`,
+  `TyperAdapter`, and `get_typer_command()` so Typer command trees can adopt
+  the same lifecycle without making Typer a core dependency.
 
 ### Changed
 

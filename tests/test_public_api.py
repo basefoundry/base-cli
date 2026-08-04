@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
-from base_cli import attachment, command_filters, command_protocol, config, history, lifecycle_options
+from base_cli import attachment, command_filters, command_protocol, config, history, lifecycle_options, typer
 
 
 class PublicApiTests(unittest.TestCase):
@@ -38,6 +38,9 @@ class PublicApiTests(unittest.TestCase):
             "AttachmentAdapter",
             "AttachmentContract",
             "BatteriesIncludedConfigLoader",
+            "TyperAdapter",
+            "attach_typer",
+            "get_typer_command",
             "ConfigSnapshot",
             "RuntimeLayout",
             "attach",
@@ -62,6 +65,7 @@ class PublicApiTests(unittest.TestCase):
         self.assertFalse(hasattr(base_cli, "UserConfig"))
         self.assertIs(base_cli.command_filters, command_filters)
         self.assertIs(base_cli.command_protocol, command_protocol)
+        self.assertIs(base_cli.typer, typer)
         self.assertTrue(issubclass(base_cli.ConfigurationError, ValueError))
 
     def test_module_all_surfaces_are_explicit(self) -> None:
@@ -119,6 +123,10 @@ class PublicApiTests(unittest.TestCase):
         self.assertIn("write_primary_record", history.__all__)
         self.assertNotIn("lock_history_file", history.__all__)
         self.assertNotIn("write_all", history.__all__)
+        self.assertEqual(
+            set(typer.__all__),
+            {"TyperAdapter", "attach_typer", "get_typer_command"},
+        )
 
     def test_entry_points_have_docstrings(self) -> None:
         self.assertTrue(base_cli.App.__doc__)
