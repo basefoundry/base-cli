@@ -13,3 +13,11 @@ call site represents an explicit user request.
 
 The consumer owns the configuration schema, merge semantics, and operational
 choice of whether to back up or synchronize its machine-local files.
+
+Applications that prefer conventional policy can opt into
+`CliProfile.batteries_included("tool")`. It loads optional platform-aware user,
+project, environment, and explicit YAML layers with documented precedence and
+records the winning source for each key in `Context.config_provenance`. Its
+reserved lifecycle keys are validated separately as `Context.framework_config`;
+consumer-owned keys remain in `Context.config`. `CliProfile.generic()` remains
+the convention-free default.

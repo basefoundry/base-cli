@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
-from base_cli import attachment, command_filters, command_protocol, history, lifecycle_options
+from base_cli import attachment, command_filters, command_protocol, config, history, lifecycle_options
 
 
 class PublicApiTests(unittest.TestCase):
@@ -37,6 +37,8 @@ class PublicApiTests(unittest.TestCase):
             "ConfigurationError",
             "AttachmentAdapter",
             "AttachmentContract",
+            "BatteriesIncludedConfigLoader",
+            "ConfigSnapshot",
             "RuntimeLayout",
             "attach",
             "command_filters",
@@ -74,6 +76,16 @@ class PublicApiTests(unittest.TestCase):
                 "AttachmentContextFactory",
                 "AttachmentContract",
                 "AttachmentServiceFactory",
+            },
+        )
+        self.assertEqual(
+            set(config.__all__),
+            {
+                "BatteriesIncludedConfigLoader",
+                "ConfigSnapshot",
+                "DEFAULT_ENVIRONMENT",
+                "FrameworkConfig",
+                "load_yaml_file",
             },
         )
         self.assertEqual(

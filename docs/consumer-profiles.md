@@ -80,6 +80,46 @@ translate internal entry-point names into user-facing labels. The generic
 default only replaces underscores with hyphens; it does not know any product's
 command aliases.
 
+## Batteries-included profile
+
+Applications that want conventional configuration discovery can opt in without
+changing the generic defaults:
+
+```python
+profile = base_cli.CliProfile.batteries_included("tool")
+app = base_cli.App(name="tool", profile=profile)
+```
+
+The profile uses platform-aware user configuration roots (`XDG_CONFIG_HOME` or
+`~/.config` on Linux, `~/Library/Application Support` on macOS, and `%APPDATA%`
+on Windows). `BASE_CLI_CONFIG_DIR` overrides that root. User files live under
+`<root>/<cli-name>/config.yaml`; a discovered project may provide
+`.base-cli.yaml` and `environments/<name>.yaml` files. All of these layers are
+optional and their filenames can be customized by the profile factory. An
+explicit `--config` path remains strict and must exist as a readable regular
+file.
+
+Configuration precedence is deterministic, from lowest to highest:
+
+1. framework default (`environment: dev`);
+2. user base configuration;
+3. project base configuration;
+4. user environment configuration;
+5. project environment configuration;
+6. explicit `--config` configuration;
+7. command-line lifecycle options.
+
+The environment is selected by `--environment` when supplied. Otherwise the
+explicit, project, or user base `environment` value is used, falling back to
+`dev`. Mapping values merge recursively; scalar and list values replace the
+lower-precedence value. `Context.config_provenance` records the winning source
+for each dotted key.
+
+The reserved framework keys `environment`, `log_level`, and `keep_temp` are
+validated into `Context.framework_config` and are excluded from the consumer
+configuration dictionary. All other keys remain consumer-owned and are exposed
+through `Context.config`.
+
 ## Safe profile errors
 
 Plain exceptions from profile callbacks are treated as unexpected internal
@@ -118,8 +158,8 @@ The following behaviors should not be added to generic lifecycle modules:
 - product-specific command lists or history schema;
 - assumptions about a downstream repository's directory layout.
 
-The next migration step is to generalize the remaining context/config types
-whose compatibility names still reflect one historical consumer.
+The generic profile and typed `Context` are now the stable framework boundary;
+consumer-specific conventions belong in an opt-in profile or adapter.
 
 The package rename is deliberately separate from this refactor. Names can be
 changed after the dependency boundary is stable.

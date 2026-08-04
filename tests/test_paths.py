@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 from base_cli.history import compact_home_text
-from base_cli.paths import default_cache_root
+from base_cli.paths import default_cache_root, default_config_root
 
 
 class DefaultCacheRootTests(unittest.TestCase):
@@ -65,6 +65,50 @@ class DefaultCacheRootTests(unittest.TestCase):
         )
 
         self.assertEqual(root, Path(r"C:\Users\alice") / "AppData" / "Local")
+
+
+class DefaultConfigRootTests(unittest.TestCase):
+    def test_explicit_config_override_wins_on_every_platform(self) -> None:
+        root = default_config_root(
+            environ={
+                "BASE_CLI_CONFIG_DIR": "/custom/config",
+                "APPDATA": "/app-data",
+                "XDG_CONFIG_HOME": "/xdg/config",
+            },
+            home=Path("/home/alice"),
+            platform_name="win32",
+        )
+        self.assertEqual(root, Path("/custom/config"))
+
+    def test_linux_prefers_xdg_config_home(self) -> None:
+        root = default_config_root(
+            environ={"XDG_CONFIG_HOME": "/xdg/config"},
+            home=Path("/home/alice"),
+            platform_name="linux",
+        )
+        self.assertEqual(root, Path("/xdg/config"))
+
+    def test_linux_falls_back_to_home_config(self) -> None:
+        self.assertEqual(
+            default_config_root(environ={}, home=Path("/home/alice"), platform_name="linux"),
+            Path("/home/alice/.config"),
+        )
+
+    def test_macos_uses_application_support(self) -> None:
+        self.assertEqual(
+            default_config_root(environ={}, home=Path("/Users/alice"), platform_name="darwin"),
+            Path("/Users/alice/Library/Application Support"),
+        )
+
+    def test_windows_prefers_app_data(self) -> None:
+        self.assertEqual(
+            default_config_root(
+                environ={"APPDATA": r"C:\Users\alice\AppData\Roaming"},
+                home=Path(r"C:\Users\alice"),
+                platform_name="win32",
+            ),
+            Path(r"C:\Users\alice\AppData\Roaming"),
+        )
 
 
 class HomePathCompactionTests(unittest.TestCase):

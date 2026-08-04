@@ -31,6 +31,7 @@ from ._runtime import (
     prune_log_files,
 )
 from .attachment import AttachmentContract
+from .config import ConfigSnapshot
 from .context import Context, recover_current_context, reset_current_context, set_current_context
 from .errors import ConfigurationError
 from .exit_codes import ExitCode
@@ -1054,12 +1055,46 @@ class App:
         explicit_config = Path(standard["config"]).expanduser() if standard.get("config") else None
         user_config = self.profile.load_user_config()
         workspace_root = self.profile.resolve_workspace_root(user_config)
-        config = self.profile.load_config(project, explicit_config)
+        requested_environment = standard.get("environment")
+        if (
+            self.profile.load_config_for_environment is not None
+            and requested_environment is not None
+        ):
+            loaded_config = self.profile.load_config_for_environment(
+                project,
+                explicit_config,
+                str(requested_environment),
+            )
+        else:
+            loaded_config = self.profile.load_config(project, explicit_config)
 
-        environment = standard.get("environment") or config.get("environment") or "dev"
-        debug = bool(standard.get("debug") or str(config.get("log_level", "")).lower() == "debug")
+        if isinstance(loaded_config, ConfigSnapshot):
+            config = loaded_config.config
+            framework_config = loaded_config.framework
+            config_provenance = loaded_config.provenance
+        else:
+            config = loaded_config
+            framework_config = None
+            config_provenance = {}
+
+        environment = (
+            standard.get("environment")
+            or (framework_config.environment if framework_config is not None else None)
+            or config.get("environment")
+            or "dev"
+        )
+        log_level = (
+            framework_config.log_level
+            if framework_config is not None
+            else str(config.get("log_level", "")).lower()
+        )
+        debug = bool(standard.get("debug") or log_level == "debug")
         quiet = bool(standard.get("quiet"))
-        keep_temp = bool(standard.get("keep_temp") or config.get("keep_temp"))
+        keep_temp = bool(
+            standard.get("keep_temp")
+            or (framework_config.keep_temp if framework_config is not None else None)
+            or config.get("keep_temp")
+        )
         _capture_effective_output_options(
             owner_app=self,
             debug=debug,
@@ -1101,6 +1136,8 @@ class App:
             temp_dir=layout.temp_dir,
             log_file=log_file,
             config=config,
+            framework_config=framework_config,
+            config_provenance=config_provenance,
             environment=environment,
             debug=debug,
             quiet=quiet,
