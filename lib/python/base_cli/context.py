@@ -72,6 +72,7 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
     services: ServicesT | None = field(default=None, repr=False, compare=False)
     framework_config: FrameworkConfig | None = field(default=None, repr=False, compare=False)
     config_provenance: Mapping[str, str] = field(default_factory=dict, repr=False, compare=False)
+    json_output: bool = False
     _run_metadata_path: Path | None = field(default=None, init=False, repr=False, compare=False)
     _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
     _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)

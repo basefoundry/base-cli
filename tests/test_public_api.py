@@ -6,7 +6,16 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
-from base_cli import attachment, command_filters, command_protocol, config, history, lifecycle_options, typer
+from base_cli import (
+    attachment,
+    command_filters,
+    command_protocol,
+    config,
+    history,
+    json_contracts,
+    lifecycle_options,
+    typer,
+)
 
 
 class PublicApiTests(unittest.TestCase):
@@ -41,6 +50,9 @@ class PublicApiTests(unittest.TestCase):
             "TyperAdapter",
             "attach_typer",
             "get_typer_command",
+            "JSON_CONTRACT_VERSION",
+            "success_envelope",
+            "error_envelope",
             "ConfigSnapshot",
             "RuntimeLayout",
             "attach",
@@ -66,6 +78,7 @@ class PublicApiTests(unittest.TestCase):
         self.assertIs(base_cli.command_filters, command_filters)
         self.assertIs(base_cli.command_protocol, command_protocol)
         self.assertIs(base_cli.typer, typer)
+        self.assertIs(base_cli.json_contracts, json_contracts)
         self.assertTrue(issubclass(base_cli.ConfigurationError, ValueError))
 
     def test_module_all_surfaces_are_explicit(self) -> None:
@@ -126,6 +139,21 @@ class PublicApiTests(unittest.TestCase):
         self.assertEqual(
             set(typer.__all__),
             {"TyperAdapter", "attach_typer", "get_typer_command"},
+        )
+        self.assertEqual(
+            set(json_contracts.__all__),
+            {
+                "JSON_CONTRACT_VERSION",
+                "JSON_ERROR_SCHEMA",
+                "JSON_LOG_SCHEMA",
+                "JSON_OUTPUT_SCHEMA",
+                "JsonLogFormatter",
+                "MAX_JSON_LOG_MESSAGE_LENGTH",
+                "error_envelope",
+                "success_envelope",
+                "dumps_envelope",
+                "redact_json_value",
+            },
         )
 
     def test_entry_points_have_docstrings(self) -> None:

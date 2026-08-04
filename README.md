@@ -37,6 +37,10 @@ Typer applications can opt into the same lifecycle with the optional
 for the migration path; Typer remains optional and is never imported by the
 core Click integration.
 
+Automation-facing JSON output, errors, and logs are opt-in through the
+versioned contracts documented in [`docs/json-contracts.md`](docs/json-contracts.md).
+Human output and Click error behavior remain the default.
+
 ## Design Goals
 
 CLI tools should be easy to write, but not magical. A command should be
@@ -453,11 +457,14 @@ Every `base_cli.App` command gets these options:
 - `--keep-temp`: preserve the run's temp directory after command completion.
 - `--log-file <path>`: write the persistent log to a specific file.
 - `--version`: shown when the `App` was created with a version.
+- `--json`: opt-in machine output, when `LifecycleOptions.json` is enabled;
+  emits the versioned envelopes described in [`docs/json-contracts.md`](docs/json-contracts.md).
 
 `LifecycleOptions()` preserves this default set. Its `debug`, `quiet`,
 `environment`, `config`, `keep_temp`, `log_file`, and `version` fields are
-enabled by default; `dry_run` is opt-in. Set one field to `None` to disable it,
-or replace it with a `LifecycleOption` to rename and configure it independently:
+enabled by default; `dry_run` and `json` are opt-in. Set one field to `None` to
+disable it, or replace it with a `LifecycleOption` to rename and configure it
+independently:
 
 ```python
 lifecycle_options = base_cli.LifecycleOptions(
@@ -482,6 +489,14 @@ app = base_cli.App(
     name="workspace-tools",
     version="1.2.3",
     lifecycle_options=lifecycle_options,
+)
+```
+
+For scripts, add the JSON option explicitly:
+
+```python
+lifecycle_options = base_cli.LifecycleOptions(
+    json=base_cli.LifecycleOption("--json"),
 )
 ```
 
@@ -528,7 +543,7 @@ def inspect(click_ctx: click.Context) -> None:
     values = base_cli.get_lifecycle_values(click_ctx)
     assert isinstance(values, base_cli.LifecycleValues)
     assert values is click_ctx.meta[base_cli.LIFECYCLE_META_KEY]
-    print(values.environment, values.debug, values.dry_run)
+    print(values.environment, values.debug, values.dry_run, values.json)
 ```
 
 The metadata record, rather than `click.Context.obj`, carries values between a

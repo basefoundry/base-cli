@@ -30,7 +30,7 @@ def _resolve_version() -> str:
 
 __version__ = _resolve_version()
 
-from . import command_filters, command_protocol, history, testing
+from . import command_filters, command_protocol, history, json_contracts, testing
 from .attachment import (
     AttachmentAdapter,
     AttachmentContextFactory,
@@ -74,6 +74,18 @@ from .context import (
 from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
+from .json_contracts import (
+    JSON_CONTRACT_VERSION,
+    JSON_ERROR_SCHEMA,
+    JSON_LOG_SCHEMA,
+    JSON_OUTPUT_SCHEMA,
+    JsonLogFormatter,
+    MAX_JSON_LOG_MESSAGE_LENGTH,
+    dumps_envelope,
+    error_envelope,
+    redact_json_value,
+    success_envelope,
+)
 from .logging import configure_logger, log_critical, log_debug, log_error, log_info, log_warning
 from .lifecycle_options import (
     LIFECYCLE_META_KEY,
@@ -144,8 +156,17 @@ __all__ = [
     "command_filters",
     "command_matches",
     "command_protocol",
+    "json_contracts",
+    "JSON_CONTRACT_VERSION",
+    "JSON_ERROR_SCHEMA",
+    "JSON_LOG_SCHEMA",
+    "JSON_OUTPUT_SCHEMA",
+    "JsonLogFormatter",
+    "MAX_JSON_LOG_MESSAGE_LENGTH",
+    "dumps_envelope",
     "dumps_record",
     "dumps_records",
+    "error_envelope",
     "history",
     "inspection_envelope",
     "render_inspection_json",
@@ -181,8 +202,10 @@ __all__ = [
     "render_document",
     "render_records",
     "register_record_schema",
+    "redact_json_value",
     "resolve_output_format",
     "run_app",
+    "success_envelope",
     "RuntimeBinding",
     "ServicesT",
     "HistoryWriter",

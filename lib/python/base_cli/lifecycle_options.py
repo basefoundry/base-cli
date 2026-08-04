@@ -160,6 +160,7 @@ class LifecycleOptions:
     log_file: LifecycleOption | None = field(default_factory=_log_file_option)
     version: LifecycleOption | None = field(default_factory=_version_option)
     dry_run: LifecycleOption | None = None
+    json: LifecycleOption | None = None
 
     def __post_init__(self) -> None:
         for key in (
@@ -171,6 +172,7 @@ class LifecycleOptions:
             "log_file",
             "version",
             "dry_run",
+            "json",
         ):
             value = getattr(self, key)
             if value is not None and not isinstance(value, LifecycleOption):
@@ -190,6 +192,7 @@ class LifecycleValues:
     keep_temp: bool = False
     log_file: Path | None = None
     dry_run: bool = False
+    json: bool = False
 
 
 def get_lifecycle_values(click_context: Any | None = None) -> LifecycleValues:

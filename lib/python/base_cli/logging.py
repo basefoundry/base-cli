@@ -10,6 +10,7 @@ from typing import TextIO
 
 from ._private_files import restrict_file
 from .context import get_current_context
+from .json_contracts import JsonLogFormatter
 from .paths import current_working_dir
 from .redaction import redact_argv
 
@@ -32,6 +33,8 @@ def configure_logger(
     quiet: bool = False,
     stream: TextIO | None = None,
     formatter: logging.Formatter | None = None,
+    json_logs: bool = False,
+    run_id: str | None = None,
 ) -> logging.Logger:
     logger = logging.getLogger(f"base_cli.{cli_name}")
     logger.setLevel(logging.DEBUG)
@@ -43,13 +46,27 @@ def configure_logger(
     user_stream = stream if stream is not None else sys.stderr
     user_handler = logging.StreamHandler(user_stream)
     user_handler.setLevel(_user_stream_level(debug, quiet))
-    user_handler.setFormatter(_handler_formatter(formatter, use_color=_use_color(user_stream)))
+    user_handler.setFormatter(
+        _handler_formatter(
+            formatter,
+            use_color=_use_color(user_stream),
+            json_logs=json_logs,
+            run_id=run_id,
+        )
+    )
     logger.addHandler(user_handler)
 
     if log_file is not None:
         file_handler = SecureLogFileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(_handler_formatter(formatter, use_color=False))
+        file_handler.setFormatter(
+            _handler_formatter(
+                formatter,
+                use_color=False,
+                json_logs=json_logs,
+                run_id=run_id,
+            )
+        )
         logger.addHandler(file_handler)
     return logger
 
@@ -62,9 +79,17 @@ def _user_stream_level(debug: bool, quiet: bool) -> int:
     return logging.INFO
 
 
-def _handler_formatter(formatter: logging.Formatter | None, *, use_color: bool) -> logging.Formatter:
+def _handler_formatter(
+    formatter: logging.Formatter | None,
+    *,
+    use_color: bool,
+    json_logs: bool,
+    run_id: str | None,
+) -> logging.Formatter:
     if formatter is not None:
         return formatter
+    if json_logs:
+        return JsonLogFormatter(run_id)
     return CliFormatter(use_color=use_color)
 
 
