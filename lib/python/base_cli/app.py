@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import io
 import inspect
 import logging
 import os
@@ -10,6 +11,7 @@ import time
 import traceback
 from collections.abc import Iterable
 from contextvars import ContextVar, Token
+from contextlib import redirect_stdout
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -37,6 +39,7 @@ from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .history import utc_now
 from .logging import configure_logger, log_invocation
+from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import (
     LIFECYCLE_META_KEY,
     LifecycleOption,
@@ -57,8 +60,8 @@ from .redaction import (
     redact_argv,
 )
 
-_STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp", "log_file")
-_FLAG_LIFECYCLE_OPTION_KEYS = frozenset({"debug", "quiet", "keep_temp", "dry_run"})
+_STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp", "log_file", "json")
+_FLAG_LIFECYCLE_OPTION_KEYS = frozenset({"debug", "quiet", "keep_temp", "dry_run", "json"})
 _NATIVE_LIFECYCLE_OPTION_ORDER = (
     "quiet",
     "debug",
@@ -67,6 +70,7 @@ _NATIVE_LIFECYCLE_OPTION_ORDER = (
     "keep_temp",
     "log_file",
     "dry_run",
+    "json",
 )
 _ATTACHED_LIFECYCLE_OPTION_ORDER = (
     "log_file",
@@ -76,6 +80,7 @@ _ATTACHED_LIFECYCLE_OPTION_ORDER = (
     "debug",
     "quiet",
     "dry_run",
+    "json",
 )
 _LIFECYCLE_CAPTURE_META_KEY = object()
 _LIFECYCLE_RESOLUTION_META_KEY = object()
@@ -98,6 +103,7 @@ _CLICK_LIFECYCLE_BINDINGS_ATTRIBUTE = "__base_cli_lifecycle_bindings__"
 _CLICK_INSTRUMENTED_SENTINEL = object()
 _CLICK_MAIN_INSTRUMENTED_SENTINEL = object()
 _CLICK_ATTACHMENT_LOCK = RLock()
+_JSON_DEFAULT_MAX_LOG_FILES = 20
 _REGISTRATION_OPEN = "open"
 _REGISTRATION_MATERIALIZING = "materializing"
 _REGISTRATION_FROZEN = "frozen"
@@ -121,6 +127,7 @@ class _InvocationState:
     debug_option: str | None = "--debug"
     options_parsed: bool = False
     attached_completion: bool = False
+    json_output: bool = False
 
 
 @dataclass(frozen=True)
@@ -298,6 +305,7 @@ def _capture_standard_options(standard: dict[str, Any], owner_app: App) -> None:
         return
     state.debug = bool(standard.get("debug"))
     state.quiet = bool(standard.get("quiet"))
+    state.json_output = bool(standard.get("json"))
     state.options_parsed = True
 
 
@@ -306,12 +314,14 @@ def _capture_effective_output_options(
     owner_app: App,
     debug: bool,
     quiet: bool,
+    json_output: bool = False,
 ) -> None:
     state = _INVOCATION_STATE.get()
     if state is None or state.owner_app is not owner_app:
         return
     state.debug = debug
     state.quiet = quiet
+    state.json_output = json_output
 
 
 def _record_unexpected_traceback(context: Context[Any, Any, Any], outcome: InvocationOutcome) -> None:
@@ -1099,6 +1109,7 @@ class App:
             owner_app=self,
             debug=debug,
             quiet=quiet,
+            json_output=bool(standard.get("json")),
         )
 
         runtime = self.profile.resolve_runtime(self.name, project)
@@ -1148,6 +1159,7 @@ class App:
             dry_run=dry_run,
             history_scope=runtime.history_scope,
             history_parent_run_id=runtime.history_parent_run_id,
+            json_output=bool(standard.get("json")),
         )
         context._run_metadata_path = run_metadata_path
 
@@ -1173,13 +1185,23 @@ class App:
 
             logger_activation_started = True
             try:
-                context.log = configure_logger(self.name, log_file, debug, quiet=quiet)
+                context.log = configure_logger(
+                    self.name,
+                    log_file,
+                    debug,
+                    quiet=quiet,
+                    json_logs=context.json_output,
+                    run_id=context.run_id,
+                )
             except OSError as exc:
                 target = f"persistent log file '{log_file}'" if log_file is not None else "stderr logging"
                 raise RuntimeDirectoryError(f"Unable to configure {target}: {exc}") from exc
             context.log.debug("cli=%s run_id=%s environment=%s", self.name, run_id, environment)
-            if self.max_log_files is not None and uses_default_log_file and log_file is not None:
-                prune_log_files(layout.owner_root / "runs", log_file, self.max_log_files, context.log)
+            retention_limit = self.max_log_files
+            if retention_limit is None and context.json_output:
+                retention_limit = _JSON_DEFAULT_MAX_LOG_FILES
+            if retention_limit is not None and uses_default_log_file and log_file is not None:
+                prune_log_files(layout.owner_root / "runs", log_file, retention_limit, context.log)
 
             if runtime.write_identity and selected_project_root is not None and not dry_run and self.log_to_file:
                 try:
@@ -1913,6 +1935,7 @@ def _normalize_lifecycle_values(
         keep_temp=bool(raw_value("keep_temp")),
         log_file=paths["log_file"],
         dry_run=bool(raw_value("dry_run")),
+        json=bool(raw_value("json")),
     )
 
 
@@ -2748,8 +2771,10 @@ def run_app(
         debug_option=_primary_lifecycle_declaration(
             app.lifecycle_options.debug,
         ),
+        json_output=_json_requested(args, app.lifecycle_options),
     )
     state_token = _INVOCATION_STATE.set(state)
+    output_capture: io.StringIO | None = None
     try:
         try:
             display_command = app.profile.display_command()
@@ -2758,18 +2783,30 @@ def run_app(
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
                 bypass_token = _INVOCATION_MAIN_BYPASS.set(command)
+                output_capture = io.StringIO() if state.json_output else None
                 try:
-                    result = command.main(
-                        args=args,
-                        prog_name=display_command or app.name,
-                        standalone_mode=False,
-                    )
+                    if output_capture is None:
+                        result = command.main(
+                            args=args,
+                            prog_name=display_command or app.name,
+                            standalone_mode=False,
+                        )
+                    else:
+                        with redirect_stdout(output_capture):
+                            result = command.main(
+                                args=args,
+                                prog_name=display_command or app.name,
+                                standalone_mode=False,
+                            )
                 finally:
                     _reset_context_var(_INVOCATION_MAIN_BYPASS, bypass_token)
             finally:
                 _reset_context_var(_INVOCATION_ARGV, invocation_token)
         except click.Abort as exc:
             outcome = outcome_from_exception(click, exc)
+            if state.json_output:
+                _emit_json_error(state, outcome, str(exc), output_capture)
+                return outcome.exit_code
             if outcome.kind == "interrupted":
                 print("Interrupted.", file=sys.stderr)
             else:
@@ -2777,6 +2814,11 @@ def run_app(
             return outcome.exit_code
         except click.ClickException as exc:
             outcome = outcome_from_exception(click, exc)
+            if state.json_output:
+                if reraise_unexpected:
+                    raise
+                _emit_json_error(state, outcome, exc.format_message(), output_capture)
+                return outcome.exit_code
             if outcome.kind == "unexpected_error":
                 if reraise_unexpected:
                     raise
@@ -2785,27 +2827,130 @@ def run_app(
             exc.show()
             return outcome.exit_code
         except KeyboardInterrupt:
+            if state.json_output:
+                outcome = outcome_from_exception(click, KeyboardInterrupt())
+                _emit_json_error(state, outcome, "Interrupted.", output_capture)
+                return outcome.exit_code
             print("Interrupted.", file=sys.stderr)
             return ExitCode.INTERRUPTED
         except SystemExit as exc:
+            if state.json_output:
+                outcome = outcome_from_exception(click, exc)
+                detail = str(exc.code) if exc.code is not None and not isinstance(exc.code, int) else ""
+                _emit_json_error(state, outcome, detail or "Command exited.", output_capture)
+                return outcome.exit_code
             if exc.code is not None and not isinstance(exc.code, int):
                 print(str(exc.code), file=sys.stderr)
             return system_exit_code(exc)
         except Exception as exc:
             if reraise_unexpected:
                 raise
+            if state.json_output:
+                outcome = outcome_from_exception(click, exc)
+                _emit_json_error(state, outcome, "Unexpected internal error.", output_capture)
+                return outcome.exit_code
             _show_unexpected_error(state, exc)
             return ExitCode.FAILURE
 
         try:
             if state.attached_completion:
+                if state.json_output:
+                    _emit_json_success(state, ExitCode.SUCCESS, output_capture)
                 return ExitCode.SUCCESS
-            return _normalize_command_result(result)
+            exit_code = _normalize_command_result(result)
+            if state.json_output:
+                if exit_code == ExitCode.SUCCESS:
+                    _emit_json_success(state, exit_code, output_capture)
+                else:
+                    _emit_json_error(
+                        state,
+                        outcome_from_exit_code(exit_code),
+                        "Command returned a non-zero exit code.",
+                        output_capture,
+                    )
+            return exit_code
         except TypeError as exc:
+            if state.json_output:
+                outcome = outcome_from_exception(click, exc)
+                _emit_json_error(state, outcome, str(exc), output_capture)
+                return outcome.exit_code
             print(f"ERROR: {exc}", file=sys.stderr)
             return ExitCode.FAILURE
     finally:
+        if output_capture is not None and not state.json_output:
+            sys.stdout.write(output_capture.getvalue())
         _reset_context_var(_INVOCATION_STATE, state_token)
+
+
+def _json_requested(args: list[str], lifecycle_options: LifecycleOptions) -> bool:
+    option = lifecycle_options.json
+    if option is None:
+        return False
+    if option.default is True:
+        return True
+    if option.envvar is not None:
+        envvars = (option.envvar,) if isinstance(option.envvar, str) else option.envvar
+        if any(os.environ.get(name, "").lower() in {"1", "true", "yes", "on"} for name in envvars):
+            return True
+    declarations = tuple(
+        declaration
+        for declaration in option.param_decls
+        if declaration.startswith(("-", "/"))
+    )
+    return any(
+        argument == declaration or argument.startswith(f"{declaration}=")
+        for argument in args
+        for declaration in declarations
+    )
+
+
+def _captured_stdout(output_capture: io.StringIO | None) -> str:
+    return "" if output_capture is None else output_capture.getvalue()
+
+
+def _emit_json_success(
+    state: _InvocationState,
+    exit_code: int,
+    output_capture: io.StringIO | None,
+) -> None:
+    details = {
+        "exit_code": exit_code,
+        "stdout": _captured_stdout(output_capture),
+    }
+    sys.stdout.write(
+        dumps_envelope(
+            success_envelope(
+                run_id=state.run_id,
+                details=details,
+                message="Success" if exit_code == ExitCode.SUCCESS else "Command completed with a non-zero exit code.",
+                code="ok" if exit_code == ExitCode.SUCCESS else "nonzero_return",
+            )
+        )
+    )
+
+
+def _emit_json_error(
+    state: _InvocationState,
+    outcome: InvocationOutcome,
+    message: str,
+    output_capture: io.StringIO | None,
+) -> None:
+    if outcome.exit_code == ExitCode.SUCCESS:
+        _emit_json_success(state, outcome.exit_code, output_capture)
+        return
+    sys.stdout.write(
+        dumps_envelope(
+            error_envelope(
+                run_id=state.run_id,
+                code=outcome.kind,
+                message=message,
+                details={
+                    "exit_code": outcome.exit_code,
+                    "stdout": _captured_stdout(output_capture),
+                },
+            )
+        )
+    )
 
 
 def _show_unexpected_error(state: _InvocationState, exc: Exception) -> None:

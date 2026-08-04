@@ -29,6 +29,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Add the optional `base-cli[typer]` integration with `attach_typer()`,
   `TyperAdapter`, and `get_typer_command()` so Typer command trees can adopt
   the same lifecycle without making Typer a core dependency.
+- Add opt-in versioned JSON success/error envelopes, redacted bounded JSON
+  logs, and public contract helpers for machine-facing integrations.
 
 ### Changed
 
