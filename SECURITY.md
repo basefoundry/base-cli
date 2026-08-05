@@ -29,13 +29,14 @@ repository maintainers through the private contact route shown on the
 
 Security fixes are targeted at the latest released minor line and the current
 development branch. At the time this policy was published, that means the
-`0.3.x` release line and `main`. Older pre-1.0 lines are best effort only;
+`0.4.x` release line and `main`. Older pre-1.0 lines are best effort only;
 upgrade to the latest release before requesting a backport. A release that
 changes the supported window will update this table and the changelog.
 
 | Version | Security support |
 | --- | --- |
-| `0.3.x` | Supported |
+| `0.4.x` | Supported |
+| `0.3.x` | Upgrade strongly recommended; best effort only |
 | `main` | Supported for fixes merged before the next release |
 | `<0.3` | Upgrade strongly recommended; best effort only |
 
