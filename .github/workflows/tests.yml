@@ -62,6 +62,7 @@ jobs:
         run: |
           python -m mypy --strict examples/typed_consumer.py
           python scripts/validate_docs.py
+          python scripts/benchmark_runtime.py --check
           python -m compileall -q examples
       - name: Run tests with coverage threshold
         run: python -m pytest --cov=base_cli --cov-report=term-missing --cov-fail-under=80
