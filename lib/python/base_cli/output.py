@@ -13,6 +13,7 @@ from typing import Any, TextIO
 import unicodedata
 
 from ._dependencies import require_yaml
+from .integrations import try_render_rich_table
 
 
 PUBLIC_OUTPUT_FORMATS = ("text", "csv", "tsv", "yaml", "json")
@@ -74,6 +75,7 @@ def render_records(
     minimum_widths: Sequence[int] | None = None,
     terminal_width: int | None = None,
     max_cell_width: int | None = _DEFAULT_MAX_CELL_WIDTH,
+    rich: bool = False,
 ) -> str:
     """Render records according to the shared public output contract.
 
@@ -84,7 +86,8 @@ def render_records(
     header or footer. ``minimum_widths`` applies only to terminal table
     columns. Terminal cells use Unicode display-cell widths and are bounded by
     ``terminal_width`` and ``max_cell_width`` with deterministic ellipsis
-    truncation.
+    truncation. ``rich=True`` opts terminal text into the optional Rich
+    renderer and otherwise falls back to the built-in table.
     """
 
     target = stream if stream is not None else sys.stdout
@@ -116,6 +119,7 @@ def render_records(
         minimum_widths,
         terminal_width=terminal_width,
         max_cell_width=max_cell_width,
+        rich=rich,
     )
     return resolved
 
@@ -204,6 +208,7 @@ def _write_table(
     *,
     terminal_width: int | None,
     max_cell_width: int | None,
+    rich: bool,
 ) -> None:
     selected_minimums = minimum_widths or ()
     if len(selected_minimums) > len(columns):
@@ -240,6 +245,15 @@ def _write_table(
         raise ValueError("terminal_width must be greater than 0 when set")
     available_width = terminal_width if terminal_width is not None else _terminal_width(stream)
     widths = _fit_table_width(widths, available_width)
+
+    if rich and try_render_rich_table(
+        stream,
+        headers,
+        table_rows,
+        footer,
+        terminal_width=terminal_width,
+    ):
+        return
 
     stream.write(
         "  ".join(_pad_cell(_truncate(header, width), width) for header, width in zip(headers, widths)).rstrip()
