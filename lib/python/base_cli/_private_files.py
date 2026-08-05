@@ -102,7 +102,6 @@ def write_private_json(path: Path, value: Mapping[str, Any]) -> None:
         temporary_name = None
         if parent_fd is not None:
             _sync_directory(parent_fd)
-        restrict_file(path)
     finally:
         if fd is not None:
             os.close(fd)
