@@ -198,7 +198,14 @@ def append_history_line(path: Path, line: str) -> None:
             sidecar_path = path.with_name(f".{path.name}.lock")
             sidecar_fd = os.open(sidecar_path, os.O_RDWR | os.O_CREAT | binary_flag, 0o600)
             if os.fstat(sidecar_fd).st_size == 0:
-                os.write(sidecar_fd, b"0")
+                try:
+                    os.write(sidecar_fd, b"0")
+                except PermissionError:
+                    # Another Windows process can initialize the shared empty
+                    # sidecar between fstat() and write(). Its byte is enough
+                    # for the subsequent blocking msvcrt lock; do not turn
+                    # that expected initialization race into a command error.
+                    pass
             restrict_file(sidecar_path)
             lock_fd = sidecar_fd
         lock_history_file(lock_fd)

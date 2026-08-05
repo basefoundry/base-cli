@@ -19,7 +19,12 @@ def fail(message: str) -> None:
 
 
 def validate_links(root: Path) -> None:
-    markdown_files = [root / "README.md", root / "CONTRIBUTING.md", *sorted((root / "docs").glob("*.md"))]
+    markdown_files = [
+        root / "README.md",
+        root / "CONTRIBUTING.md",
+        root / "SECURITY.md",
+        *sorted((root / "docs").glob("*.md")),
+    ]
     for document in markdown_files:
         text = document.read_text(encoding="utf-8")
         for raw_target in LINK_PATTERN.findall(text):

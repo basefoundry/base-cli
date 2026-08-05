@@ -4,6 +4,7 @@ required_files=(
   README.md
   VERSION
   CHANGELOG.md
+  SECURITY.md
   CONTRIBUTING.md
   .github/pull_request_template.md
   .github/base-project.yml
@@ -16,6 +17,8 @@ required_files=(
   docs/releasing.md
   docs/api-stability.md
   docs/migrations.md
+  docs/security-threat-model.md
+  docs/security-review.md
   MANIFEST.in
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py

@@ -9,6 +9,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Add the security policy, runtime threat model, and threat-to-control release
+  checklist covering secret handling, filesystem ownership, plugins, inherited
+  runs, concurrency, and telemetry boundaries.
 - Add the public API stability and deprecation policy, migration guide, and
   `base_cli.deprecated()` warning helper with contract-test guardrails.
 - Add immutable `LifecycleOptions` and `LifecycleOption` policies for enabling,

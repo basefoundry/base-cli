@@ -59,3 +59,24 @@ class HistoryAppendTests(unittest.TestCase):
             self.assertTrue(path.with_name(".history.jsonl.lock").is_file())
 
         self.assertEqual(fake_msvcrt.calls, [(_FakeMsvcrt.LK_LOCK, 1), (_FakeMsvcrt.LK_UNLCK, 1)])
+
+    def test_msvcrt_sidecar_initialization_race_is_tolerated(self) -> None:
+        fake_msvcrt = _FakeMsvcrt()
+        original_write = history.os.write
+        calls = 0
+
+        def write_with_initialization_race(fd: int, data: bytes) -> int:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise PermissionError(13, "sidecar is being initialized")
+            return original_write(fd, data)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "history.jsonl"
+            with mock.patch.object(history, "_fcntl", None), mock.patch.object(
+                history, "_msvcrt", fake_msvcrt
+            ), mock.patch.object(history.os, "write", side_effect=write_with_initialization_race):
+                history.append_history_line(path, '{"run": 1}\n')
+
+            self.assertEqual(path.read_text(encoding="utf-8"), '{"run": 1}\n')
