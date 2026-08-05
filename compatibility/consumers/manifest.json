@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "consumers": [
+    {
+      "name": "Atlas",
+      "slug": "atlas_click",
+      "entry_point": "atlas-consumer",
+      "use_case": "Inventory and status automation",
+      "contract_checks": ["nested_click_help", "structured_status", "redaction"]
+    },
+    {
+      "name": "Beacon",
+      "slug": "beacon_typer",
+      "entry_point": "beacon-consumer",
+      "use_case": "Typed deployment workflow",
+      "contract_checks": ["typer_validation", "native_help", "redaction"]
+    },
+    {
+      "name": "Cinder",
+      "slug": "cinder_automation",
+      "entry_point": "cinder-consumer",
+      "use_case": "Scheduled reconciliation",
+      "contract_checks": ["dry_run", "json_output", "optional_telemetry"]
+    }
+  ]
+}

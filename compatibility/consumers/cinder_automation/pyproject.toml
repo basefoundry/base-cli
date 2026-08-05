@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "base-cli-compat-consumer-cinder"
+version = "0.1.0"
+description = "Independent automation consumer compatibility fixture for base-cli"
+requires-python = ">=3.10"
+dependencies = ["base-cli>=0.3,<0.4", "click>=8.1"]
+
+[project.optional-dependencies]
+observability = ["opentelemetry-api>=1.24,<2"]
+
+[project.scripts]
+cinder-consumer = "cinder_automation.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

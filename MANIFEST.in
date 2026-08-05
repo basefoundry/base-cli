@@ -9,9 +9,10 @@ include SECURITY.md
 include VERSION
 include base_manifest.yaml
 include pyproject.toml
-recursive-include .github *.yml
+recursive-include .github *.yml *.md
 recursive-include docs *.md
 recursive-include examples *.py *.md *.toml
+recursive-include compatibility *.py *.md *.toml *.json
 recursive-include lib/python/base_cli *.py py.typed
 recursive-include scripts *.py
 recursive-include tests *.py

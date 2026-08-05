@@ -37,6 +37,7 @@ ALLOWED_SDIST_PREFIXES = (
     ".github/",
     "docs/",
     "examples/",
+    "compatibility/",
     "lib/python/base_cli/",
     "scripts/",
     "tests/",
