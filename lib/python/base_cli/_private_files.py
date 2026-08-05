@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import secrets
+import time
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -98,7 +99,7 @@ def write_private_json(path: Path, value: Mapping[str, Any]) -> None:
         else:
             if path.is_symlink():
                 raise OSError(f"refusing to replace symlink '{path}'")
-            os.replace(path.parent / temporary_name, path)
+            _replace_with_retry(path.parent / temporary_name, path)
         temporary_name = None
         if parent_fd is not None:
             _sync_directory(parent_fd)
@@ -177,3 +178,17 @@ def _sync_directory(parent_fd: int) -> None:
         # Directory fsync is not available on all supported filesystems and
         # platforms.  The file itself was still flushed before replacement.
         pass
+
+
+def _replace_with_retry(source: Path, destination: Path) -> None:
+    """Replace a private file, tolerating transient Windows sharing races."""
+
+    attempts = 1 if os.name != "nt" else 10
+    for attempt in range(attempts):
+        try:
+            os.replace(source, destination)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.001 * (attempt + 1))
