@@ -5,7 +5,21 @@ All notable changes to base-cli will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions are tracked in the repo-root `VERSION` file.
 
-## [Unreleased]
+## [0.4.0] - 2026-08-05
+
+This is a pre-1.0 minor release and therefore a compatibility boundary. See
+the API stability policy and migration guide before upgrading from `0.3.x`.
+
+### Migration notes
+
+- Consumer profiles should raise `base_cli.ConfigurationError` for expected,
+  user-correctable configuration failures instead of plain `ValueError`.
+- Consumers should import `RuntimeLayout` from `base_cli.runtime`; the private
+  `_runtime` module is not a compatibility surface.
+- `base_cli.testing.invoke()` now exercises the production `run_app()` boundary,
+  so tests should assert the same exit status users receive.
+- Click-native `--option=value` syntax is accepted and redacted like the
+  space-separated form.
 
 ### Added
 
@@ -80,6 +94,12 @@ and versions are tracked in the repo-root `VERSION` file.
   disabled.
 - Restore Click-native `--option=value` parsing, including redaction of
   sensitive equals-form values.
+
+## [Unreleased]
+
+### Planned
+
+- Continue compatibility hardening and adoption work for the next release.
 
 ## [0.3.0] - 2026-08-01
 
