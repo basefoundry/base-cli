@@ -18,6 +18,7 @@ required_files=(
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py
   scripts/validate_docs.py
+  tests/conftest.py
 )
 
 for file in "${required_files[@]}"; do
