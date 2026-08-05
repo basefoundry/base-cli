@@ -126,4 +126,4 @@ jobs:
           $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
           $path = $env:GITHUB_WORKSPACE.Substring(2).Replace('\', '/')
           $linuxWorkspace = "/mnt/$drive$path"
-          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; bash tests/validate.sh; python3 --version"
+          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/validate.sh; bash tests/validate.sh; python3 --version"
