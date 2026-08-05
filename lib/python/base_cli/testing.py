@@ -13,6 +13,9 @@ if TYPE_CHECKING:
     from click.testing import Result
 
 
+__all__ = ["invoke"]
+
+
 _INVOKE_CWD_LOCK = RLock()
 
 

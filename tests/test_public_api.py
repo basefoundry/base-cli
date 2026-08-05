@@ -160,6 +160,7 @@ class PublicApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(set(deprecations.__all__), {"BaseCliDeprecationWarning", "deprecated"})
+        self.assertEqual(base_cli.testing.__all__, ["invoke"])
 
     def test_entry_points_have_docstrings(self) -> None:
         self.assertTrue(base_cli.App.__doc__)
