@@ -190,6 +190,7 @@ __all__ = [
     "dumps_record",
     "dumps_records",
     "error_envelope",
+    "extensions",
     "history",
     "integrations",
     "inspection_envelope",

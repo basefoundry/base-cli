@@ -14,7 +14,10 @@ required_files=(
   .github/workflows/tests.yml
   .github/workflows/package.yml
   docs/releasing.md
+  MANIFEST.in
   scripts/validate_package_artifact.py
+  scripts/validate_installed_package.py
+  scripts/validate_docs.py
 )
 
 for file in "${required_files[@]}"; do

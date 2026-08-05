@@ -15,10 +15,18 @@ The Package workflow rejects a tag that does not exactly match `v${VERSION}`.
 
 ## Validation workflow
 
-Pull requests and pushes to `main` build one sdist and one wheel, run `twine
-check`, inspect metadata and package data, and install the reviewed wheel across
-Python 3.10 through 3.14. The publish job downloads that same artifact; it does
-not rebuild during publication.
+Pull requests and pushes to `main` start from a clean artifact destination,
+build one sdist and one wheel, enforce the source allowlist, run `twine check`,
+and install the reviewed wheel in an isolated environment. The installed-wheel
+smoke test exercises public API, lifecycle, and output behavior without the
+source tree on `sys.path`. Tests run across Python 3.10 through 3.14 on Linux,
+macOS, and Windows, with Debian, Fedora, and WSL validation retained. Blocking
+quality gates cover Ruff formatting/lint, strict public-sample typing, an 80%
+branch-coverage threshold, documentation/example checks, and dependency/static
+security scans.
+
+The publish job downloads that same reviewed artifact; it does not rebuild
+during publication.
 
 ## TestPyPI rehearsal
 

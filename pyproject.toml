@@ -52,6 +52,13 @@ rich = [
 telemetry = [
   "opentelemetry-api>=1.24,<2",
 ]
+quality = [
+  "bandit>=1.7,<2",
+  "coverage[toml]>=7.6,<8",
+  "pip-audit>=2.7,<3",
+  "pytest-cov>=5,<7",
+  "ruff>=0.8,<1",
+]
 
 [project.urls]
 Homepage = "https://github.com/basefoundry/base-cli"
@@ -74,3 +81,22 @@ base_cli = ["py.typed"]
 addopts = "-q"
 testpaths = ["tests"]
 pythonpath = ["lib/python"]
+
+[tool.coverage.run]
+branch = true
+source = ["base_cli"]
+
+[tool.coverage.report]
+fail_under = 80
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "pragma: no cover",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+ignore = ["E402", "E501"]

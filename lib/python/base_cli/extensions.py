@@ -8,7 +8,7 @@ and choose when a selected entry point is loaded.
 from __future__ import annotations
 
 import importlib.metadata as metadata
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
