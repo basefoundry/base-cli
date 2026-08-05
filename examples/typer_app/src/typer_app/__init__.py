@@ -1,0 +1,1 @@
+"""Typer adapter reference application."""

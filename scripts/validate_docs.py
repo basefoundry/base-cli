@@ -24,6 +24,7 @@ def validate_links(root: Path) -> None:
         root / "CONTRIBUTING.md",
         root / "SECURITY.md",
         *sorted((root / "docs").glob("*.md")),
+        *sorted((root / "examples").rglob("*.md")),
     ]
     for document in markdown_files:
         text = document.read_text(encoding="utf-8")
@@ -44,7 +45,7 @@ def validate_links(root: Path) -> None:
 
 
 def validate_examples(root: Path) -> None:
-    for example in sorted((root / "examples").glob("*.py")):
+    for example in sorted((root / "examples").rglob("*.py")):
         try:
             ast.parse(example.read_text(encoding="utf-8"), filename=str(example))
         except SyntaxError as exc:

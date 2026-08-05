@@ -184,6 +184,11 @@ The repository includes [`examples/typed_consumer.py`](examples/typed_consumer.p
 a strict-typechecked consumer showing the public profile, runtime, and generic
 context contracts. CI runs `mypy --strict` against that sample.
 
+For complete installable applications, see the [reference application
+catalog](examples/README.md). It covers a minimal command, nested/plugin Click,
+Typer, and automation/observability flows; each example has its own packaging,
+tests, completion, release, and troubleshooting guidance.
+
 ## Minimal Command
 
 ```python

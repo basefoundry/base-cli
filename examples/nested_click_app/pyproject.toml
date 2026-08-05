@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68,<77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "base-cli-reference-nested-click"
+version = "0.1.0"
+description = "Nested Click and plugin-discovery base-cli reference application"
+requires-python = ">=3.10"
+dependencies = [
+  "base-cli>=0.3",
+  "click>=8.1",
+]
+
+[project.scripts]
+base-nested = "nested_click_app.cli:main"
+
+[project.entry-points."base_cli.plugins"]
+sample = "nested_click_app.plugin:install"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
