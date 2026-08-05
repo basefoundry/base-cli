@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
@@ -122,6 +124,42 @@ class RunBundleRetentionTests(unittest.TestCase):
             with self.assertRaises(OSError):
                 write_private_json(destination, {"status": "error"})
             self.assertEqual(victim.read_text(encoding="utf-8"), "unchanged")
+
+    def test_concurrent_metadata_writers_leave_one_valid_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "run.json"
+
+            def write(index: int) -> None:
+                write_private_json(path, {"writer": index, "status": "ok"})
+
+            with ThreadPoolExecutor(max_workers=8) as workers:
+                list(workers.map(write, range(40)))
+
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "ok")
+            self.assertIn(payload["writer"], range(40))
+
+    def test_concurrent_pruners_keep_a_valid_bounded_index(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            for index in range(8):
+                _bundle(root, f"run-{index}", started_at=f"2020-01-{index + 1:02d}T00:00:00Z")
+
+            def prune() -> None:
+                prune_run_bundles(
+                    root,
+                    policy=RetentionPolicy(max_bundles=2),
+                    logger=logging.getLogger(__name__),
+                )
+
+            with ThreadPoolExecutor(max_workers=4) as workers:
+                list(workers.map(lambda _index: prune(), range(4)))
+
+            self.assertLessEqual(len([path for path in root.iterdir() if path.is_dir()]), 2)
+            payload = json.loads((root / ".base-cli-run-index.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["version"], 1)
+            self.assertLessEqual(len(payload["bundles"]), 2)
 
 
 if __name__ == "__main__":
