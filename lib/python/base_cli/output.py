@@ -4,14 +4,21 @@ from __future__ import annotations
 
 import csv
 import json
+import os
+import re
+import shutil
 import sys
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, TextIO
+import unicodedata
 
 from ._dependencies import require_yaml
 
 
 PUBLIC_OUTPUT_FORMATS = ("text", "csv", "tsv", "yaml", "json")
+_ANSI_ESCAPE_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
+_DEFAULT_TERMINAL_WIDTH = 120
+_DEFAULT_MAX_CELL_WIDTH = 80
 
 
 class OutputFormatError(ValueError):
@@ -65,27 +72,32 @@ def render_records(
     stream: TextIO | None = None,
     footer: str | None = None,
     minimum_widths: Sequence[int] | None = None,
+    terminal_width: int | None = None,
+    max_cell_width: int | None = _DEFAULT_MAX_CELL_WIDTH,
 ) -> str:
     """Render records according to the shared public output contract.
 
-    The returned string is also written to *stream* when supplied (or stdout
-    when omitted).  JSON and YAML retain the mapping shape supplied by the
-    caller; delimited formats use the explicit ``columns`` order and never
-    emit a header or footer. ``minimum_widths`` applies only to terminal table
-    columns; values can still expand beyond those widths.
+    The returned format name is also written to *stream* when supplied (or
+    stdout when omitted). JSON and YAML retain the mapping shape supplied by
+    the caller; delimited formats stream one row at a time, use the explicit
+    ``columns`` order, sanitize terminal control sequences, and never emit a
+    header or footer. ``minimum_widths`` applies only to terminal table
+    columns. Terminal cells use Unicode display-cell widths and are bounded by
+    ``terminal_width`` and ``max_cell_width`` with deterministic ellipsis
+    truncation.
     """
 
     target = stream if stream is not None else sys.stdout
-    record_list = [dict(record) for record in records]
     resolved = resolve_output_format(requested_format, stream=target)
 
     if resolved in ("csv", "tsv"):
         delimiter = "," if resolved == "csv" else "\t"
         writer = csv.writer(target, delimiter=delimiter, lineterminator="\n")
-        for record in record_list:
-            writer.writerow([_cell_value(record.get(key)) for _header, key in columns])
+        for record in records:
+            writer.writerow([_delimited_value(record.get(key)) for _header, key in columns])
         return resolved
 
+    record_list = [dict(record) for record in records]
     if resolved == "json":
         target.write(json.dumps(record_list, separators=(",", ":")))
         target.write("\n")
@@ -96,7 +108,15 @@ def render_records(
         target.write(yaml.safe_dump(record_list, sort_keys=False, allow_unicode=True))
         return resolved
 
-    _write_table(target, record_list, columns, footer, minimum_widths)
+    _write_table(
+        target,
+        record_list,
+        columns,
+        footer,
+        minimum_widths,
+        terminal_width=terminal_width,
+        max_cell_width=max_cell_width,
+    )
     return resolved
 
 
@@ -163,12 +183,27 @@ def _cell_value(value: Any) -> str:
     return str(value)
 
 
+def _delimited_value(value: Any) -> str:
+    """Return a safe scalar for redirected CSV/TSV output.
+
+    Delimited output is commonly piped into another process. Keep the normal
+    csv module's quoting behavior, but remove ANSI/control sequences so a
+    producer cannot inject terminal presentation or unexpectedly split a
+    record across physical lines.
+    """
+
+    return _table_cell(_cell_value(value))
+
+
 def _write_table(
     stream: TextIO,
     records: Sequence[Mapping[str, Any]],
     columns: Sequence[tuple[str, str]],
     footer: str | None,
     minimum_widths: Sequence[int] | None,
+    *,
+    terminal_width: int | None,
+    max_cell_width: int | None,
 ) -> None:
     selected_minimums = minimum_widths or ()
     if len(selected_minimums) > len(columns):
@@ -179,20 +214,109 @@ def _write_table(
             stream.write(f"{footer}\n")
         return
 
-    widths = [
-        max(len(header), selected_minimums[index] if index < len(selected_minimums) else 0)
-        for index, (header, _key) in enumerate(columns)
-    ]
-    rows: list[list[str]] = []
-    for record in records:
-        row = [_cell_value(record.get(key)) for _header, key in columns]
-        rows.append(row)
-        widths = [max(width, len(value)) for width, value in zip(widths, row)]
+    if not columns:
+        if footer:
+            stream.write(f"{footer}\n")
+        return
 
-    stream.write("  ".join(header.ljust(width) for (header, _key), width in zip(columns, widths)).rstrip())
+    table_rows = [
+        [_table_cell(_cell_value(record.get(key))) for _header, key in columns]
+        for record in records
+    ]
+    headers = [_table_cell(header) for header, _key in columns]
+    widths = [
+        max(_display_width(header), selected_minimums[index] if index < len(selected_minimums) else 0)
+        for index, header in enumerate(headers)
+    ]
+    for row in table_rows:
+        widths = [max(width, _display_width(value)) for width, value in zip(widths, row)]
+
+    if max_cell_width is not None:
+        if max_cell_width < 1:
+            raise ValueError("max_cell_width must be greater than 0 when set")
+        widths = [min(width, max_cell_width) for width in widths]
+
+    if terminal_width is not None and terminal_width < 1:
+        raise ValueError("terminal_width must be greater than 0 when set")
+    available_width = terminal_width if terminal_width is not None else _terminal_width(stream)
+    widths = _fit_table_width(widths, available_width)
+
+    stream.write(
+        "  ".join(_pad_cell(_truncate(header, width), width) for header, width in zip(headers, widths)).rstrip()
+    )
     stream.write("\n")
-    for row in rows:
-        stream.write("  ".join(value.ljust(width) for value, width in zip(row, widths)).rstrip())
+    for row in table_rows:
+        stream.write("  ".join(_pad_cell(_truncate(value, width), width) for value, width in zip(row, widths)).rstrip())
         stream.write("\n")
     if footer:
         stream.write(f"\n{footer}\n")
+
+
+def _terminal_width(stream: TextIO) -> int:
+    try:
+        return max(1, shutil.get_terminal_size(fallback=(_DEFAULT_TERMINAL_WIDTH, 24)).columns)
+    except OSError:
+        try:
+            return max(1, os.get_terminal_size(stream.fileno()).columns)
+        except (AttributeError, OSError, ValueError):
+            return _DEFAULT_TERMINAL_WIDTH
+
+
+def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
+    if not widths:
+        return widths
+    available = max(1, terminal_width - 2 * (len(widths) - 1))
+    if sum(widths) <= available:
+        return widths
+    result = list(widths)
+    while sum(result) > available:
+        index = max(range(len(result)), key=result.__getitem__)
+        if result[index] <= 1:
+            break
+        result[index] -= 1
+    return result
+
+
+def _table_cell(value: str) -> str:
+    value = _ANSI_ESCAPE_RE.sub("", value)
+    return "".join(
+        character
+        if character == "\t" or (character >= " " and character != "\x7f")
+        else " "
+        for character in value
+    )
+
+
+def _display_width(value: str) -> int:
+    width = 0
+    for character in value:
+        if character == "\t":
+            width += 1
+            continue
+        if unicodedata.combining(character):
+            continue
+        if unicodedata.category(character) in {"Cc", "Cf"}:
+            continue
+        width += 2 if unicodedata.east_asian_width(character) in {"W", "F"} else 1
+    return width
+
+
+def _truncate(value: str, width: int) -> str:
+    if _display_width(value) <= width:
+        return value
+    if width <= 1:
+        return "…"[:width]
+    remaining = width - 1
+    result: list[str] = []
+    used = 0
+    for character in value:
+        character_width = _display_width(character)
+        if used + character_width > remaining:
+            break
+        result.append(character)
+        used += character_width
+    return "".join(result) + "…"
+
+
+def _pad_cell(value: str, width: int) -> str:
+    return value + " " * max(0, width - _display_width(value))
