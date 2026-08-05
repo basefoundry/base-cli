@@ -46,6 +46,11 @@ mechanism, and migration requirements are documented in
 [`docs/api-stability.md`](docs/api-stability.md) and
 [`docs/migrations.md`](docs/migrations.md).
 
+Security reporting, runtime trust boundaries, threat assumptions, and the
+release security checklist are documented in [`SECURITY.md`](SECURITY.md),
+[`docs/security-threat-model.md`](docs/security-threat-model.md), and
+[`docs/security-review.md`](docs/security-review.md).
+
 Shared record renderers keep machine output stable: CSV and TSV stream
 one-pass iterables without headers or footers, while terminal tables account
 for Unicode display width and safely truncate oversized cells. See

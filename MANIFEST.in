@@ -5,6 +5,7 @@ include CONTRIBUTING.md
 include LICENSE
 include MANIFEST.in
 include README.md
+include SECURITY.md
 include VERSION
 include base_manifest.yaml
 include pyproject.toml
