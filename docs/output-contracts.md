@@ -18,3 +18,8 @@ Long cells are bounded by `max_cell_width` (80 by default), and the complete
 table is fitted to the detected terminal width (120 columns as a safe fallback)
 using an ellipsis. Pass `terminal_width` and `max_cell_width` explicitly when a
 caller needs deterministic rendering in tests or a custom frontend.
+
+For an optional polished human table, pass `rich=True` to `render_records()`.
+Rich is consulted only for interactive `text`; all redirected and structured
+formats retain the rules above and fall back to the built-in renderer if Rich
+is unavailable or fails.

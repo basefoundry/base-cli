@@ -39,6 +39,7 @@ from .context import Context, recover_current_context, reset_current_context, se
 from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .history import utc_now
+from .integrations import TelemetryOptions, TelemetrySession, finish_telemetry, start_telemetry
 from .logging import configure_logger, log_invocation
 from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import (
@@ -471,11 +472,17 @@ class App:
         max_run_bundles: int | None = None,
         max_run_age_seconds: float | None = None,
         max_run_total_bytes: int | None = None,
+        rich: bool = False,
+        telemetry: TelemetryOptions | None = None,
     ) -> None:
         if max_log_files is not None and max_log_files < 1:
             raise ValueError("max_log_files must be greater than 0 when set.")
         if retention is not None and not isinstance(retention, RetentionPolicy):
             raise TypeError("retention must be a RetentionPolicy instance or None.")
+        if not isinstance(rich, bool):
+            raise TypeError("rich must be a bool.")
+        if telemetry is not None and not isinstance(telemetry, TelemetryOptions):
+            raise TypeError("telemetry must be a TelemetryOptions instance or None.")
         if retention is not None and any(
             value is not None
             for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
@@ -506,6 +513,8 @@ class App:
         self.help = help
         self.log_to_file = log_to_file
         self.max_log_files = max_log_files
+        self.rich = rich
+        self.telemetry = telemetry
         # Standalone applications must not inherit a consumer's product
         # conventions. Consumers with product-specific policies should pass an
         # explicit profile.
@@ -991,6 +1000,7 @@ class App:
             started_monotonic_ns = time.monotonic_ns()
             context: Context[Any, Any, Any] | None = None
             recorder: RunRecorder | None = None
+            telemetry_session: TelemetrySession | None = None
             outcome = outcome_from_exit_code(ExitCode.SUCCESS)
             invocation_argv: list[str] = []
             redaction_plan = self._redaction_plan
@@ -1013,6 +1023,7 @@ class App:
                 _capture_invocation_context(context, self)
                 invocation_argv = redact_argv(_current_invocation_argv(), redaction_plan)
                 _start_run_recorder(recorder)
+                telemetry_session = start_telemetry(self.telemetry, context)
                 log_invocation(context.log, invocation_argv, None)
                 if context.project_root is not None:
                     context.log.debug("project_root=%s", context.project_root)
@@ -1058,6 +1069,12 @@ class App:
                         except BaseException as exc:  # pylint: disable=broad-exception-caught
                             _warn_lifecycle_failure(context, "Run recorder construction failed", exc)
                     if recorder is not None:
+                        finish_telemetry(
+                            telemetry_session,
+                            context,
+                            outcome,
+                            ended_monotonic_ns=ended_monotonic_ns,
+                        )
                         _finish_run_recorder(
                             recorder,
                             outcome,
@@ -1191,6 +1208,7 @@ class App:
             history_scope=runtime.history_scope,
             history_parent_run_id=runtime.history_parent_run_id,
             json_output=bool(standard.get("json")),
+            rich=self.rich,
         )
         context._run_metadata_path = run_metadata_path
 
@@ -1328,6 +1346,7 @@ class _AttachedLifecycleResource:
         self.started_monotonic_ns = time.monotonic_ns()
         self.context: Context[Any, Any, Any] | None = None
         self.invocation: _AttachedInvocation | None = None
+        self.telemetry_session: TelemetrySession | None = None
         self.context_token: Any = None
         self.invocation_token: Any = None
         self.original_click_exit: Callable[..., Any] | None = None
@@ -1359,6 +1378,7 @@ class _AttachedLifecycleResource:
             )
             self.invocation_token = _ATTACHED_INVOCATION.set(self.invocation)
             _start_run_recorder(recorder)
+            self.telemetry_session = start_telemetry(self.attachment.app.telemetry, context)
 
             original_click_exit = self.click_context.exit
 
@@ -1487,6 +1507,12 @@ class _AttachedLifecycleResource:
             invocation.recorder,
             self.outcome,
             ended_at=ended_at,
+            ended_monotonic_ns=ended_monotonic_ns,
+        )
+        finish_telemetry(
+            self.telemetry_session,
+            context,
+            self.outcome,
             ended_monotonic_ns=ended_monotonic_ns,
         )
         try:

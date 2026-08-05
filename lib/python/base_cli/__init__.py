@@ -30,7 +30,7 @@ def _resolve_version() -> str:
 
 __version__ = _resolve_version()
 
-from . import command_filters, command_protocol, extensions, history, json_contracts, testing
+from . import command_filters, command_protocol, extensions, history, integrations, json_contracts, testing
 from .attachment import (
     AttachmentAdapter,
     AttachmentContextFactory,
@@ -87,6 +87,7 @@ from .extensions import (
 )
 from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
+from .integrations import TelemetryOptions, TelemetrySession, try_render_rich_table
 from .json_contracts import (
     JSON_CONTRACT_VERSION,
     JSON_ERROR_SCHEMA,
@@ -190,6 +191,7 @@ __all__ = [
     "dumps_records",
     "error_envelope",
     "history",
+    "integrations",
     "inspection_envelope",
     "render_inspection_json",
     "testing",
@@ -233,6 +235,9 @@ __all__ = [
     "success_envelope",
     "RuntimeBinding",
     "ServicesT",
+    "TelemetryOptions",
+    "TelemetrySession",
+    "try_render_rich_table",
     "HistoryWriter",
     "HistoryDisplayResolver",
     "UserConfigLoader",

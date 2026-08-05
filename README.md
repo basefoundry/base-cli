@@ -47,6 +47,11 @@ for Unicode display width and safely truncate oversized cells. See
 [`docs/output-contracts.md`](docs/output-contracts.md) for the output rules and
 deterministic width controls.
 
+Optional Rich tables and OpenTelemetry lifecycle spans are available through
+separate extras; they are never imported or required by the default install.
+See [`docs/integrations.md`](docs/integrations.md) for opt-in configuration and
+graceful-degradation behavior.
+
 ## Design Goals
 
 CLI tools should be easy to write, but not magical. A command should be
