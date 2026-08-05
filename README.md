@@ -189,6 +189,10 @@ catalog](examples/README.md). It covers a minimal command, nested/plugin Click,
 Typer, and automation/observability flows; each example has its own packaging,
 tests, completion, release, and troubleshooting guidance.
 
+Teams evaluating adoption can follow the [adopter readiness and migration
+guide](docs/adopter-readiness.md) and run the three independent
+[downstream compatibility consumers](compatibility/README.md).
+
 ## Minimal Command
 
 ```python

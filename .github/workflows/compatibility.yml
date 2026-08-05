@@ -1,0 +1,43 @@
+name: Reference consumers
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  downstream:
+    name: Install and test independent consumers
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install framework build and test dependencies
+        run: python -m pip install ".[dev,typer,rich,telemetry]"
+      - name: Build and install the framework wheel
+        run: |
+          python -m build --wheel
+          python -m pip uninstall --yes base-cli
+          python -m pip install dist/*.whl
+      - name: Validate consumer manifest
+        run: python scripts/validate_consumers.py
+      - name: Install consumers independently
+        run: |
+          python -m pip install compatibility/consumers/atlas_click
+          python -m pip install compatibility/consumers/beacon_typer
+          python -m pip install "compatibility/consumers/cinder_automation[observability]"
+      - name: Run downstream compatibility suites
+        run: |
+          for tests in compatibility/consumers/*/tests; do
+            python -m pytest "$tests"
+          done

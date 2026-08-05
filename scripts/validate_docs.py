@@ -25,6 +25,7 @@ def validate_links(root: Path) -> None:
         root / "SECURITY.md",
         *sorted((root / "docs").glob("*.md")),
         *sorted((root / "examples").rglob("*.md")),
+        *sorted((root / "compatibility").rglob("*.md")),
     ]
     for document in markdown_files:
         text = document.read_text(encoding="utf-8")
