@@ -30,7 +30,7 @@ def _resolve_version() -> str:
 
 __version__ = _resolve_version()
 
-from . import command_filters, command_protocol, history, json_contracts, testing
+from . import command_filters, command_protocol, extensions, history, json_contracts, testing
 from .attachment import (
     AttachmentAdapter,
     AttachmentContextFactory,
@@ -72,6 +72,19 @@ from .context import (
     get_current_context,
 )
 from .errors import ConfigurationError
+from .extensions import (
+    COMMAND_ENTRY_POINT_GROUP,
+    ENTRY_POINT_GROUPS,
+    PLUGIN_ENTRY_POINT_GROUP,
+    PROFILE_ENTRY_POINT_GROUP,
+    ExtensionCollisionError,
+    ExtensionDescriptor,
+    ExtensionDiscovery,
+    ExtensionDiscoveryError,
+    ExtensionLoadError,
+    ExtensionLoadResult,
+    ExtensionsDisabledError,
+)
 from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
 from .json_contracts import (
@@ -139,8 +152,17 @@ __all__ = [
     "CommandProtocolError",
     "CommandSchemaRegistry",
     "ConfigurationError",
+    "COMMAND_ENTRY_POINT_GROUP",
     "Context",
     "ConfigT",
+    "ENTRY_POINT_GROUPS",
+    "ExtensionCollisionError",
+    "ExtensionDescriptor",
+    "ExtensionDiscovery",
+    "ExtensionDiscoveryError",
+    "ExtensionLoadError",
+    "ExtensionLoadResult",
+    "ExtensionsDisabledError",
     "DEFAULT_SCHEMA_REGISTRY",
     "DisplayCommandResolver",
     "EnvironmentConfigLoader",
@@ -195,6 +217,8 @@ __all__ = [
     "ProjectDiscovery",
     "RECORD_SCHEMAS",
     "RuntimeLayout",
+    "PLUGIN_ENTRY_POINT_GROUP",
+    "PROFILE_ENTRY_POINT_GROUP",
     "RetentionPolicy",
     "RuntimeResolver",
     "is_terminal",
