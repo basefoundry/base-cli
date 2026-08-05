@@ -31,6 +31,7 @@ from ._runtime import (
     create_owned_runtime_directory,
     create_runtime_directory,
     prune_log_files,
+    prune_run_bundles,
 )
 from .attachment import AttachmentContract
 from .config import ConfigSnapshot
@@ -51,6 +52,7 @@ from .paths import (
     normalize_cli_name,
 )
 from .profile import CliProfile
+from .runtime import RetentionPolicy
 from .redaction import (
     REDACTED,
     RedactionPlan,
@@ -465,9 +467,38 @@ class App:
         max_log_files: int | None = None,
         profile: CliProfile | None = None,
         lifecycle_options: LifecycleOptions | None = None,
+        retention: RetentionPolicy | None = None,
+        max_run_bundles: int | None = None,
+        max_run_age_seconds: float | None = None,
+        max_run_total_bytes: int | None = None,
     ) -> None:
         if max_log_files is not None and max_log_files < 1:
             raise ValueError("max_log_files must be greater than 0 when set.")
+        if retention is not None and not isinstance(retention, RetentionPolicy):
+            raise TypeError("retention must be a RetentionPolicy instance or None.")
+        if retention is not None and any(
+            value is not None
+            for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
+        ):
+            raise ValueError("pass either retention or individual run retention bounds, not both.")
+        if retention is not None:
+            self.retention: RetentionPolicy | None = retention
+        elif any(
+            value is not None
+            for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
+        ):
+            self.retention = RetentionPolicy(
+                max_bundles=max_run_bundles,
+                max_age_seconds=max_run_age_seconds,
+                max_total_bytes=max_run_total_bytes,
+            )
+        elif max_log_files is None:
+            self.retention = RetentionPolicy.safe_defaults()
+        else:
+            # Keep the original per-file option's behavior for explicitly
+            # opted-in legacy consumers; modern bundles are still handled by
+            # the compatibility path below.
+            self.retention = None
         self._registration_lock = RLock()
         self._registration_state = _REGISTRATION_OPEN
         self._name = normalize_cli_name(name or sys.argv[0])
@@ -1197,11 +1228,38 @@ class App:
                 target = f"persistent log file '{log_file}'" if log_file is not None else "stderr logging"
                 raise RuntimeDirectoryError(f"Unable to configure {target}: {exc}") from exc
             context.log.debug("cli=%s run_id=%s environment=%s", self.name, run_id, environment)
-            retention_limit = self.max_log_files
-            if retention_limit is None and context.json_output:
-                retention_limit = _JSON_DEFAULT_MAX_LOG_FILES
-            if retention_limit is not None and uses_default_log_file and log_file is not None:
-                prune_log_files(layout.owner_root / "runs", log_file, retention_limit, context.log)
+            if uses_default_log_file and log_file is not None:
+                if self.retention is not None:
+                    prune_run_bundles(
+                        layout.owner_root / "runs",
+                        layout.run_root,
+                        policy=self.retention,
+                        logger=context.log,
+                    )
+                elif self.max_log_files is not None:
+                    # Compatibility for the original public option.  The
+                    # legacy pass handles pre-metadata flat log directories;
+                    # metadata-backed runs are routed to bundle retention by
+                    # the helper itself.
+                    prune_log_files(
+                        layout.owner_root / "runs",
+                        log_file,
+                        self.max_log_files,
+                        context.log,
+                    )
+                    prune_run_bundles(
+                        layout.owner_root / "runs",
+                        layout.run_root,
+                        policy=RetentionPolicy(max_bundles=self.max_log_files),
+                        logger=context.log,
+                    )
+                elif context.json_output:
+                    prune_run_bundles(
+                        layout.owner_root / "runs",
+                        layout.run_root,
+                        policy=RetentionPolicy(max_bundles=_JSON_DEFAULT_MAX_LOG_FILES),
+                        logger=context.log,
+                    )
 
             if runtime.write_identity and selected_project_root is not None and not dry_run and self.log_to_file:
                 try:

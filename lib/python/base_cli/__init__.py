@@ -117,7 +117,7 @@ from .profile import (
     UserConfigLoader,
     WorkspaceRootResolver,
 )
-from .runtime import RuntimeLayout
+from .runtime import RetentionPolicy, RuntimeLayout
 from .typer import TyperAdapter, attach_typer, get_typer_command
 
 __all__ = [
@@ -195,6 +195,7 @@ __all__ = [
     "ProjectDiscovery",
     "RECORD_SCHEMAS",
     "RuntimeLayout",
+    "RetentionPolicy",
     "RuntimeResolver",
     "is_terminal",
     "output_format_choices",
