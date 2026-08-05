@@ -14,6 +14,8 @@ required_files=(
   .github/workflows/tests.yml
   .github/workflows/package.yml
   docs/releasing.md
+  docs/api-stability.md
+  docs/migrations.md
   MANIFEST.in
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py

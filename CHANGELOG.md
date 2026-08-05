@@ -9,6 +9,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Add the public API stability and deprecation policy, migration guide, and
+  `base_cli.deprecated()` warning helper with contract-test guardrails.
 - Add immutable `LifecycleOptions` and `LifecycleOption` policies for enabling,
   disabling, renaming, and configuring each standard option independently, with
   normalized `LifecycleValues` stored in namespaced Click metadata without
