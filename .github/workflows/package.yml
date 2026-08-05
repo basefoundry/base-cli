@@ -8,7 +8,9 @@ on:
       - "VERSION"
       - "README.md"
       - "LICENSE"
+      - "MANIFEST.in"
       - "scripts/validate_package_artifact.py"
+      - "scripts/validate_installed_package.py"
       - "docs/releasing.md"
       - ".github/workflows/package.yml"
   push:
@@ -73,6 +75,11 @@ jobs:
       - name: Validate repository baseline
         run: ./tests/validate.sh
 
+      - name: Prepare clean artifact destination
+        run: |
+          git clean -ffdx
+          mkdir -p dist
+
       - name: Install build and validation tools
         run: python -m pip install --upgrade build twine
 
@@ -134,6 +141,14 @@ jobs:
           assert hasattr(base_cli, "App")
           print(f"base-cli {base_cli.__version__} installed successfully")
           PY
+
+      - name: Exercise installed wheel API and lifecycle
+        env:
+          EXPECTED_VERSION: ${{ needs.build.outputs.version }}
+        run: python -I scripts/validate_installed_package.py
+
+      - name: Check installed dependency consistency
+        run: python -m pip check
 
   publish:
     name: Publish reviewed distribution

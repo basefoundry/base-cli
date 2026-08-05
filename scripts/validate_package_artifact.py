@@ -17,6 +17,31 @@ PACKAGE_NAME = "base-cli"
 IMPORT_NAME = "base_cli"
 MINIMUM_PYTHON = ">=3.10"
 REQUIRED_DEPENDENCIES = ("click>=8.1", "PyYAML>=6.0")
+ALLOWED_WHEEL_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", "top_level.txt", "entry_points.txt"})
+ALLOWED_SDIST_FILES = frozenset(
+    {
+        "CHANGELOG.md",
+        "CONTRIBUTING.md",
+        "LICENSE",
+        "MANIFEST.in",
+        "PKG-INFO",
+        "README.md",
+        "setup.cfg",
+        "VERSION",
+        "base_manifest.yaml",
+        "pyproject.toml",
+    }
+)
+ALLOWED_SDIST_PREFIXES = (
+    ".github/",
+    "docs/",
+    "examples/",
+    "lib/python/base_cli/",
+    "scripts/",
+    "tests/",
+    "base_cli.egg-info/",
+    "lib/python/base_cli.egg-info/",
+)
 
 
 def fail(message: str) -> NoReturn:
@@ -32,7 +57,14 @@ def read_expected_version() -> str:
     return lines[0].strip()
 
 
-def validate_wheel(path: Path, expected_version: str) -> None:
+def expected_package_files() -> set[str]:
+    package_root = Path(__file__).resolve().parents[1] / "lib" / "python" / IMPORT_NAME
+    if not package_root.is_dir():
+        fail(f"package source directory does not exist: {package_root}")
+    return {path.relative_to(package_root).as_posix() for path in package_root.rglob("*") if path.is_file()}
+
+
+def validate_wheel(path: Path, expected_version: str, package_files: set[str]) -> None:
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         metadata_names = [name for name in names if name.endswith(".dist-info/METADATA")]
@@ -58,17 +90,47 @@ def validate_wheel(path: Path, expected_version: str) -> None:
         if f"{IMPORT_NAME}/py.typed" not in names:
             fail(f"{path.name} does not contain {IMPORT_NAME}/py.typed")
         if not any(
-            name.endswith(".dist-info/LICENSE") or name.endswith(".dist-info/licenses/LICENSE")
-            for name in names
+            name.endswith(".dist-info/LICENSE") or name.endswith(".dist-info/licenses/LICENSE") for name in names
         ):
             fail(f"{path.name} does not contain the packaged LICENSE file")
         if any(name.startswith("tests/") or f"/{IMPORT_NAME}/tests/" in name for name in names):
             fail(f"{path.name} contains repository test files")
 
+        dist_info_prefix = metadata_names[0].rsplit("/", 1)[0] + "/"
+        for name in names:
+            if name.startswith(f"{IMPORT_NAME}/"):
+                relative = name[len(IMPORT_NAME) + 1 :]
+                if relative not in package_files:
+                    fail(f"{path.name} contains non-allowlisted package file {name!r}")
+                continue
+            if name.startswith(dist_info_prefix):
+                relative = name[len(dist_info_prefix) :]
+                if relative in {"LICENSE", "licenses/LICENSE"}:
+                    continue
+                if relative not in ALLOWED_WHEEL_DIST_INFO_FILES:
+                    fail(f"{path.name} contains non-allowlisted metadata file {name!r}")
+                continue
+            fail(f"{path.name} contains non-allowlisted archive member {name!r}")
+
 
 def validate_sdist(path: Path, expected_version: str) -> None:
     with tarfile.open(path, "r:gz") as archive:
-        names = [member.name for member in archive.getmembers()]
+        members = archive.getmembers()
+        names = [member.name for member in members]
+        roots = {name.split("/", 1)[0] for name in names if name}
+        if len(roots) != 1:
+            fail(f"{path.name} must contain exactly one top-level directory")
+        root = next(iter(roots))
+        root_prefix = f"{root}/"
+        for member in members:
+            name = member.name
+            if name == root or member.isdir():
+                continue
+            if not name.startswith(root_prefix):
+                fail(f"{path.name} contains member outside its top-level directory: {name!r}")
+            relative = name[len(root_prefix) :]
+            if relative not in ALLOWED_SDIST_FILES and not relative.startswith(ALLOWED_SDIST_PREFIXES):
+                fail(f"{path.name} contains non-allowlisted archive member {relative!r}")
         required_suffixes = {"pyproject.toml", "README.md", "LICENSE", "VERSION"}
         present_suffixes = {name.rsplit("/", 1)[-1] for name in names}
         missing = required_suffixes - present_suffixes
@@ -98,7 +160,7 @@ def main() -> None:
     if not wheels[0].name.startswith(expected_stem) or not sdists[0].name.startswith(expected_stem):
         fail(f"artifact filenames do not match version {expected_version}")
 
-    validate_wheel(wheels[0], expected_version)
+    validate_wheel(wheels[0], expected_version, expected_package_files())
     validate_sdist(sdists[0], expected_version)
     print(f"Validated {PACKAGE_NAME} {expected_version}: wheel, sdist, metadata, package data, and test boundary.")
 

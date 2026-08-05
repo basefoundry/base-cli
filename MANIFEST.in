@@ -1,0 +1,19 @@
+# Release source allowlist. Keep this explicit so stale build output cannot
+# silently enter an sdist.
+include CHANGELOG.md
+include CONTRIBUTING.md
+include LICENSE
+include MANIFEST.in
+include README.md
+include VERSION
+include base_manifest.yaml
+include pyproject.toml
+recursive-include .github *.yml
+recursive-include docs *.md
+recursive-include examples *.py
+recursive-include lib/python/base_cli *.py py.typed
+recursive-include scripts *.py
+recursive-include tests *.py
+global-exclude *.py[cod]
+global-exclude __pycache__/*
+global-exclude .DS_Store
