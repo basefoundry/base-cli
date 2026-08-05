@@ -41,6 +41,12 @@ Automation-facing JSON output, errors, and logs are opt-in through the
 versioned contracts documented in [`docs/json-contracts.md`](docs/json-contracts.md).
 Human output and Click error behavior remain the default.
 
+Shared record renderers keep machine output stable: CSV and TSV stream
+one-pass iterables without headers or footers, while terminal tables account
+for Unicode display width and safely truncate oversized cells. See
+[`docs/output-contracts.md`](docs/output-contracts.md) for the output rules and
+deterministic width controls.
+
 ## Design Goals
 
 CLI tools should be easy to write, but not magical. A command should be
