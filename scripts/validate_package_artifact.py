@@ -26,6 +26,7 @@ ALLOWED_SDIST_FILES = frozenset(
         "MANIFEST.in",
         "PKG-INFO",
         "README.md",
+        "SECURITY.md",
         "setup.cfg",
         "VERSION",
         "base_manifest.yaml",
