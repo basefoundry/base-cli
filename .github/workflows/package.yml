@@ -11,6 +11,8 @@ on:
       - "MANIFEST.in"
       - "scripts/validate_package_artifact.py"
       - "scripts/validate_installed_package.py"
+      - "scripts/validate_examples.py"
+      - "examples/**"
       - "docs/releasing.md"
       - ".github/workflows/package.yml"
   push:

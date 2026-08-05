@@ -1,0 +1,1 @@
+"""Nested Click reference application."""

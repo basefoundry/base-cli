@@ -14,6 +14,7 @@ required_files=(
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
   .github/workflows/package.yml
+  .github/workflows/examples.yml
   docs/releasing.md
   docs/api-stability.md
   docs/migrations.md
@@ -23,6 +24,7 @@ required_files=(
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py
   scripts/validate_docs.py
+  scripts/validate_examples.py
   scripts/benchmark_runtime.py
   tests/conftest.py
 )
