@@ -69,7 +69,14 @@ jobs:
       - name: Run static security checks
         run: |
           bandit -q -r lib/python/base_cli scripts -lll -iii
-          pip-audit --strict
+          # The project itself is installed from this checkout and may not be
+          # published to PyPI yet (for example, while validating a release PR).
+          # Audit every installed third-party package without asking pip-audit
+          # to resolve the unpublished project distribution.
+          python -m pip freeze \
+            | grep -Eiv '^base-cli[[:space:]]*==' \
+            > "$RUNNER_TEMP/base-cli-audit-requirements.txt"
+          pip-audit --strict -r "$RUNNER_TEMP/base-cli-audit-requirements.txt"
 
   linux-distributions:
     name: Validate (${{ matrix.name }})
