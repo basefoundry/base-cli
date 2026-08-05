@@ -124,6 +124,16 @@ The core lifecycle is synchronous so cleanup, Click resource unwinding, and
 outcome finalization remain deterministic; an adapter may provide an explicit
 async runner without changing the core contract.
 
+### Optional entry-point extensions
+
+Applications that want package-distributed commands, profiles, or integrations
+can opt into `base_cli.ExtensionDiscovery`. It recognizes the documented
+`base_cli.commands`, `base_cli.profiles`, and `base_cli.plugins` entry-point
+groups. Discovery is lazy and cached, duplicate names fail explicitly, broken
+extensions are isolated by `load_all()`, and consumers can disable discovery or
+provide an allowlist. See [`docs/extensions.md`](docs/extensions.md) for the
+entry-point contracts and deterministic ordering rules.
+
 ## Public API
 
 The supported facade is `import base_cli`. It exports the command lifecycle
