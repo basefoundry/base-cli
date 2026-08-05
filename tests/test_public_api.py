@@ -11,6 +11,7 @@ from base_cli import (
     command_filters,
     command_protocol,
     config,
+    deprecations,
     history,
     json_contracts,
     lifecycle_options,
@@ -47,6 +48,8 @@ class PublicApiTests(unittest.TestCase):
             "AttachmentAdapter",
             "AttachmentContract",
             "BatteriesIncludedConfigLoader",
+            "BaseCliDeprecationWarning",
+            "deprecated",
             "TyperAdapter",
             "attach_typer",
             "get_typer_command",
@@ -79,6 +82,7 @@ class PublicApiTests(unittest.TestCase):
         self.assertIs(base_cli.command_protocol, command_protocol)
         self.assertIs(base_cli.typer, typer)
         self.assertIs(base_cli.json_contracts, json_contracts)
+        self.assertIs(base_cli.deprecations, deprecations)
         self.assertTrue(issubclass(base_cli.ConfigurationError, ValueError))
 
     def test_module_all_surfaces_are_explicit(self) -> None:
@@ -155,6 +159,7 @@ class PublicApiTests(unittest.TestCase):
                 "redact_json_value",
             },
         )
+        self.assertEqual(set(deprecations.__all__), {"BaseCliDeprecationWarning", "deprecated"})
 
     def test_entry_points_have_docstrings(self) -> None:
         self.assertTrue(base_cli.App.__doc__)

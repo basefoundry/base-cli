@@ -30,7 +30,7 @@ def _resolve_version() -> str:
 
 __version__ = _resolve_version()
 
-from . import command_filters, command_protocol, extensions, history, integrations, json_contracts, testing
+from . import command_filters, command_protocol, deprecations, extensions, history, integrations, json_contracts, testing
 from .attachment import (
     AttachmentAdapter,
     AttachmentContextFactory,
@@ -38,6 +38,7 @@ from .attachment import (
     AttachmentServiceFactory,
 )
 from .config import BatteriesIncludedConfigLoader, ConfigSnapshot, FrameworkConfig
+from .deprecations import BaseCliDeprecationWarning, deprecated
 from .app import (
     App,
     argument,
@@ -143,6 +144,7 @@ __all__ = [
     "AttachmentServiceFactory",
     "TyperAdapter",
     "BatteriesIncludedConfigLoader",
+    "BaseCliDeprecationWarning",
     "BOOLEAN",
     "ApplicationStateT",
     "CliProfile",
@@ -179,6 +181,7 @@ __all__ = [
     "command_filters",
     "command_matches",
     "command_protocol",
+    "deprecations",
     "json_contracts",
     "JSON_CONTRACT_VERSION",
     "JSON_ERROR_SCHEMA",
@@ -202,6 +205,7 @@ __all__ = [
     "command",
     "configure_logger",
     "delegated_display_command",
+    "deprecated",
     "get_command_app",
     "get_current_context",
     "get_typer_command",

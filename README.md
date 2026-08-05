@@ -41,6 +41,11 @@ Automation-facing JSON output, errors, and logs are opt-in through the
 versioned contracts documented in [`docs/json-contracts.md`](docs/json-contracts.md).
 Human output and Click error behavior remain the default.
 
+The supported public facade, compatibility promises, deprecation warning
+mechanism, and migration requirements are documented in
+[`docs/api-stability.md`](docs/api-stability.md) and
+[`docs/migrations.md`](docs/migrations.md).
+
 Shared record renderers keep machine output stable: CSV and TSV stream
 one-pass iterables without headers or footers, while terminal tables account
 for Unicode display width and safely truncate oversized cells. See
