@@ -23,7 +23,10 @@ source tree on `sys.path`. Tests run across Python 3.10 through 3.14 on Linux,
 macOS, and Windows, with Debian, Fedora, and WSL validation retained. Blocking
 quality gates cover Ruff formatting/lint, strict public-sample typing, an 80%
 branch-coverage threshold, documentation/example checks, and dependency/static
-security scans.
+security scans. The [performance contract](performance.md) also checks fresh
+import and isolated invocation budgets, while the adversarial suite exercises
+redaction, protocol framing, persistence, concurrency, retention, and signal
+cleanup.
 
 The publish job downloads that same reviewed artifact; it does not rebuild
 during publication.

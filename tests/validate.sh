@@ -18,6 +18,7 @@ required_files=(
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py
   scripts/validate_docs.py
+  scripts/benchmark_runtime.py
   tests/conftest.py
 )
 

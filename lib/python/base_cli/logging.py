@@ -6,7 +6,17 @@ import platform
 import sys
 import time
 from pathlib import Path
-from typing import TextIO
+from typing import BinaryIO, TextIO
+
+try:
+    import fcntl as _fcntl
+except ImportError:  # pragma: no cover - fcntl is unavailable on Windows.
+    _fcntl = None  # type: ignore[assignment]
+
+try:
+    import msvcrt as _msvcrt
+except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
+    _msvcrt = None  # type: ignore[assignment]
 
 from ._private_files import restrict_file
 from .context import get_current_context
@@ -107,6 +117,10 @@ def secure_log_file_permissions(log_file: Path) -> None:
 
 
 class SecureLogFileHandler(logging.FileHandler):
+    def __init__(self, filename: str | os.PathLike[str], *args: object, **kwargs: object) -> None:
+        self._lock_path = Path(filename).with_name(f".{Path(filename).name}.lock")
+        super().__init__(filename, *args, **kwargs)  # type: ignore[arg-type]
+
     def _open(self) -> TextIO:
         fd = os.open(self.baseFilename, _secure_log_file_open_flags(self.mode), 0o600)
         try:
@@ -117,6 +131,47 @@ class SecureLogFileHandler(logging.FileHandler):
         except BaseException:
             os.close(fd)
             raise
+
+    def emit(self, record: logging.LogRecord) -> None:
+        lock_stream = _open_log_lock(self._lock_path)
+        try:
+            _lock_log_stream(lock_stream)
+            super().emit(record)
+        finally:
+            _unlock_log_stream(lock_stream)
+            lock_stream.close()
+
+
+def _open_log_lock(path: Path) -> BinaryIO:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    stream = path.open("a+b")
+    try:
+        if stream.seek(0, os.SEEK_END) == 0:
+            stream.write(b"0")
+            stream.flush()
+        restrict_file(path)
+        return stream
+    except BaseException:
+        stream.close()
+        raise
+
+
+def _lock_log_stream(stream: BinaryIO) -> None:
+    fd = stream.fileno()
+    if _fcntl is not None:
+        _fcntl.flock(fd, _fcntl.LOCK_EX)
+    elif _msvcrt is not None:
+        stream.seek(0)
+        _msvcrt.locking(fd, _msvcrt.LK_LOCK, 1)
+
+
+def _unlock_log_stream(stream: BinaryIO) -> None:
+    fd = stream.fileno()
+    if _fcntl is not None:
+        _fcntl.flock(fd, _fcntl.LOCK_UN)
+    elif _msvcrt is not None:
+        stream.seek(0)
+        _msvcrt.locking(fd, _msvcrt.LK_UNLCK, 1)
 
 
 def _secure_log_file_open_flags(mode: str) -> int:
