@@ -53,6 +53,7 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 
 ### Changed
 
+- Add README health and support badges for CI, downstream consumers, PyPI, and supported Python versions.
 - Normalize command returns, Click errors, aborts, interrupts, `SystemExit`, and
   unexpected exceptions through one core outcome model and clean `run_app()`
   process boundary.

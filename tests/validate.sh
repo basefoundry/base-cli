@@ -43,7 +43,24 @@ for file in "${required_files[@]}"; do
 done
 
 version="$(head -n 1 VERSION | tr -d '\r')"
-if ! sed -n '1,12p' README.md | tr -d '\r' | grep -F "| \`$version\` | [Apache-2.0](LICENSE) | \`python -m pip install base-cli\` | [v$version](https://github.com/basefoundry/base-cli/releases/tag/v$version) |" >/dev/null; then
+readme_head="$(sed -n '1,18p' README.md | tr -d '\r')"
+if ! printf '%s\n' "$readme_head" | grep -F "[![Tests](https://img.shields.io/github/actions/workflow/status/basefoundry/base-cli/tests.yml?branch=main&label=tests)](https://github.com/basefoundry/base-cli/actions/workflows/tests.yml)" >/dev/null; then
+  printf 'README.md is missing the main-branch tests health badge.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$readme_head" | grep -F "[![Reference consumers](https://img.shields.io/github/actions/workflow/status/basefoundry/base-cli/compatibility.yml?branch=main&label=consumers)](https://github.com/basefoundry/base-cli/actions/workflows/compatibility.yml)" >/dev/null; then
+  printf 'README.md is missing the reference-consumer health badge.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$readme_head" | grep -F "[![PyPI](https://img.shields.io/pypi/v/base-cli.svg)](https://pypi.org/project/base-cli/)" >/dev/null; then
+  printf 'README.md is missing the PyPI release badge.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$readme_head" | grep -F "[![Python](https://img.shields.io/pypi/pyversions/base-cli.svg)](https://pypi.org/project/base-cli/)" >/dev/null; then
+  printf 'README.md is missing the supported Python versions badge.\n' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$readme_head" | grep -F "| \`$version\` | [Apache-2.0](LICENSE) | \`python -m pip install base-cli\` | [v$version](https://github.com/basefoundry/base-cli/releases/tag/v$version) |" >/dev/null; then
   printf 'README.md release strip does not match VERSION (%s), license, install command, and release link.\n' "$version" >&2
   exit 1
 fi
