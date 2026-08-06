@@ -5,6 +5,31 @@ All notable changes to base-cli will be documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and versions are tracked in the repo-root `VERSION` file.
 
+## [Unreleased]
+
+### Added
+
+- Add the MkDocs documentation site configuration, strict documentation checks,
+  and GitHub Pages deployment workflow.
+- Add the importable, intentionally empty `base_cli.experimental` namespace for
+  future preview APIs without expanding the stable API surface.
+
+### Changed
+
+- Reclassify the project as Beta in package metadata to reflect its documented
+  API stability policy, compatibility suite, and production-adoption guidance.
+- Add a version, license, install, and release-notes strip to the README and
+  validate it against the repository version contract.
+- Extend the optional Typer adapter through Typer 0.27.x by selecting the
+  command tree's matching public or vendored Click dialect, with a Python 3.10
+  through 3.14 compatibility matrix covering Typer 0.25.1, 0.26.0, and 0.27.1.
+- Document the intentional opaque `Context.user_config` boundary and the
+  compatibility requirements for any future fourth context type parameter.
+
+### Planned
+
+- Continue compatibility hardening and adoption work for the next release.
+
 ## [0.4.0] - 2026-08-05
 
 This is a pre-1.0 minor release and therefore a compatibility boundary. See
@@ -95,31 +120,6 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
   disabled.
 - Restore Click-native `--option=value` parsing, including redaction of
   sensitive equals-form values.
-
-## [Unreleased]
-
-### Added
-
-- Add the MkDocs documentation site configuration, strict documentation checks,
-  and GitHub Pages deployment workflow.
-- Add the importable, intentionally empty `base_cli.experimental` namespace for
-  future preview APIs without expanding the stable API surface.
-
-### Changed
-
-- Reclassify the project as Beta in package metadata to reflect its documented
-  API stability policy, compatibility suite, and production-adoption guidance.
-- Add a version, license, install, and release-notes strip to the README and
-  validate it against the repository version contract.
-- Extend the optional Typer adapter through Typer 0.27.x by selecting the
-  command tree's matching public or vendored Click dialect, with a Python 3.10
-  through 3.14 compatibility matrix covering Typer 0.25.1, 0.26.0, and 0.27.1.
-- Document the intentional opaque `Context.user_config` boundary and the
-  compatibility requirements for any future fourth context type parameter.
-
-### Planned
-
-- Continue compatibility hardening and adoption work for the next release.
 
 ## [0.3.0] - 2026-08-01
 
