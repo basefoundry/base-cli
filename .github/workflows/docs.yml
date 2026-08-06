@@ -52,9 +52,6 @@ jobs:
       - name: Validate repository links and examples
         run: python scripts/validate_docs.py
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
-
       - name: Build documentation with strict warnings
         run: python -m mkdocs build --strict --site-dir site
 
@@ -76,6 +73,9 @@ jobs:
       pages: write
       id-token: write
     steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@f33f41b675f0ab2dc5a6863c9a170fe83af3571e # v4.0.0
