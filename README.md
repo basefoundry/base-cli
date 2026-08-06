@@ -862,7 +862,7 @@ available as a compatibility per-file policy; new applications should use
 Logs use a stable, human-readable shape:
 
 ```text
-2026-05-26 12:34:56 INFO    path/to/file.py:42 message
+2026-05-26 12:34:56 -0700 INFO    path/to/file.py:42 message
 ```
 
 Use either `ctx.log` directly:
