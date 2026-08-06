@@ -108,5 +108,6 @@ logger = base_cli.configure_logger(
 Each line is a JSON object with `schema_version`, `schema`, `timestamp` (UTC),
 `level`, `logger`, `message`, and `run_id`. Messages are redacted and capped at
 8 KiB; persistent files retain base-cli's owner-only permissions and JSON mode
-bounds default-log retention to the most recent 20 files (or the explicit
-`max_log_files` setting). JSON logs never use terminal color codes.
+bounds default-log retention to the most recent 20 run bundles (or the
+explicit `RetentionPolicy` setting). The legacy `max_log_files` option remains
+available for compatibility. JSON logs never use terminal color codes.
