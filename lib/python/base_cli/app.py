@@ -18,6 +18,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, ParamSpec, TypeVar
 
+from ._click_compat import dialect_for_command
 from ._lifecycle import (
     InvocationOutcome,
     RunRecorder,
@@ -676,7 +677,7 @@ class App:
         base-cli extends its root parameters and adds one lifecycle boundary.
         """
 
-        click = _require_click()
+        click = dialect_for_command(command)
         if not isinstance(command, click.Command):
             raise TypeError("App.attach() requires a click.Command instance.")
         _reject_async_callback(getattr(command, "callback", None))
@@ -2864,6 +2865,7 @@ def run_app(
             display_command = app.profile.display_command()
             invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
             command = app.click_command
+            click = dialect_for_command(command)
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
                 bypass_token = _INVOCATION_MAIN_BYPASS.set(command)

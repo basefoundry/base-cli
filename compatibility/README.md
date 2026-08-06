@@ -20,6 +20,10 @@ own dependencies, and runs each consumer's tests. This catches import,
 packaging, adapter, and contract regressions without relying on repository
 source imports.
 
+The same workflow runs the Typer adapter and Beacon fixture against Typer
+0.25.1, 0.26.0, and 0.27.1 on Python 3.10 through 3.14. This matrix covers the
+transition from Click's public command classes to Typer's vendored Click fork.
+
 Run the same checks locally:
 
 ```bash

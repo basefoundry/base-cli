@@ -12,6 +12,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  typer-matrix:
+    name: Typer ${{ matrix.typer-version }} / Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        typer-version: ["0.25.1", "0.26.0", "0.27.1"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install framework and exact Typer line
+        run: |
+          python -m pip install "setuptools<77" "wheel"
+          python -m pip install ".[dev]"
+          python -m pip install --upgrade "typer==${{ matrix.typer-version }}"
+      - name: Install Beacon fixture without dependency resolution
+        run: python -m pip install --no-deps compatibility/consumers/beacon_typer
+      - name: Run adapter and Beacon compatibility tests
+        run: python -m pytest tests/test_typer_adapter.py compatibility/consumers/beacon_typer/tests
+
   downstream:
     name: Install and test independent consumers
     runs-on: ubuntu-latest
