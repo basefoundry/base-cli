@@ -93,14 +93,14 @@ guardrail:
 | Friction found during onboarding | Linked issue | Disposition |
 | --- | --- | --- |
 | Existing nested/lazy Click trees need lifecycle attachment | [#57](https://github.com/basefoundry/base-cli/issues/57) | Resolved; Atlas fixture remains a regression check. |
-| Typed consumers need a supported adapter and version boundary | [#61](https://github.com/basefoundry/base-cli/issues/61) | Resolved; Beacon pins Typer `<0.26` and tests the boundary. |
+| Typed consumers need a supported adapter and version boundary | [#61](https://github.com/basefoundry/base-cli/issues/61) | Resolved; Beacon exercises the public and vendored Click boundaries across the supported Typer matrix. |
 | Automation needs a stable machine contract | [#63](https://github.com/basefoundry/base-cli/issues/63) | Resolved; Cinder asserts JSON output and error behavior. |
 | Teams need repeatable wheel, platform, and downstream checks | [#67](https://github.com/basefoundry/base-cli/issues/67), [#68](https://github.com/basefoundry/base-cli/issues/68) | Resolved; compatibility workflow is retained. |
 | Adoption requires explicit API, migration, and security expectations | [#69](https://github.com/basefoundry/base-cli/issues/69), [#70](https://github.com/basefoundry/base-cli/issues/70) | Resolved; this checklist links the published policies. |
 | Teams need copy-pasteable production examples | [#71](https://github.com/basefoundry/base-cli/issues/71) | Resolved; four installable examples remain in CI. |
 
 There are no unresolved release-blocking findings in the three fixture
-baseline. The accepted residuals are the documented Typer `<0.26` support
+baseline. The accepted residuals are the documented Typer `<0.28` support
 window, consumer-owned configuration/schema policy, and the absence of a
 permissioned public customer case study. Any new blocker must be filed as a
 linked issue before release and either fixed or explicitly accepted in the

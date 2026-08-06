@@ -7,7 +7,7 @@ name = "base-cli-compat-consumer-beacon"
 version = "0.1.0"
 description = "Independent Typer consumer compatibility fixture for base-cli"
 requires-python = ">=3.10"
-dependencies = ["base-cli>=0.3,<0.4", "typer>=0.12,<0.26"]
+dependencies = ["base-cli>=0.3,<0.5", "typer>=0.12,<0.28"]
 
 [project.scripts]
 beacon-consumer = "beacon_typer.cli:main"

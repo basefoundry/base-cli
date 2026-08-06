@@ -13,15 +13,15 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any, Callable, TYPE_CHECKING
 
+from ._click_compat import dialect_for_typer, mark_command_dialect
 from .app import App, attach
 from .context import Context
 
 if TYPE_CHECKING:
-    import click
     import typer
 
     _TyperApp = typer.Typer
-    _ClickCommand = click.Command
+    _ClickCommand = Any
 else:
     _TyperApp = Any
     _ClickCommand = Any
@@ -64,16 +64,13 @@ def get_typer_command(typer_app: _TyperApp) -> _ClickCommand:
         ) from exc
 
     command = get_command(typer_app)
-    # Importing Click here keeps this module optional while ensuring a clear
-    # failure if a third-party Typer distribution returns an incompatible tree.
-    import click
-
-    if not isinstance(command, click.Command):
+    dialect = dialect_for_typer(typer)
+    if not isinstance(command, dialect.Command):
         raise TypeError(
             "Typer did not produce a Click command; upgrade to a supported "
-            "Typer release (currently 0.12 through 0.25)."
+            "Typer release (currently 0.12 through 0.27.x)."
         )
-    return command
+    return mark_command_dialect(command, dialect)
 
 
 def _name_command_for_lifecycle(

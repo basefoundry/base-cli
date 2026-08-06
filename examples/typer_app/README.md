@@ -59,6 +59,7 @@ publishing. Announce adapter support-range changes as release notes.
 ## Operational troubleshooting
 
 - Run with `--debug` and capture `--log-file` when diagnosing a command.
-- If help fails after a Typer upgrade, check that the version is below 0.26.
+- If help fails after a Typer upgrade, check that the version is within the
+  supported `>=0.12,<0.28` range.
 - Use `--count 1` to distinguish application failures from input validation.
 - Redact access codes and other credentials from issue reports and transcripts.

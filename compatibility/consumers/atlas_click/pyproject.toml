@@ -7,7 +7,7 @@ name = "base-cli-compat-consumer-atlas"
 version = "0.1.0"
 description = "Independent Click consumer compatibility fixture for base-cli"
 requires-python = ">=3.10"
-dependencies = ["base-cli>=0.3,<0.4", "click>=8.1"]
+dependencies = ["base-cli>=0.3,<0.5", "click>=8.1"]
 
 [project.scripts]
 atlas-consumer = "atlas_click.cli:main"

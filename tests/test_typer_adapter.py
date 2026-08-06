@@ -40,7 +40,10 @@ class TyperAdapterTests(unittest.TestCase):
             sensitive_parameters={"access_code"},
         )
 
-        self.assertIsInstance(command, __import__("click").Command)
+        self.assertTrue(callable(command.main))
+        vendor_click = getattr(self.typer, "_click", None)
+        if vendor_click is not None:
+            self.assertIsInstance(command, vendor_click.Command)
         self.assertEqual(command.name, "typer-cli")
         with tempfile.TemporaryDirectory() as home:
             result = base_cli.testing.invoke(
@@ -105,6 +108,29 @@ class TyperAdapterTests(unittest.TestCase):
         command = adapter.attach(name="cached-cli", log_to_file=False)
         self.assertIs(command, adapter.command)
         self.assertEqual(command.name, "cached-cli")
+
+    def test_adapter_uses_owner_dialect_for_version_option(self) -> None:
+        cli = self.typer.Typer()
+
+        @cli.command()
+        def status() -> None:
+            self.typer.echo("ready")
+
+        command = base_cli.attach_typer(
+            cli,
+            name="versioned-cli",
+            version="9.8.7",
+            log_to_file=False,
+        )
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(
+                command,
+                ["--version"],
+                home=Path(home),
+            )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertIn("versioned-cli, version 9.8.7", result.stdout)
 
     def test_unnamed_multi_command_requires_a_lifecycle_name(self) -> None:
         cli = self.typer.Typer()

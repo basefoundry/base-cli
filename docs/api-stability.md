@@ -50,7 +50,7 @@ that need a frozen API should pin a minor release (for example, `~=0.4.0`).
 The core package requires Python `>=3.10` and currently tests CPython 3.10
 through 3.14 on Linux, macOS, and Windows. Core runtime dependencies are
 Click `>=8.1` and PyYAML `>=6.0`. Optional integrations are independently
-versioned and constrained in `pyproject.toml`: Typer `>=0.12,<0.26`, Rich
+versioned and constrained in `pyproject.toml`: Typer `>=0.12,<0.28`, Rich
 `>=13.7,<15`, and OpenTelemetry API `>=1.24,<2`. The lower bounds are the
 minimum supported versions; a dependency major release is supported after it
 passes the compatibility suite. A future minor release may drop an end-of-life
