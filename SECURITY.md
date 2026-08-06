@@ -2,7 +2,7 @@
 
 `base-cli` is a library for embedding a lifecycle into Python command-line
 applications. We take reports about the framework, its release artifacts, and
-the security controls documented in the [runtime threat model](docs/security-threat-model.md)
+the security controls documented in the [runtime threat model](https://basefoundry.github.io/base-cli/security-threat-model/)
 seriously.
 
 ## Reporting a vulnerability
@@ -40,7 +40,7 @@ changes the supported window will update this table and the changelog.
 | `main` | Supported for fixes merged before the next release |
 | `<0.3` | Upgrade strongly recommended; best effort only |
 
-The [API stability policy](docs/api-stability.md) explains the pre-1.0
+The [API stability policy](https://basefoundry.github.io/base-cli/api-stability/) explains the pre-1.0
 compatibility boundary. A security fix may require an emergency breaking
 change when leaving a vulnerable behavior in place would expose users.
 
@@ -68,6 +68,6 @@ The framework protects the lifecycle data it owns: argv redaction, private
 runtime files, fail-closed temporary cleanup, bounded JSON contracts, and
 opt-in telemetry with a safe attribute set. It does not sandbox consumer
 callbacks, third-party plugins, Python dependencies, shell commands, or the
-operating system. Consumers must review the [threat model](docs/security-threat-model.md)
-and complete the [security review checklist](docs/security-review.md) for their
+operating system. Consumers must review the [threat model](https://basefoundry.github.io/base-cli/security-threat-model/)
+and complete the [security review checklist](https://basefoundry.github.io/base-cli/security-review/) for their
 own profile, plugins, paths, history writer, and telemetry exporter.

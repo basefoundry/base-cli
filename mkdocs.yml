@@ -1,0 +1,53 @@
+site_name: base-cli
+site_description: A small, consumer-neutral Python framework for professional command-line applications.
+site_url: https://basefoundry.github.io/base-cli/
+repo_name: basefoundry/base-cli
+repo_url: https://github.com/basefoundry/base-cli
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - search.share
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Adopter readiness: adopter-readiness.md
+      - Platform support: platform-support.md
+      - Consumer profiles: consumer-profiles.md
+  - API and contracts:
+      - API stability: api-stability.md
+      - Migration guide: migrations.md
+      - Output contracts: output-contracts.md
+      - JSON contracts: json-contracts.md
+      - Typed user configuration: user-config-typing.md
+      - Entry-point extensions: extensions.md
+  - Integrations:
+      - Typer adapter: typer-adapter.md
+      - Optional integrations: integrations.md
+  - Operations and security:
+      - Local configuration: local-config.md
+      - Cache ownership and layout: cache-ownership-and-layout.md
+      - Performance: performance.md
+      - Runtime threat model: security-threat-model.md
+      - Security release review: security-review.md
+      - Releasing base-cli: releasing.md

@@ -98,6 +98,11 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 
 ## [Unreleased]
 
+### Added
+
+- Add the MkDocs documentation site configuration, strict documentation checks,
+  and GitHub Pages deployment workflow.
+
 ### Changed
 
 - Reclassify the project as Beta in package metadata to reflect its documented

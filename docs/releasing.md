@@ -31,6 +31,18 @@ cleanup.
 The publish job downloads that same reviewed artifact; it does not rebuild
 during publication.
 
+## Documentation site
+
+The Documentation workflow builds this site with `mkdocs build --strict` and
+publishes the reviewed site to GitHub Pages after changes land on `main`. The
+canonical URL is <https://basefoundry.github.io/base-cli/> and is exposed in
+the PyPI project metadata as the `Documentation` link.
+
+Repository administrators should enable GitHub Pages for the repository using
+the GitHub Actions source and approve the `github-pages` environment the first
+time the workflow deploys. Pull requests run the strict build and repository
+link checks without publishing.
+
 ## TestPyPI rehearsal
 
 1. Dispatch **Package** from the branch or tag to be rehearsed and choose
