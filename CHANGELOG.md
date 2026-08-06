@@ -101,6 +101,8 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 
 - Reclassify the project as Beta in package metadata to reflect its documented
   API stability policy, compatibility suite, and production-adoption guidance.
+- Add a version, license, install, and release-notes strip to the README and
+  validate it against the repository version contract.
 
 ### Planned
 

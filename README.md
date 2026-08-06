@@ -1,5 +1,9 @@
 # `base-cli`
 
+| Version | License | Install | Release notes |
+| --- | --- | --- | --- |
+| `0.4.0` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.4.0](https://github.com/basefoundry/base-cli/releases/tag/v0.4.0) |
+
 `base-cli` is the PyPI distribution; import it in Python as `base_cli`.
 
 Install it with:
