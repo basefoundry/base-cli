@@ -12,6 +12,7 @@ from base_cli import (
     command_protocol,
     config,
     deprecations,
+    experimental,
     history,
     json_contracts,
     lifecycle_options,
@@ -62,6 +63,7 @@ class PublicApiTests(unittest.TestCase):
             "command_filters",
             "command_matches",
             "command_protocol",
+            "experimental",
             "dumps_record",
             "dumps_records",
             "get_command_app",
@@ -83,6 +85,7 @@ class PublicApiTests(unittest.TestCase):
         self.assertIs(base_cli.typer, typer)
         self.assertIs(base_cli.json_contracts, json_contracts)
         self.assertIs(base_cli.deprecations, deprecations)
+        self.assertIs(base_cli.experimental, experimental)
         self.assertTrue(issubclass(base_cli.ConfigurationError, ValueError))
 
     def test_module_all_surfaces_are_explicit(self) -> None:
@@ -160,6 +163,7 @@ class PublicApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(set(deprecations.__all__), {"BaseCliDeprecationWarning", "deprecated"})
+        self.assertEqual(experimental.__all__, [])
         self.assertEqual(base_cli.testing.__all__, ["invoke"])
 
     def test_entry_points_have_docstrings(self) -> None:

@@ -102,6 +102,8 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 
 - Add the MkDocs documentation site configuration, strict documentation checks,
   and GitHub Pages deployment workflow.
+- Add the importable, intentionally empty `base_cli.experimental` namespace for
+  future preview APIs without expanding the stable API surface.
 
 ### Changed
 
