@@ -42,4 +42,10 @@ for file in "${required_files[@]}"; do
   }
 done
 
+version="$(head -n 1 VERSION | tr -d '\r')"
+if ! sed -n '1,12p' README.md | tr -d '\r' | grep -F "| \`$version\` | [Apache-2.0](LICENSE) | \`python -m pip install base-cli\` | [v$version](https://github.com/basefoundry/base-cli/releases/tag/v$version) |" >/dev/null; then
+  printf 'README.md release strip does not match VERSION (%s), license, install command, and release link.\n' "$version" >&2
+  exit 1
+fi
+
 printf 'Repository baseline is present.\n'
