@@ -8,6 +8,35 @@ Install it with:
 python -m pip install base-cli
 ```
 
+## Quick start
+
+Create a small command with a consistent context, logging, and cleanup
+lifecycle:
+
+```python
+from __future__ import annotations
+
+import base_cli
+
+
+app = base_cli.App(name="hello", version="0.1.0")
+
+
+@app.command()
+@base_cli.option("--name", default="world", show_default=True)
+def hello(ctx: base_cli.Context, name: str) -> int:
+    ctx.log.info("greeting %s", name)
+    print(f"Hello, {name}!")
+    return base_cli.ExitCode.SUCCESS
+
+
+if __name__ == "__main__":
+    raise SystemExit(base_cli.run_app(app))
+```
+
+Run it with `python hello.py --name Ada`. The full lifecycle and configuration
+options are documented below.
+
 Release builds, TestPyPI rehearsals, and protected PyPI publication are
 documented in [`docs/releasing.md`](docs/releasing.md). The package exposes
 `base_cli.__version__`, which matches the distribution version.
