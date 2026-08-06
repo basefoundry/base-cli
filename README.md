@@ -1,5 +1,10 @@
 # `base-cli`
 
+[![Tests](https://img.shields.io/github/actions/workflow/status/basefoundry/base-cli/tests.yml?branch=main&label=tests)](https://github.com/basefoundry/base-cli/actions/workflows/tests.yml)
+[![Reference consumers](https://img.shields.io/github/actions/workflow/status/basefoundry/base-cli/compatibility.yml?branch=main&label=consumers)](https://github.com/basefoundry/base-cli/actions/workflows/compatibility.yml)
+[![PyPI](https://img.shields.io/pypi/v/base-cli.svg)](https://pypi.org/project/base-cli/)
+[![Python](https://img.shields.io/pypi/pyversions/base-cli.svg)](https://pypi.org/project/base-cli/)
+
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
 | `0.4.0` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.4.0](https://github.com/basefoundry/base-cli/releases/tag/v0.4.0) |
