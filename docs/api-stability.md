@@ -27,10 +27,10 @@ and history implementation details are not stable machine interfaces unless a
 separate contract document says otherwise. Consumers that need automation
 should select the JSON or record protocol contracts.
 
-`base_cli.experimental` is reserved for preview APIs. No experimental symbols
-are currently shipped. A future preview must live under that namespace, be
-labelled experimental in its documentation, and must not be re-exported from
-the stable facade until it is promoted.
+The importable `base_cli.experimental` module is reserved for preview APIs. No
+experimental symbols are currently shipped. A future preview must live under
+that namespace, be labelled experimental in its documentation, and must not
+be re-exported from the stable facade until it is promoted.
 
 ## Versioning and compatibility
 

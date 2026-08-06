@@ -30,7 +30,17 @@ def _resolve_version() -> str:
 
 __version__ = _resolve_version()
 
-from . import command_filters, command_protocol, deprecations, extensions, history, integrations, json_contracts, testing
+from . import (
+    command_filters,
+    command_protocol,
+    deprecations,
+    experimental,
+    extensions,
+    history,
+    integrations,
+    json_contracts,
+    testing,
+)
 from .attachment import (
     AttachmentAdapter,
     AttachmentContextFactory,
@@ -182,6 +192,7 @@ __all__ = [
     "command_matches",
     "command_protocol",
     "deprecations",
+    "experimental",
     "json_contracts",
     "JSON_CONTRACT_VERSION",
     "JSON_ERROR_SCHEMA",

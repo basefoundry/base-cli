@@ -55,6 +55,7 @@ EXPECTED_FACADE_EXPORTS = frozenset(
         "command_matches",
         "command_protocol",
         "deprecations",
+        "experimental",
         "json_contracts",
         "JSON_CONTRACT_VERSION",
         "JSON_ERROR_SCHEMA",
