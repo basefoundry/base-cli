@@ -97,6 +97,11 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 
 ## [Unreleased]
 
+### Changed
+
+- Reclassify the project as Beta in package metadata to reflect its documented
+  API stability policy, compatibility suite, and production-adoption guidance.
+
 ### Planned
 
 - Continue compatibility hardening and adoption work for the next release.
