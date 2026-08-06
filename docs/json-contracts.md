@@ -51,6 +51,45 @@ their own structured `details` records. Secret-looking keys (`token`,
 `password`, `secret`, `api_key`, and `authorization`) and credential-bearing
 URLs are redacted recursively.
 
+## Inspection envelopes
+
+Read-only inspection commands can use the stable inspection helpers when their
+result is a diagnostic snapshot rather than a command success or failure. The
+public `inspection_envelope()` helper returns a versioned mapping with the
+command name, an inspection status, caller-owned data, and an optional error:
+
+```python
+import base_cli
+
+payload = base_cli.inspection_envelope(
+    command="release check",
+    status="ok",
+    data={"project": "demo", "version": "0.4.0"},
+)
+```
+
+The v1 shape is:
+
+```json
+{
+  "schema_version": 1,
+  "command": "release check",
+  "status": "ok",
+  "data": {"project": "demo", "version": "0.4.0"},
+  "error": null
+}
+```
+
+`status` is one of `ok`, `warn`, or `error`. The `data` mapping is copied into
+the envelope; `error` is either `null` or a caller-defined mapping containing
+diagnostic details. These envelopes are intended for idempotent, read-only
+queries and do not replace the success/error lifecycle envelopes used for
+command execution outcomes.
+
+`render_inspection_json()` produces the same envelope as indented JSON with a
+trailing newline and no ASCII-only escaping. Use it when the inspection result
+is written directly to a machine-readable output stream.
+
 ## JSON logs
 
 Pass `json_logs=True` and the run identifier to `configure_logger()` when an
