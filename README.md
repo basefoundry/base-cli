@@ -199,6 +199,8 @@ The supported facade is `import base_cli`. It exports the command lifecycle
 (`App`, `Context`, `run_app`, decorators, and logging helpers), command filters,
 and the structured command protocol helpers. Consumer-owned user configuration
 is passed through `Context.user_config`; the library does not impose a schema.
+See [`docs/user-config-typing.md`](docs/user-config-typing.md) for the
+intentional opaque boundary and the recommended typed accessor pattern.
 The corresponding modules are also available as
 `base_cli.command_filters`, `base_cli.command_protocol`, and
 `base_cli.history`.

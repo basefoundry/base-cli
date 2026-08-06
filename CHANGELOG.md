@@ -107,6 +107,8 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 - Extend the optional Typer adapter through Typer 0.27.x by selecting the
   command tree's matching public or vendored Click dialect, with a Python 3.10
   through 3.14 compatibility matrix covering Typer 0.25.1, 0.26.0, and 0.27.1.
+- Document the intentional opaque `Context.user_config` boundary and the
+  compatibility requirements for any future fourth context type parameter.
 
 ### Planned
 

@@ -19,6 +19,7 @@ required_files=(
   .github/ISSUE_TEMPLATE/support.md
   docs/releasing.md
   docs/api-stability.md
+  docs/user-config-typing.md
   docs/migrations.md
   docs/security-threat-model.md
   docs/security-review.md

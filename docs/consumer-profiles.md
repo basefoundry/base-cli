@@ -159,7 +159,10 @@ The following behaviors should not be added to generic lifecycle modules:
 - assumptions about a downstream repository's directory layout.
 
 The generic profile and typed `Context` are now the stable framework boundary;
-consumer-specific conventions belong in an opt-in profile or adapter.
+consumer-specific conventions belong in an opt-in profile or adapter. The
+intentional typing boundary for `Context.user_config` and the recommended
+consumer accessor pattern are documented in
+[`user-config-typing.md`](user-config-typing.md).
 
 The package rename is deliberately separate from this refactor. Names can be
 changed after the dependency boundary is stable.
@@ -185,6 +188,12 @@ consumer. `AttachmentAdapter` and `AttachmentContract` describe the typed
 boundary used by `App.attach()`. Attachment returns the same concrete Click
 command object, so aliases, lazy groups, and custom Click subclasses remain
 owned by the consumer.
+
+`user_config` is intentionally opaque (`object | None`) because its schema is
+consumer-owned. Define one typed accessor in the consumer instead of casting it
+in every command; see [`user-config-typing.md`](user-config-typing.md). A fourth
+generic parameter is reserved for a future compatibility boundary and is not
+part of the 0.4.x API.
 
 The core lifecycle is synchronous by design. Native `async def` callbacks and
 callbacks that return awaitables are rejected with an actionable error. An
