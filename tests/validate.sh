@@ -8,7 +8,9 @@ required_files=(
   CONTRIBUTING.md
   .github/pull_request_template.md
   .github/base-project.yml
+  .github/workflows/docs.yml
   LICENSE
+  mkdocs.yml
   base_manifest.yaml
   .github/workflows/issue-branch-policy.yml
   .github/workflows/project-intake.yml
@@ -18,6 +20,7 @@ required_files=(
   .github/workflows/compatibility.yml
   .github/ISSUE_TEMPLATE/support.md
   docs/releasing.md
+  docs/index.md
   docs/api-stability.md
   docs/user-config-typing.md
   docs/migrations.md

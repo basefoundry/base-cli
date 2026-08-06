@@ -17,6 +17,7 @@ PACKAGE_NAME = "base-cli"
 IMPORT_NAME = "base_cli"
 MINIMUM_PYTHON = ">=3.10"
 REQUIRED_DEPENDENCIES = ("click>=8.1", "PyYAML>=6.0")
+DOCUMENTATION_URL = "Documentation, https://basefoundry.github.io/base-cli/"
 ALLOWED_WHEEL_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", "top_level.txt", "entry_points.txt"})
 ALLOWED_SDIST_FILES = frozenset(
     {
@@ -88,6 +89,8 @@ def validate_wheel(path: Path, expected_version: str, package_files: set[str]) -
         for dependency in REQUIRED_DEPENDENCIES:
             if dependency not in dependencies:
                 fail(f"{path.name} is missing runtime dependency {dependency!r}")
+        if DOCUMENTATION_URL not in metadata.get_all("Project-URL", []):
+            fail(f"{path.name} is missing the canonical Documentation project URL")
 
         if f"{IMPORT_NAME}/py.typed" not in names:
             fail(f"{path.name} does not contain {IMPORT_NAME}/py.typed")

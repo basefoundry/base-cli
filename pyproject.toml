@@ -60,11 +60,15 @@ quality = [
   "pytest-cov>=5,<7",
   "ruff>=0.8,<1",
 ]
+docs = [
+  "mkdocs-material>=9.5,<10",
+]
 
 [project.urls]
 Homepage = "https://github.com/basefoundry/base-cli"
 Repository = "https://github.com/basefoundry/base-cli"
 Issues = "https://github.com/basefoundry/base-cli/issues"
+Documentation = "https://basefoundry.github.io/base-cli/"
 
 [tool.setuptools]
 package-dir = {"" = "lib/python"}

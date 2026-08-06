@@ -29,7 +29,7 @@ box below:
 - [ ] Publish an owner, escalation path, and a redacted support bundle format.
 
 The maintainable downstream fixtures in
-[`compatibility/consumers`](../compatibility/README.md) are the executable
+[compatibility consumers](https://github.com/basefoundry/base-cli/tree/main/compatibility/consumers) are the executable
 version of this checklist.
 
 ## Migration path
@@ -58,13 +58,13 @@ version of this checklist.
 
 For public API and deprecation rules, see [`api-stability.md`](api-stability.md)
 and [`migrations.md`](migrations.md). The four framework reference applications
-show copy-pasteable packaging patterns in [`examples/README.md`](../examples/README.md).
+show copy-pasteable packaging patterns in the [reference application catalog](https://github.com/basefoundry/base-cli/blob/main/examples/README.md).
 
 ## Support channel
 
-Use the repository's [Adoption support issue template](../.github/ISSUE_TEMPLATE/support.md)
+Use the repository's [Adoption support issue template](https://github.com/basefoundry/base-cli/blob/main/.github/ISSUE_TEMPLATE/support.md)
 for migration questions, compatibility failures, and redacted reproductions.
-Security reports must follow [`SECURITY.md`](../SECURITY.md), not a public issue.
+Security reports must follow [`SECURITY.md`](https://github.com/basefoundry/base-cli/blob/main/SECURITY.md), not a public issue.
 Include the framework version, Python/platform, installed dependency versions,
 command shape (with secrets removed), exit code, and a support bundle path.
 Maintainers triage adoption issues during normal project work and link any

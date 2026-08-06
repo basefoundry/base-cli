@@ -17,6 +17,9 @@ Install it with:
 python -m pip install base-cli
 ```
 
+Read the complete documentation at
+<https://basefoundry.github.io/base-cli/>.
+
 ## Quick start
 
 Create a small command with a consistent context, logging, and cleanup
@@ -47,7 +50,7 @@ Run it with `python hello.py --name Ada`. The full lifecycle and configuration
 options are documented below.
 
 Release builds, TestPyPI rehearsals, and protected PyPI publication are
-documented in [`docs/releasing.md`](docs/releasing.md). The package exposes
+documented in [`docs/releasing.md`](https://basefoundry.github.io/base-cli/releasing/). The package exposes
 `base_cli.__version__`, which matches the distribution version.
 
 The package is distributed under the Apache License 2.0. Base itself remains
@@ -71,33 +74,33 @@ execution, while `base_cli` provides reusable lifecycle behavior:
 - test helpers built on Click's `CliRunner`
 
 Typer applications can opt into the same lifecycle with the optional
-`base-cli[typer]` extra. See [`docs/typer-adapter.md`](docs/typer-adapter.md)
+`base-cli[typer]` extra. See [`docs/typer-adapter.md`](https://basefoundry.github.io/base-cli/typer-adapter/)
 for the migration path; Typer remains optional and is never imported by the
 core Click integration.
 
 Automation-facing JSON output, errors, and logs are opt-in through the
-versioned contracts documented in [`docs/json-contracts.md`](docs/json-contracts.md).
+versioned contracts documented in [`docs/json-contracts.md`](https://basefoundry.github.io/base-cli/json-contracts/).
 Human output and Click error behavior remain the default.
 
 The supported public facade, compatibility promises, deprecation warning
 mechanism, and migration requirements are documented in
-[`docs/api-stability.md`](docs/api-stability.md) and
-[`docs/migrations.md`](docs/migrations.md).
+[`docs/api-stability.md`](https://basefoundry.github.io/base-cli/api-stability/) and
+[`docs/migrations.md`](https://basefoundry.github.io/base-cli/migrations/).
 
 Security reporting, runtime trust boundaries, threat assumptions, and the
 release security checklist are documented in [`SECURITY.md`](SECURITY.md),
-[`docs/security-threat-model.md`](docs/security-threat-model.md), and
-[`docs/security-review.md`](docs/security-review.md).
+[`docs/security-threat-model.md`](https://basefoundry.github.io/base-cli/security-threat-model/), and
+[`docs/security-review.md`](https://basefoundry.github.io/base-cli/security-review/).
 
 Shared record renderers keep machine output stable: CSV and TSV stream
 one-pass iterables without headers or footers, while terminal tables account
 for Unicode display width and safely truncate oversized cells. See
-[`docs/output-contracts.md`](docs/output-contracts.md) for the output rules and
+[`docs/output-contracts.md`](https://basefoundry.github.io/base-cli/output-contracts/) for the output rules and
 deterministic width controls.
 
 Optional Rich tables and OpenTelemetry lifecycle spans are available through
 separate extras; they are never imported or required by the default install.
-See [`docs/integrations.md`](docs/integrations.md) for opt-in configuration and
+See [`docs/integrations.md`](https://basefoundry.github.io/base-cli/integrations/) for opt-in configuration and
 graceful-degradation behavior.
 
 ## Design Goals
@@ -141,7 +144,7 @@ The generic profile has no manifest filename convention, no product-owned
 configuration directory, and no implicit history writer. Applications can
 provide those policies through callbacks or build their own profile. The
 consumer-owned adapters should supply any product-specific policies. See
-[`docs/consumer-profiles.md`](docs/consumer-profiles.md) for the boundary and
+[`docs/consumer-profiles.md`](https://basefoundry.github.io/base-cli/consumer-profiles/) for the boundary and
 migration guidance.
 
 ### Typed extension contracts
@@ -190,7 +193,7 @@ can opt into `base_cli.ExtensionDiscovery`. It recognizes the documented
 `base_cli.commands`, `base_cli.profiles`, and `base_cli.plugins` entry-point
 groups. Discovery is lazy and cached, duplicate names fail explicitly, broken
 extensions are isolated by `load_all()`, and consumers can disable discovery or
-provide an allowlist. See [`docs/extensions.md`](docs/extensions.md) for the
+provide an allowlist. See [`docs/extensions.md`](https://basefoundry.github.io/base-cli/extensions/) for the
 entry-point contracts and deterministic ordering rules.
 
 ## Public API
@@ -199,7 +202,7 @@ The supported facade is `import base_cli`. It exports the command lifecycle
 (`App`, `Context`, `run_app`, decorators, and logging helpers), command filters,
 and the structured command protocol helpers. Consumer-owned user configuration
 is passed through `Context.user_config`; the library does not impose a schema.
-See [`docs/user-config-typing.md`](docs/user-config-typing.md) for the
+See [`docs/user-config-typing.md`](https://basefoundry.github.io/base-cli/user-config-typing/) for the
 intentional opaque boundary and the recommended typed accessor pattern.
 The corresponding modules are also available as
 `base_cli.command_filters`, `base_cli.command_protocol`, and
@@ -230,7 +233,7 @@ Typer, and automation/observability flows; each example has its own packaging,
 tests, completion, release, and troubleshooting guidance.
 
 Teams evaluating adoption can follow the [adopter readiness and migration
-guide](docs/adopter-readiness.md) and run the three independent
+guide](https://basefoundry.github.io/base-cli/adopter-readiness/) and run the three independent
 [downstream compatibility consumers](compatibility/README.md).
 
 ## Minimal Command
@@ -538,7 +541,7 @@ Every `base_cli.App` command gets these options:
 - `--log-file <path>`: write the persistent log to a specific file.
 - `--version`: shown when the `App` was created with a version.
 - `--json`: opt-in machine output, when `LifecycleOptions.json` is enabled;
-  emits the versioned envelopes described in [`docs/json-contracts.md`](docs/json-contracts.md).
+  emits the versioned envelopes described in [`docs/json-contracts.md`](https://basefoundry.github.io/base-cli/json-contracts/).
 
 `LifecycleOptions()` preserves this default set. Its `debug`, `quiet`,
 `environment`, `config`, `keep_temp`, `log_file`, and `version` fields are
@@ -986,7 +989,7 @@ On POSIX, base-cli enforces owner-only `0600`/`0700` modes. On Windows, the
 default user-local cache root relies on inherited user-profile ACLs; consumers
 using a custom cache root must provide the appropriate ACL themselves.
 
-See [Platform support](docs/platform-support.md) for the supported Linux,
+See [Platform support](https://basefoundry.github.io/base-cli/platform-support/) for the supported Linux,
 WSL2, macOS, and native Windows boundaries. Native Windows support covers the
 generic `base-cli` framework; it does not imply native Windows support for
 Base or `basectl`.
