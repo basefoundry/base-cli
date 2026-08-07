@@ -848,6 +848,50 @@ class AppRunMetadataTests(unittest.TestCase):
         self.assertEqual(metadata["project_root"], str(Path("/tmp/bound-project").resolve()))
         self.assertEqual(metadata["manifest"], str(Path("/tmp/bound-project/project.yml").resolve()))
 
+    def test_metadata_and_identity_compact_home_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            project = home / "project"
+            manifest = project / "project.yml"
+            project.mkdir()
+            manifest.write_text("name: demo\n", encoding="utf-8")
+
+            def discover(_cwd: Path) -> base_cli.ProjectInfo:
+                return base_cli.ProjectInfo(root=project, manifest=manifest, name="demo")
+
+            base_profile = base_cli.CliProfile.generic(
+                cache_root=home / "cache",
+                discover_project=discover,
+            )
+
+            def resolve_runtime(
+                cli_name: str,
+                project_info: base_cli.ProjectInfo | None,
+            ) -> base_cli.RuntimeBinding:
+                binding = base_profile.resolve_runtime(cli_name, project_info)
+                return replace(binding, write_identity=True)
+
+            profile = replace(base_profile, resolve_runtime=resolve_runtime)
+            app = base_cli.App(name="metadata-path-compaction", profile=profile)
+
+            @app.command()
+            def main(ctx: base_cli.Context) -> None:
+                del ctx
+
+            status, _ = _run(app, home)
+            metadata_path, metadata = _load_only_metadata(self, home)
+            identity_paths = sorted((home / "cache").glob("**/identity.json"))
+            self.assertEqual(status, 0)
+            self.assertEqual(len(identity_paths), 1, identity_paths)
+            identity = json.loads(identity_paths[0].read_text(encoding="utf-8"))
+            metadata_text = metadata_path.read_text(encoding="utf-8")
+
+        self.assertEqual(metadata["project_root"], "~/project")
+        self.assertEqual(metadata["manifest"], "~/project/project.yml")
+        self.assertEqual(identity["project_root"], "~/project")
+        self.assertEqual(identity["manifest"], "~/project/project.yml")
+        self.assertNotIn(str(home), metadata_text)
+
     def test_parse_error_and_no_file_modes_do_not_own_run_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)

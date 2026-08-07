@@ -39,7 +39,7 @@ from .config import ConfigSnapshot
 from .context import Context, recover_current_context, reset_current_context, set_current_context
 from .errors import ConfigurationError
 from .exit_codes import ExitCode
-from .history import utc_now
+from .history import compact_optional_path, utc_now
 from .integrations import TelemetryOptions, TelemetrySession, finish_telemetry, start_telemetry
 from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import (
@@ -1291,8 +1291,8 @@ class App:
                             {
                                 "schema_version": 1,
                                 "project": selected_project_name,
-                                "project_root": str(selected_project_root),
-                                "manifest": str(manifest_path) if manifest_path is not None else None,
+                                "project_root": compact_optional_path(selected_project_root),
+                                "manifest": compact_optional_path(manifest_path),
                                 "checkout_id": layout.owner_root.name,
                             },
                         )

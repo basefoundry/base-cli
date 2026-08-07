@@ -9,7 +9,7 @@ from ._private_files import write_private_json
 from ._runtime import refresh_run_bundle_index
 from .context import Context
 from .exit_codes import ExitCode
-from .history import format_timestamp
+from .history import compact_optional_path, format_timestamp
 
 
 @dataclass(frozen=True)
@@ -104,9 +104,9 @@ class RunRecorder:
             "status": status,
             "started_at": format_timestamp(self.started_at),
             "project": context.project_name,
-            "project_root": str(context.project_root) if context.project_root else None,
-            "manifest": str(context.manifest_path) if context.manifest_path else None,
-            "workspace_root": str(context.workspace_root) if context.workspace_root else None,
+            "project_root": compact_optional_path(context.project_root),
+            "manifest": compact_optional_path(context.manifest_path),
+            "workspace_root": compact_optional_path(context.workspace_root),
             # ``--keep-temp`` is an explicit request to retain diagnostics;
             # retention therefore protects the complete invocation bundle,
             # not only its temporary directory.
