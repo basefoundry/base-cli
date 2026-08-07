@@ -171,9 +171,15 @@ def render_document(
 
 
 def _document_columns(records: Sequence[Mapping[str, Any]]) -> list[tuple[str, str]]:
-    if not records:
-        return []
-    return [(str(key).upper(), str(key)) for key in records[0]]
+    column_keys: list[str] = []
+    seen: set[str] = set()
+    for record in records:
+        for key in record:
+            normalized_key = str(key)
+            if normalized_key not in seen:
+                seen.add(normalized_key)
+                column_keys.append(normalized_key)
+    return [(key.upper(), key) for key in column_keys]
 
 
 def _cell_value(value: Any) -> str:

@@ -4,7 +4,7 @@ import io
 import json
 import unittest
 
-from base_cli.output import OutputFormatError, render_records, resolve_output_format
+from base_cli.output import OutputFormatError, render_document, render_records, resolve_output_format
 
 
 class _Stream(io.StringIO):
@@ -240,3 +240,45 @@ class OutputTest(unittest.TestCase):
         render_records((), requested_format="text", columns=COLUMNS, stream=stream, footer="0 projects.")
 
         self.assertEqual(stream.getvalue(), "0 projects.\n")
+
+    def test_render_document_unions_heterogeneous_record_columns(self) -> None:
+        stream = _Stream(terminal=False)
+        document = {
+            "rows": [
+                {"name": "one", "path": "/tmp/one"},
+                {"name": "two", "extra": "only later"},
+            ]
+        }
+
+        render_document(
+            document,
+            requested_format="csv",
+            records_key="rows",
+            stream=stream,
+        )
+
+        self.assertEqual(
+            stream.getvalue(),
+            "one,/tmp/one,\ntwo,,only later\n",
+        )
+
+    def test_render_document_tsv_includes_later_record_columns(self) -> None:
+        stream = _Stream(terminal=False)
+        document = {
+            "rows": [
+                {"name": "one"},
+                {"name": "two", "status": "ready"},
+            ]
+        }
+
+        render_document(
+            document,
+            requested_format="tsv",
+            records_key="rows",
+            stream=stream,
+        )
+
+        output = stream.getvalue()
+        self.assertIn("one\t\n", output)
+        self.assertIn("two\tready\n", output)
+        self.assertIn("ready", output)
