@@ -193,9 +193,6 @@ intentional typing boundary for `Context.user_config` and the recommended
 consumer accessor pattern are documented in
 [`user-config-typing.md`](user-config-typing.md).
 
-The package rename is deliberately separate from this refactor. Names can be
-changed after the dependency boundary is stable.
-
 ## Typed extension contracts
 
 The supported callback contracts are exported from `base_cli` as typed protocols
