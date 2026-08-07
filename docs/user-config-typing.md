@@ -1,7 +1,7 @@
 # Typed user configuration
 
-This proposal resolves the typing boundary for `Context.user_config` without
-making a consumer's configuration schema part of the generic lifecycle.
+This document explains the intentional typing boundary for `Context.user_config`
+and the recommended patterns for typed access in consuming applications.
 
 ## Decision for the 0.4.x line
 
@@ -84,7 +84,7 @@ Context[ConfigT, ApplicationStateT, ServicesT, UserConfigT]
 ```
 
 That change must be designed as an end-to-end generic flow, not just a field
-annotation. The proposal must cover:
+annotation. Any such design must cover:
 
 1. a generic `UserConfigLoader[UserConfigT]` and a generic `CliProfile`;
 2. inference and explicit type aliases for `App` and every callback protocol;
@@ -96,7 +96,7 @@ annotation. The proposal must cover:
 No fourth type parameter should ship until those questions have a reviewed
 answer and at least two independent typed consumer fixtures exercise it.
 
-## Follow-up implementation
+## Future compatibility follow-up
 
 This document is the design decision for issue [#105](https://github.com/basefoundry/base-cli/issues/105).
 The next implementation can add an optional framework helper only if repeated
