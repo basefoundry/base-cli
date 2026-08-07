@@ -200,10 +200,26 @@ changed after the dependency boundary is stable.
 
 The supported callback contracts are exported from `base_cli` as typed protocols
 for static analyzers: `ProjectDiscovery`, `UserConfigLoader`,
-`ConfigLoader`, `RuntimeResolver`, `WorkspaceRootResolver`, `HistoryWriter`,
-`DisplayCommandResolver`, and `HistoryDisplayResolver`. A custom runtime
+`ConfigLoader`, `EnvironmentConfigLoader`, `RuntimeResolver`,
+`WorkspaceRootResolver`, `HistoryWriter`, `DisplayCommandResolver`, and
+`HistoryDisplayResolver`. A custom runtime
 resolver returns `RuntimeBinding`, whose immutable `layout` is the public
 `RuntimeLayout` dataclass. No consumer needs to import `_runtime`.
+
+Use `EnvironmentConfigLoader` when configuration discovery depends on the
+selected environment. Its callback receives the discovered project (when one
+exists), an optional explicit `--config` path, and the environment name, then
+returns either a mapping or a `ConfigSnapshot`:
+
+```text
+(project: ProjectInfo | None, explicit_path: Path | None, environment: str)
+    -> dict[str, Any] | ConfigSnapshot
+```
+
+This hook is useful for consumers that keep separate files or secret sources
+per environment. Keep the environment-specific policy in the consumer adapter;
+the framework only invokes the callback and merges the returned snapshot into
+the normal configuration lifecycle.
 
 `Context` accepts three consumer payload types:
 
