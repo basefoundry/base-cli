@@ -27,9 +27,7 @@ class RunAppTests(unittest.TestCase):
 
         profile = replace(
             base_cli.CliProfile.generic(),
-            display_command=lambda: (_ for _ in ()).throw(
-                MalformedExit("private pre-context detail")
-            ),
+            display_command=lambda: (_ for _ in ()).throw(MalformedExit("private pre-context detail")),
         )
         app = base_cli.App(name="malformed-pre-context", profile=profile)
 
@@ -77,13 +75,16 @@ class RunAppTests(unittest.TestCase):
 
                 home = Path(tmpdir)
                 stderr = io.StringIO()
-                with mock.patch.dict(
-                    os.environ,
-                    {
-                        "HOME": str(home),
-                        "BASE_CLI_CACHE_DIR": str(home / ".cache"),
-                    },
-                ), redirect_stderr(stderr):
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        {
+                            "HOME": str(home),
+                            "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                        },
+                    ),
+                    redirect_stderr(stderr),
+                ):
                     status = base_cli.run_app(app, [])
 
                 output = stderr.getvalue()
@@ -114,13 +115,16 @@ class RunAppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
             stderr = io.StringIO()
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "HOME": str(home),
-                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
-                },
-            ), redirect_stderr(stderr):
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(home),
+                        "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                    },
+                ),
+                redirect_stderr(stderr),
+            ):
                 status = base_cli.run_app(app, [])
 
         self.assertEqual(status, 2)
@@ -142,10 +146,13 @@ class RunAppTests(unittest.TestCase):
             config = home / "invalid.yml"
             config.write_text("broken: [", encoding="utf-8")
             stderr = io.StringIO()
-            with mock.patch.dict(
-                os.environ,
-                {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(home / ".cache")},
-            ), redirect_stderr(stderr):
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(home / ".cache")},
+                ),
+                redirect_stderr(stderr),
+            ):
                 status = base_cli.run_app(app, ["--config", str(config)])
 
         self.assertEqual(status, 2)
@@ -185,13 +192,16 @@ class RunAppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
             stderr = io.StringIO()
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "HOME": str(home),
-                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
-                },
-            ), redirect_stderr(stderr):
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(home),
+                        "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                    },
+                ),
+                redirect_stderr(stderr),
+            ):
                 status = base_cli.run_app(app, [])
 
         self.assertEqual(status, 1)
@@ -211,13 +221,16 @@ class RunAppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
             stderr = io.StringIO()
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "HOME": str(home),
-                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
-                },
-            ), redirect_stderr(stderr):
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(home),
+                        "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                    },
+                ),
+                redirect_stderr(stderr),
+            ):
                 status = base_cli.run_app(app, ["--name=demo"])
 
         self.assertEqual(status, 0)
@@ -237,10 +250,13 @@ class RunAppTests(unittest.TestCase):
             del ctx
 
         stderr = io.StringIO()
-        with mock.patch.dict(
-            os.environ,
-            {"BASE_CLI_DISPLAY_COMMAND": "tool demo"},
-        ), redirect_stderr(stderr):
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"BASE_CLI_DISPLAY_COMMAND": "tool demo"},
+            ),
+            redirect_stderr(stderr),
+        ):
             status = base_cli.run_app(app, ["--bad-option"])
 
         self.assertEqual(status, 2)

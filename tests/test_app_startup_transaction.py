@@ -369,14 +369,17 @@ class AppStartupTransactionTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
-            with mock.patch.object(
-                app_module,
-                "prune_log_files",
-                side_effect=RuntimeError("primary startup failure"),
-            ), mock.patch.object(
-                app_module.Context,
-                "_cleanup_owned_temp_dir",
-                side_effect=RuntimeError("secondary rollback failure"),
+            with (
+                mock.patch.object(
+                    app_module,
+                    "prune_log_files",
+                    side_effect=RuntimeError("primary startup failure"),
+                ),
+                mock.patch.object(
+                    app_module.Context,
+                    "_cleanup_owned_temp_dir",
+                    side_effect=RuntimeError("secondary rollback failure"),
+                ),
             ):
                 with self.assertRaisesRegex(RuntimeError, "primary startup failure"):
                     with mock.patch.dict(

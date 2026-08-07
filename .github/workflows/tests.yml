@@ -58,7 +58,7 @@ jobs:
         run: python -m pip install ".[dev,typer,quality]"
       - name: Run formatting and lint checks
         run: |
-          ruff format --check scripts examples
+          ruff format --check lib/python/base_cli scripts examples tests
           ruff check lib/python/base_cli scripts examples tests
       - name: Run strict typing and documentation checks
         run: |

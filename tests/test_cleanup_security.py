@@ -308,10 +308,13 @@ class CleanupSecurityTests(unittest.TestCase):
             marker.write_text("preserve", encoding="utf-8")
             context, stream = self._context(root, temp_dir, run_root)
 
-            with mock.patch.object(cleanup_module, "_requires_mount_identity", return_value=True), mock.patch.object(
-                cleanup_module,
-                "_mount_identity",
-                return_value=None,
+            with (
+                mock.patch.object(cleanup_module, "_requires_mount_identity", return_value=True),
+                mock.patch.object(
+                    cleanup_module,
+                    "_mount_identity",
+                    return_value=None,
+                ),
             ):
                 context.cleanup()
 

@@ -37,8 +37,7 @@ def _require_typer() -> Any:
         import typer
     except ImportError as exc:  # pragma: no cover - exercised without the extra
         raise RuntimeError(
-            "The Typer adapter requires the optional 'typer' dependency. "
-            "Install it with 'pip install base-cli[typer]'."
+            "The Typer adapter requires the optional 'typer' dependency. Install it with 'pip install base-cli[typer]'."
         ) from exc
     return typer
 
@@ -93,8 +92,7 @@ def _name_command_for_lifecycle(
         return
     if not target_name:
         raise RuntimeError(
-            "Typer produced an unnamed command group. Pass name='your-cli' "
-            "or construct a named base_cli.App."
+            "Typer produced an unnamed command group. Pass name='your-cli' or construct a named base_cli.App."
         )
     command.name = target_name
 

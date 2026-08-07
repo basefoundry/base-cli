@@ -185,10 +185,13 @@ class AppLifecycleTests(unittest.TestCase):
         def main(ctx: base_cli.Context) -> None:
             del ctx
 
-        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
-            app_module,
-            "reset_current_context",
-            side_effect=KeyboardInterrupt(),
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            mock.patch.object(
+                app_module,
+                "reset_current_context",
+                side_effect=KeyboardInterrupt(),
+            ),
         ):
             result = invoke(app, [], home=Path(tmpdir))
 

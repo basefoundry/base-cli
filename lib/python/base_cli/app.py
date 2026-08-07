@@ -196,9 +196,7 @@ class _AttachedInvocation:
         if getattr(getattr(parent_context, "command", None), "chain", False):
             self._has_chain = True
         self._resolution_parents[id(parent_context)] = parent_context
-        self._resolved_children.setdefault(id(parent_context), []).append(
-            (command_name, child_command, None)
-        )
+        self._resolved_children.setdefault(id(parent_context), []).append((command_name, child_command, None))
 
     def note_child_context(self, child_context: Any) -> None:
         parent = getattr(child_context, "parent", None)
@@ -485,16 +483,12 @@ class App:
         if telemetry is not None and not isinstance(telemetry, TelemetryOptions):
             raise TypeError("telemetry must be a TelemetryOptions instance or None.")
         if retention is not None and any(
-            value is not None
-            for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
+            value is not None for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
         ):
             raise ValueError("pass either retention or individual run retention bounds, not both.")
         if retention is not None:
             self.retention: RetentionPolicy | None = retention
-        elif any(
-            value is not None
-            for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
-        ):
+        elif any(value is not None for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)):
             self.retention = RetentionPolicy(
                 max_bundles=max_run_bundles,
                 max_age_seconds=max_run_age_seconds,
@@ -575,13 +569,11 @@ class App:
     def _ensure_registration_open(self) -> None:
         if self._registration_state == _REGISTRATION_MATERIALIZING:
             raise RuntimeError(
-                f"App '{self.name}' registration is unavailable while its Click command "
-                "is being materialized."
+                f"App '{self.name}' registration is unavailable while its Click command is being materialized."
             )
         if self._registration_state == _REGISTRATION_FROZEN:
             raise RuntimeError(
-                f"App '{self.name}' registration is frozen because its Click command "
-                "has already been materialized."
+                f"App '{self.name}' registration is frozen because its Click command has already been materialized."
             )
 
     def _validate_single_command_name(
@@ -647,9 +639,7 @@ class App:
                     )
                 name = _resolved_command_name(func, command_args, command_kwargs)
                 if name in self._subcommand_names:
-                    raise RuntimeError(
-                        f"App '{self.name}' already has a registered subcommand named '{name}'."
-                    )
+                    raise RuntimeError(f"App '{self.name}' already has a registered subcommand named '{name}'.")
                 self._subcommands.append(
                     _SubcommandRegistration(
                         func=func,
@@ -686,9 +676,7 @@ class App:
             raise TypeError("context_factory must be callable or None.")
         if service_factory is not None and not callable(service_factory):
             raise TypeError("service_factory must be callable or None.")
-        normalized_sensitive_parameters = _normalize_sensitive_parameters(
-            sensitive_parameters
-        )
+        normalized_sensitive_parameters = _normalize_sensitive_parameters(sensitive_parameters)
 
         with _CLICK_ATTACHMENT_LOCK, self._registration_lock:
             existing = getattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, None)
@@ -718,13 +706,10 @@ class App:
             self._ensure_registration_open()
             if self._command_func is not None or self._subcommands:
                 raise RuntimeError(
-                    f"App '{self.name}' already has registered commands and cannot "
-                    "attach an existing Click tree."
+                    f"App '{self.name}' already has registered commands and cannot attach an existing Click tree."
                 )
             if self._attached_command is not None:
-                raise RuntimeError(
-                    f"App '{self.name}' is already attached to a Click command."
-                )
+                raise RuntimeError(f"App '{self.name}' is already attached to a Click command.")
             command_name = getattr(command, "name", None)
             if not isinstance(command_name, str) or not command_name:
                 raise RuntimeError("App.attach() requires a named Click command.")
@@ -768,12 +753,10 @@ class App:
                         f"{description} marker. Remove that attribute before attaching."
                     )
             command_was_instrumented = (
-                getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, None)
-                is _CLICK_INSTRUMENTED_SENTINEL
+                getattr(command, _CLICK_INSTRUMENTED_ATTRIBUTE, None) is _CLICK_INSTRUMENTED_SENTINEL
             )
             main_was_instrumented = (
-                getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, None)
-                is _CLICK_MAIN_INSTRUMENTED_SENTINEL
+                getattr(command, _CLICK_MAIN_INSTRUMENTED_ATTRIBUTE, None) is _CLICK_MAIN_INSTRUMENTED_SENTINEL
             )
             previous_redaction_plan = self._redaction_plan
             previous_attached_command = self._attached_command
@@ -855,9 +838,7 @@ class App:
             if command is not None:
                 return command
             if self._registration_state == _REGISTRATION_MATERIALIZING:
-                raise RuntimeError(
-                    f"App '{self.name}' Click command materialization is already in progress."
-                )
+                raise RuntimeError(f"App '{self.name}' Click command materialization is already in progress.")
 
             self._registration_state = _REGISTRATION_MATERIALIZING
             try:
@@ -956,8 +937,7 @@ class App:
             )
         )
         if self.lifecycle_options.dry_run is not None and (
-            explicit_dry_run_parameter is not None
-            or conventional_dry_run_parameter
+            explicit_dry_run_parameter is not None or conventional_dry_run_parameter
         ):
             conflicting_parameter = explicit_dry_run_parameter or "dry_run"
             raise RuntimeError(
@@ -980,10 +960,7 @@ class App:
                 {},
             )
             extra_values: dict[str, _RawLifecycleValue] = {}
-            if (
-                self.lifecycle_options.dry_run is None
-                and dry_run_parameter in kwargs
-            ):
+            if self.lifecycle_options.dry_run is None and dry_run_parameter in kwargs:
                 extra_values["dry_run"] = _RawLifecycleValue(
                     value=kwargs.get(dry_run_parameter),
                     source=click_context.get_parameter_source(dry_run_parameter),
@@ -1116,10 +1093,7 @@ class App:
         user_config = self.profile.load_user_config()
         workspace_root = self.profile.resolve_workspace_root(user_config)
         requested_environment = standard.get("environment")
-        if (
-            self.profile.load_config_for_environment is not None
-            and requested_environment is not None
-        ):
+        if self.profile.load_config_for_environment is not None and requested_environment is not None:
             loaded_config = self.profile.load_config_for_environment(
                 project,
                 explicit_config,
@@ -1144,9 +1118,7 @@ class App:
             or "dev"
         )
         log_level = (
-            framework_config.log_level
-            if framework_config is not None
-            else str(config.get("log_level", "")).lower()
+            framework_config.log_level if framework_config is not None else str(config.get("log_level", "")).lower()
         )
         debug = bool(standard.get("debug") or log_level == "debug")
         quiet = bool(standard.get("quiet"))
@@ -1629,8 +1601,7 @@ def _make_lifecycle_value_option(
 
     expected_flag = key in _FLAG_LIFECYCLE_OPTION_KEYS
     has_secondary_declaration = any(
-        (";" if declaration.startswith("/") else "/") in declaration
-        for declaration in option.param_decls
+        (";" if declaration.startswith("/") else "/") in declaration for declaration in option.param_decls
     )
     if not expected_flag and has_secondary_declaration:
         raise RuntimeError(
@@ -1641,9 +1612,7 @@ def _make_lifecycle_value_option(
     attrs.update(callback=capture, expose_value=False)
     parameter = click.Option(_lifecycle_param_decls(option), **attrs)
     if not isinstance(getattr(parameter, "name", None), str) or not parameter.name:
-        raise RuntimeError(
-            f"LifecycleOptions.{key} does not produce a stable Click destination."
-        )
+        raise RuntimeError(f"LifecycleOptions.{key} does not produce a stable Click destination.")
     if bool(getattr(parameter, "is_flag", False)) != expected_flag:
         expected_shape = "a scalar flag" if expected_flag else "one scalar value"
         raise RuntimeError(
@@ -1686,9 +1655,7 @@ def _make_lifecycle_version_option(
         raise RuntimeError("Click did not create the requested version option.")
     parameter = parameters[-1]
     if not isinstance(getattr(parameter, "name", None), str) or not parameter.name:
-        raise RuntimeError(
-            "LifecycleOptions.version does not produce a stable Click destination."
-        )
+        raise RuntimeError("LifecycleOptions.version does not produce a stable Click destination.")
     return parameter
 
 
@@ -1762,10 +1729,7 @@ def _lifecycle_collision_details(
         )
         if overlapping:
             alias_collisions.append((existing, overlapping))
-        if (
-            getattr(parameter, "name", None)
-            and getattr(existing, "name", None) == parameter.name
-        ):
+        if getattr(parameter, "name", None) and getattr(existing, "name", None) == parameter.name:
             destination_collisions.append(existing)
     return alias_collisions, destination_collisions
 
@@ -1780,10 +1744,7 @@ def _implicit_help_declarations(
     declarations = context_settings.get("help_option_names", ("--help",))
     if declarations is None:
         declarations = ("--help",)
-    return {
-        _normalize_attached_option_declaration(str(declaration), normalize)
-        for declaration in declarations
-    }
+    return {_normalize_attached_option_declaration(str(declaration), normalize) for declaration in declarations}
 
 
 def _missing_adopted_declarations(
@@ -1801,11 +1762,7 @@ def _missing_adopted_declarations(
         existing,
         normalize,
     )
-    return (
-        requested_positive - existing_positive
-    ) | (
-        requested_negative - existing_negative
-    )
+    return (requested_positive - existing_positive) | (requested_negative - existing_negative)
 
 
 def _reject_implicit_help_collision(
@@ -1843,20 +1800,14 @@ def _native_lifecycle_collision_error(
         if id(existing) in lifecycle_parameter_keys
     }
     if conflicting_keys:
-        conflicting = ", ".join(
-            f"'{other_key}'" for other_key in sorted(conflicting_keys)
-        )
+        conflicting = ", ".join(f"'{other_key}'" for other_key in sorted(conflicting_keys))
         return RuntimeError(
             f"Lifecycle option '{key}' conflicts with lifecycle option(s) "
             f"{conflicting}. Give LifecycleOptions.{key} a distinct declaration "
             "and Click destination."
         )
     if alias_collisions:
-        aliases = sorted(
-            declaration
-            for _existing, declarations in alias_collisions
-            for declaration in declarations
-        )
+        aliases = sorted(declaration for _existing, declarations in alias_collisions for declaration in declarations)
         detail = f"option declaration(s) {', '.join(aliases)}"
     else:
         detail = f"Click destination '{getattr(parameter, 'name', None)}'"
@@ -1938,16 +1889,8 @@ def _install_native_lifecycle_options(
 
     parameters[:] = [
         *([version_parameter] if version_parameter is not None else []),
-        *(
-            lifecycle_parameters[key]
-            for key in _NATIVE_LIFECYCLE_OPTION_ORDER
-            if key in lifecycle_parameters
-        ),
-        *(
-            parameter
-            for parameter in existing_parameters
-            if id(parameter) not in lifecycle_parameter_keys
-        ),
+        *(lifecycle_parameters[key] for key in _NATIVE_LIFECYCLE_OPTION_ORDER if key in lifecycle_parameters),
+        *(parameter for parameter in existing_parameters if id(parameter) not in lifecycle_parameter_keys),
     ]
 
     setattr(command, _CLICK_LIFECYCLE_BINDINGS_ATTRIBUTE, bindings)
@@ -1994,9 +1937,7 @@ def _normalize_lifecycle_values(
 
     environment = raw_value("environment")
     if environment is not None and not isinstance(environment, str):
-        raise click.UsageError(
-            "The configured lifecycle environment option must produce a string."
-        )
+        raise click.UsageError("The configured lifecycle environment option must produce a string.")
 
     paths: dict[str, Path | None] = {}
     for key in ("config", "log_file"):
@@ -2010,8 +1951,7 @@ def _normalize_lifecycle_values(
             raw_path = None
         if not isinstance(raw_path, str):
             raise click.UsageError(
-                f"The configured lifecycle {key.replace('_', '-')} option must "
-                "produce a string or path-like object."
+                f"The configured lifecycle {key.replace('_', '-')} option must produce a string or path-like object."
             )
         paths[key] = Path(raw_path)
 
@@ -2048,10 +1988,7 @@ def _resolve_lifecycle_values(
             if isinstance(existing_resolution_map, dict)
             else ()
         )
-        if not any(
-            existing_public_value is value
-            for value in framework_values
-        ):
+        if not any(existing_public_value is value for value in framework_values):
             raise click.UsageError(
                 f"Click context metadata key {LIFECYCLE_META_KEY!r} is reserved for "
                 "base-cli LifecycleValues. Rename the application metadata key."
@@ -2095,10 +2032,7 @@ def _resolve_lifecycle_values(
 
 
 def _standard_options_from_values(values: LifecycleValues) -> dict[str, Any]:
-    return {
-        key: getattr(values, key)
-        for key in _STANDARD_OPTION_KEYS
-    }
+    return {key: getattr(values, key) for key in _STANDARD_OPTION_KEYS}
 
 
 def _add_attached_standard_options(
@@ -2114,9 +2048,7 @@ def _add_attached_standard_options(
         raise TypeError("Attached Click commands must expose a mutable params list.")
     existing_parameters = list(parameters)
     existing_options = [
-        parameter
-        for parameter in existing_parameters
-        if getattr(parameter, "param_type_name", None) == "option"
+        parameter for parameter in existing_parameters if getattr(parameter, "param_type_name", None) == "option"
     ]
     context_settings = dict(getattr(command, "context_settings", None) or {})
     token_normalize_func = context_settings.get("token_normalize_func")
@@ -2179,15 +2111,11 @@ def _add_attached_standard_options(
                 token_normalize_func,
             )
             foreign_aliases = [
-                (candidate, declarations)
-                for candidate, declarations in alias_collisions
-                if candidate is not existing
+                (candidate, declarations) for candidate, declarations in alias_collisions if candidate is not existing
             ]
             if foreign_aliases:
                 aliases = sorted(
-                    declaration
-                    for _candidate, declarations in foreign_aliases
-                    for declaration in declarations
+                    declaration for _candidate, declarations in foreign_aliases for declaration in declarations
                 )
                 raise RuntimeError(
                     f"Lifecycle option '{key}' cannot adopt '{parameter.opts[0]}' "
@@ -2210,9 +2138,7 @@ def _add_attached_standard_options(
             foreign_destinations = [
                 candidate
                 for candidate in existing_parameters
-                if candidate is not existing
-                and getattr(candidate, "name", None)
-                == getattr(existing, "name", None)
+                if candidate is not existing and getattr(candidate, "name", None) == getattr(existing, "name", None)
             ]
             if foreign_destinations:
                 raise RuntimeError(
@@ -2222,10 +2148,7 @@ def _add_attached_standard_options(
                     f"disable LifecycleOptions.{key}."
                 )
             expected_flag = key in _FLAG_LIFECYCLE_OPTION_KEYS
-            is_flag = bool(
-                getattr(existing, "is_flag", False)
-                or getattr(existing, "count", False)
-            )
+            is_flag = bool(getattr(existing, "is_flag", False) or getattr(existing, "count", False))
             positive_declarations = {
                 _normalize_attached_option_declaration(
                     str(declaration),
@@ -2264,9 +2187,7 @@ def _add_attached_standard_options(
             bound_existing_parameters[id(existing)] = key
             parameter_name = getattr(existing, "name", None)
             if not parameter_name:
-                raise RuntimeError(
-                    f"Existing '{parameter.opts[0]}' option has no Click destination."
-                )
+                raise RuntimeError(f"Existing '{parameter.opts[0]}' option has no Click destination.")
             bindings[key] = _LifecycleBinding(
                 key=key,
                 parameter_name=str(parameter_name),
@@ -2326,9 +2247,7 @@ def _add_attached_standard_options(
             )
         ]
         if len(primary_matches) > 1:
-            raise RuntimeError(
-                f"Lifecycle version declaration '{parameter.opts[0]}' is ambiguous."
-            )
+            raise RuntimeError(f"Lifecycle version declaration '{parameter.opts[0]}' is ambiguous.")
         if primary_matches:
             existing = primary_matches[0]
             if version_option.name is not None and existing.name != version_option.name:
@@ -2338,10 +2257,7 @@ def _add_attached_standard_options(
                     f"{version_option.name!r}. Remove name= to adopt the vendor "
                     "destination, or rename/disable the lifecycle version option."
                 )
-            compatible = bool(
-                getattr(existing, "is_flag", False)
-                and getattr(existing, "is_eager", False)
-            )
+            compatible = bool(getattr(existing, "is_flag", False) and getattr(existing, "is_eager", False))
             if not compatible:
                 raise RuntimeError(
                     f"Existing '{parameter.opts[0]}' option is incompatible with "
@@ -2353,9 +2269,7 @@ def _add_attached_standard_options(
                 token_normalize_func,
             )
             if any(candidate is not existing for candidate, _aliases in alias_collisions):
-                raise RuntimeError(
-                    "LifecycleOptions.version has an alias used by another Click option."
-                )
+                raise RuntimeError("LifecycleOptions.version has an alias used by another Click option.")
             missing_declarations = _missing_adopted_declarations(
                 parameter,
                 existing,
@@ -2365,14 +2279,12 @@ def _add_attached_standard_options(
                 alias_text = ", ".join(sorted(missing_declarations))
                 raise RuntimeError(
                     "Existing lifecycle version option does not expose configured "
-                f"declaration(s) {alias_text} with the required flag polarity. "
+                    f"declaration(s) {alias_text} with the required flag polarity. "
                     "Add compatible aliases to the vendor option, or rename/disable "
                     "the lifecycle version option."
                 )
             if any(
-                candidate is not existing
-                and getattr(candidate, "name", None)
-                == getattr(existing, "name", None)
+                candidate is not existing and getattr(candidate, "name", None) == getattr(existing, "name", None)
                 for candidate in existing_parameters
             ):
                 raise RuntimeError(
@@ -2411,7 +2323,7 @@ def _normalize_attached_option_declaration(
     if not first or first.isalnum() or first == "_":
         return declaration
     prefix = declaration[:2] if declaration[1:2] == first else first
-    return f"{prefix}{normalize(declaration[len(prefix):])}"
+    return f"{prefix}{normalize(declaration[len(prefix) :])}"
 
 
 def _selected_click_path(
@@ -2430,18 +2342,13 @@ def _selected_click_path(
                 for parent, child in zip(contexts, contexts[1:], strict=False):
                     resolutions = resolved_children.get(id(parent), [])
                     recorded = next(
-                        (
-                            resolution
-                            for resolution in reversed(resolutions)
-                            if resolution[2] is child
-                        ),
+                        (resolution for resolution in reversed(resolutions) if resolution[2] is child),
                         None,
                     )
                     invoked_name = (
                         recorded[0]
                         if recorded is not None
-                        else getattr(child, "info_name", None)
-                        or getattr(child.command, "name", "")
+                        else getattr(child, "info_name", None) or getattr(child.command, "name", "")
                     )
                     selected.append((str(invoked_name), child.command))
                 return tuple(selected)
@@ -2538,9 +2445,7 @@ def _instrument_attached_click_command(click: Any, command: Any) -> None:
         if marker is _CLICK_INSTRUMENTED_SENTINEL:
             return
         if marker is not None:
-            raise RuntimeError(
-                "Click command uses base-cli's reserved command instrumentation marker."
-            )
+            raise RuntimeError("Click command uses base-cli's reserved command instrumentation marker.")
         _reject_async_callback(getattr(command, "callback", None))
         original_invoke = command.invoke
         original_resolve = getattr(command, "resolve_command", None)
@@ -2550,11 +2455,7 @@ def _instrument_attached_click_command(click: Any, command: Any) -> None:
             active = _ATTACHED_INVOCATION.get()
             with _CLICK_ATTACHMENT_LOCK:
                 attachment = getattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, None)
-            if (
-                active is not None
-                and isinstance(attachment, _ClickAttachment)
-                and attachment is not active.attachment
-            ):
+            if active is not None and isinstance(attachment, _ClickAttachment) and attachment is not active.attachment:
                 raise RuntimeError(
                     f"Click command '{getattr(command, 'name', None) or '<unnamed>'}' "
                     "is attached to a different base_cli.App and cannot be nested "
@@ -2683,9 +2584,7 @@ def _instrument_attached_click_main(command: Any) -> None:
     if marker is _CLICK_MAIN_INSTRUMENTED_SENTINEL:
         return
     if marker is not None:
-        raise RuntimeError(
-            "Click command uses base-cli's reserved main instrumentation marker."
-        )
+        raise RuntimeError("Click command uses base-cli's reserved main instrumentation marker.")
     original_main = command.main
 
     @functools.wraps(original_main)
@@ -2769,8 +2668,7 @@ def get_command_app(command_func: Any) -> App:
                 if registered_owner._command_func is command_func:  # pylint: disable=protected-access
                     return registered_owner
     raise TypeError(
-        "Expected a base_cli.App, an attached Click command, or a function "
-        "registered with @base_cli.command()."
+        "Expected a base_cli.App, an attached Click command, or a function registered with @base_cli.command()."
     )
 
 
@@ -2790,24 +2688,16 @@ def attach(
     this helper) is idempotent.
     """
 
-    normalized_sensitive_parameters = _normalize_sensitive_parameters(
-        sensitive_parameters
-    )
+    normalized_sensitive_parameters = _normalize_sensitive_parameters(sensitive_parameters)
     existing = getattr(command, _CLICK_ATTACHMENT_ATTRIBUTE, None)
     if app is not None and app_kwargs:
         unexpected = ", ".join(sorted(app_kwargs))
-        raise TypeError(
-            f"App constructor arguments cannot be used with app= ({unexpected})."
-        )
-    if isinstance(existing, _ClickAttachment) and (
-        app is None or app is existing.app
-    ):
+        raise TypeError(f"App constructor arguments cannot be used with app= ({unexpected}).")
+    if isinstance(existing, _ClickAttachment) and (app is None or app is existing.app):
         existing_app = get_command_app(command)
         if app_kwargs:
             unexpected = ", ".join(sorted(app_kwargs))
-            raise TypeError(
-                f"Click command is already attached; app arguments cannot be changed ({unexpected})."
-            )
+            raise TypeError(f"Click command is already attached; app arguments cannot be changed ({unexpected}).")
         if not normalized_sensitive_parameters:
             normalized_sensitive_parameters = existing.sensitive_parameters
         if (
@@ -2881,11 +2771,7 @@ def run_app(
                 # so raw argv cannot determine capture eligibility.  Buffer the
                 # command whenever JSON mode exists and let the parsed lifecycle
                 # value decide whether to emit an envelope or replay human text.
-                output_capture = (
-                    io.StringIO()
-                    if app.lifecycle_options.json is not None
-                    else None
-                )
+                output_capture = io.StringIO() if app.lifecycle_options.json is not None else None
                 try:
                     if output_capture is None:
                         result = command.main(
@@ -2994,11 +2880,7 @@ def _json_requested(args: list[str], lifecycle_options: LifecycleOptions) -> boo
         envvars = (option.envvar,) if isinstance(option.envvar, str) else option.envvar
         if any(os.environ.get(name, "").lower() in {"1", "true", "yes", "on"} for name in envvars):
             return True
-    declarations = tuple(
-        declaration
-        for declaration in option.param_decls
-        if declaration.startswith(("-", "/"))
-    )
+    declarations = tuple(declaration for declaration in option.param_decls if declaration.startswith(("-", "/")))
     return any(
         argument == declaration or argument.startswith(f"{declaration}=")
         for argument in args
@@ -3082,10 +2964,7 @@ def _normalize_command_result(result: Any) -> int:
         return ExitCode.SUCCESS
     if isinstance(result, int):
         return result
-    raise TypeError(
-        "Commands must return None or an int exit code; "
-        f"got {type(result).__name__}."
-    )
+    raise TypeError(f"Commands must return None or an int exit code; got {type(result).__name__}.")
 
 
 def _reject_async_callback(callback: Any) -> None:
@@ -3125,11 +3004,7 @@ def _primary_lifecycle_declaration(
 ) -> str | None:
     declarations, _negative_declarations = _lifecycle_flag_declarations(option)
     return next(
-        (
-            declaration
-            for declaration in declarations
-            if declaration.startswith("--")
-        ),
+        (declaration for declaration in declarations if declaration.startswith("--")),
         declarations[0] if declarations else None,
     )
 
@@ -3139,12 +3014,10 @@ def _leading_output_flags(
     lifecycle_options: LifecycleOptions,
 ) -> tuple[bool, bool]:
     debug_positive, debug_negative = (
-        set(declarations)
-        for declarations in _lifecycle_flag_declarations(lifecycle_options.debug)
+        set(declarations) for declarations in _lifecycle_flag_declarations(lifecycle_options.debug)
     )
     quiet_positive, quiet_negative = (
-        set(declarations)
-        for declarations in _lifecycle_flag_declarations(lifecycle_options.quiet)
+        set(declarations) for declarations in _lifecycle_flag_declarations(lifecycle_options.quiet)
     )
     debug = False
     quiet = False
@@ -3205,18 +3078,13 @@ def command(
         _reject_async_callback(func)
         with _COMMAND_APP_LOCK:
             if getattr(func, _COMMAND_APP_ATTRIBUTE, None) is not None:
-                raise RuntimeError(
-                    f"Function '{func.__name__}' is already registered with "
-                    "@base_cli.command()."
-                )
+                raise RuntimeError(f"Function '{func.__name__}' is already registered with @base_cli.command().")
             owner = App(name=explicit_name or _inferred_command_name(func))
             registered = owner.command(*args, **kwargs)(func)
             try:
                 setattr(func, _COMMAND_APP_ATTRIBUTE, owner)
             except (AttributeError, TypeError) as exc:
-                raise TypeError(
-                    "@base_cli.command() requires a function that can retain its owning App."
-                ) from exc
+                raise TypeError("@base_cli.command() requires a function that can retain its owning App.") from exc
             return registered
 
     return decorator

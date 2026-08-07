@@ -13,7 +13,15 @@ from base_cli._private_files import write_private_json
 from base_cli._runtime import prune_run_bundles
 
 
-def _bundle(root: Path, name: str, *, status: str = "ok", started_at: str = "2020-01-01T00:00:00Z", size: int = 1, preserve: bool = False) -> Path:
+def _bundle(
+    root: Path,
+    name: str,
+    *,
+    status: str = "ok",
+    started_at: str = "2020-01-01T00:00:00Z",
+    size: int = 1,
+    preserve: bool = False,
+) -> Path:
     path = root / name
     (path / "logs").mkdir(parents=True)
     (path / "logs" / "primary.log").write_bytes(b"x" * size)

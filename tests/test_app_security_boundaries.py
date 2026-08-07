@@ -55,10 +55,13 @@ class RuntimeOwnershipBoundaryTests(unittest.TestCase):
                     replacement.rename(temp_dir)
                 original_require(parent_fd, name, created_stat, path)
 
-            with mock.patch.object(runtime_module.os, "fstat", side_effect=capture_fstat), mock.patch.object(
-                runtime_module,
-                "_require_current_owned_entry",
-                side_effect=replace_before_binding,
+            with (
+                mock.patch.object(runtime_module.os, "fstat", side_effect=capture_fstat),
+                mock.patch.object(
+                    runtime_module,
+                    "_require_current_owned_entry",
+                    side_effect=replace_before_binding,
+                ),
             ):
                 with self.assertRaisesRegex(RuntimeDirectoryError, "changed during creation"):
                     runtime_module.create_owned_runtime_directory(temp_dir, cache_root)
@@ -212,9 +215,7 @@ class AppRedactionBoundaryTests(unittest.TestCase):
                 for secret in all_secrets:
                     self.assertNotIn(secret, rendered)
                     self.assertNotIn(secret, log_text)
-                self.assertTrue(
-                    {"credential", "-t", "--token", "--auth-token", "payload"}.issubset(sensitive)
-                )
+                self.assertTrue({"credential", "-t", "--token", "--auth-token", "payload"}.issubset(sensitive))
 
     def test_secret_name_heuristics_cover_options_and_arguments(self) -> None:
         captured: list[list[str]] = []
@@ -349,10 +350,13 @@ class AppCleanupBoundaryTests(unittest.TestCase):
             raced_marker.append(marker)
             original_create(path, cache_root)
 
-        with tempfile.TemporaryDirectory() as tmpdir, mock.patch.object(
-            app_module,
-            "create_owned_runtime_directory",
-            side_effect=race_create,
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            mock.patch.object(
+                app_module,
+                "create_owned_runtime_directory",
+                side_effect=race_create,
+            ),
         ):
             result = invoke(app, [], home=Path(tmpdir))
 

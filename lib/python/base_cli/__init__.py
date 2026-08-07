@@ -12,11 +12,7 @@ def _resolve_version() -> str:
     python_dir = package_dir.parent
     lib_dir = python_dir.parent
     checkout_root = lib_dir.parent
-    if (
-        python_dir.name == "python"
-        and lib_dir.name == "lib"
-        and (checkout_root / "pyproject.toml").is_file()
-    ):
+    if python_dir.name == "python" and lib_dir.name == "lib" and (checkout_root / "pyproject.toml").is_file():
         version_file = checkout_root / "VERSION"
         if version_file.is_file():
             value = version_file.read_text(encoding="utf-8").splitlines()[0].strip()

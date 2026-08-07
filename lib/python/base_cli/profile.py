@@ -193,8 +193,7 @@ class CliProfile:
             display_command=_no_display_command,
             history_display_command=history_display_command
             or cast(HistoryDisplayResolver, _generic_history_display_command),
-            resolve_workspace_root=resolve_workspace_root
-            or cast(WorkspaceRootResolver, _no_workspace_root),
+            resolve_workspace_root=resolve_workspace_root or cast(WorkspaceRootResolver, _no_workspace_root),
         )
 
     @classmethod
@@ -223,11 +222,7 @@ class CliProfile:
         if not normalized_name:
             raise ValueError("cli_name must contain a non-empty command name")
         root = (config_root or default_config_root()).expanduser()
-        selected_user_dir = (
-            user_config_dir.expanduser()
-            if user_config_dir is not None
-            else root / normalized_name
-        )
+        selected_user_dir = user_config_dir.expanduser() if user_config_dir is not None else root / normalized_name
         loader = BatteriesIncludedConfigLoader(
             normalized_name,
             user_config_dir=selected_user_dir,
@@ -266,9 +261,9 @@ class CliProfile:
             load_user_config=load_user_config,
             load_config=load_config,
             load_config_for_environment=load_config_for_environment,
-            resolve_runtime=resolve_runtime
-            or _generic_runtime_resolver(cache_root, application_home),
+            resolve_runtime=resolve_runtime or _generic_runtime_resolver(cache_root, application_home),
         )
+
 
 def _discover_no_project(_cwd: Path) -> ProjectInfo | None:
     return None

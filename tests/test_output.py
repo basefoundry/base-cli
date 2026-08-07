@@ -175,11 +175,9 @@ class OutputTest(unittest.TestCase):
     def test_text_is_tsv_when_redirected(self) -> None:
         stream = _Stream(terminal=False)
 
-        render_records(
-            RECORDS, requested_format="text", columns=COLUMNS, stream=stream, footer="ignored"
-        )
+        render_records(RECORDS, requested_format="text", columns=COLUMNS, stream=stream, footer="ignored")
 
-        self.assertEqual(stream.getvalue(), "base\t/work/base\ndemo,one\t\"/work/demo\tone\"\n")
+        self.assertEqual(stream.getvalue(), 'base\t/work/base\ndemo,one\t"/work/demo\tone"\n')
 
     def test_redirected_text_sanitizes_ansi_and_control_characters(self) -> None:
         stream = _Stream(terminal=False)
@@ -212,7 +210,7 @@ class OutputTest(unittest.TestCase):
 
         render_records(RECORDS, requested_format="csv", columns=COLUMNS, stream=stream, footer="ignored")
 
-        self.assertEqual(stream.getvalue(), "base,/work/base\n\"demo,one\",/work/demo\tone\n")
+        self.assertEqual(stream.getvalue(), 'base,/work/base\n"demo,one",/work/demo\tone\n')
 
     def test_json_preserves_record_shape(self) -> None:
         stream = _Stream(terminal=True)

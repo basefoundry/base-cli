@@ -258,9 +258,7 @@ def _validate_and_store_schema(
     fields: Mapping[str, FieldSpec],
 ) -> None:
     if not isinstance(record_type, str) or re.fullmatch(r"[A-Za-z][A-Za-z0-9-]*", record_type) is None:
-        raise CommandProtocolError(
-            "record_type must start with a letter and contain only letters, digits, and hyphens"
-        )
+        raise CommandProtocolError("record_type must start with a letter and contain only letters, digits, and hyphens")
     if record_type in schemas:
         raise CommandProtocolError(f"record_type '{record_type}' is already registered")
     if not isinstance(fields, Mapping) or not fields:

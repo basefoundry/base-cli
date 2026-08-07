@@ -86,11 +86,14 @@ def error_envelope(
 def dumps_envelope(envelope: Mapping[str, Any]) -> str:
     """Serialize an envelope as one compact, newline-terminated JSON record."""
 
-    return json.dumps(
-        redact_json_value(dict(envelope)),
-        ensure_ascii=False,
-        separators=(",", ":"),
-    ) + "\n"
+    return (
+        json.dumps(
+            redact_json_value(dict(envelope)),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        + "\n"
+    )
 
 
 def redact_json_value(value: Any, *, _key: str | None = None) -> Any:
@@ -99,10 +102,7 @@ def redact_json_value(value: Any, *, _key: str | None = None) -> Any:
     if _key is not None and _is_sensitive_key(_key):
         return REDACTED
     if isinstance(value, Mapping):
-        return {
-            str(key): redact_json_value(item, _key=str(key))
-            for key, item in value.items()
-        }
+        return {str(key): redact_json_value(item, _key=str(key)) for key, item in value.items()}
     if isinstance(value, list):
         return [redact_json_value(item) for item in value]
     if isinstance(value, tuple):
@@ -140,11 +140,7 @@ class JsonLogFormatter(logging.Formatter):
 
 
 def _timestamp(value: float) -> str:
-    return (
-        datetime.fromtimestamp(value, tz=timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z")
-    )
+    return datetime.fromtimestamp(value, tz=timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _safe_text(value: str) -> str:

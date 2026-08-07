@@ -229,10 +229,7 @@ def _write_table(
             stream.write(f"{footer}\n")
         return
 
-    table_rows = [
-        [_table_cell(_cell_value(record.get(key))) for _header, key in columns]
-        for record in records
-    ]
+    table_rows = [[_table_cell(_cell_value(record.get(key))) for _header, key in columns] for record in records]
     headers = [_table_cell(header) for header, _key in columns]
     widths = [
         max(_display_width(header), selected_minimums[index] if index < len(selected_minimums) else 0)
@@ -262,16 +259,14 @@ def _write_table(
 
     stream.write(
         "  ".join(
-            _pad_cell(_truncate(header, width), width)
-            for header, width in zip(headers, widths, strict=False)
+            _pad_cell(_truncate(header, width), width) for header, width in zip(headers, widths, strict=False)
         ).rstrip()
     )
     stream.write("\n")
     for row in table_rows:
         stream.write(
             "  ".join(
-                _pad_cell(_truncate(value, width), width)
-                for value, width in zip(row, widths, strict=False)
+                _pad_cell(_truncate(value, width), width) for value, width in zip(row, widths, strict=False)
             ).rstrip()
         )
         stream.write("\n")
@@ -307,10 +302,7 @@ def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
 def _table_cell(value: str) -> str:
     value = _ANSI_ESCAPE_RE.sub("", value)
     return "".join(
-        character
-        if character == "\t" or (character >= " " and character != "\x7f")
-        else " "
-        for character in value
+        character if character == "\t" or (character >= " " and character != "\x7f") else " " for character in value
     )
 
 

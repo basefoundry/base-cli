@@ -207,6 +207,7 @@ class AppSubcommandTests(unittest.TestCase):
             del ctx
 
         with self.assertRaisesRegex(RuntimeError, "already has registered subcommands"):
+
             @app.command()
             def main(ctx: base_cli.Context) -> None:
                 del ctx

@@ -192,13 +192,11 @@ def _require_current_owned_entry(
     path: Path,
 ) -> None:
     current_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-    if (
-        not stat.S_ISDIR(current_stat.st_mode)
-        or (current_stat.st_dev, current_stat.st_ino) != (created_stat.st_dev, created_stat.st_ino)
+    if not stat.S_ISDIR(current_stat.st_mode) or (current_stat.st_dev, current_stat.st_ino) != (
+        created_stat.st_dev,
+        created_stat.st_ino,
     ):
-        raise RuntimeDirectoryError(
-            f"Unable to claim invocation temp directory '{path}': it changed during creation."
-        )
+        raise RuntimeDirectoryError(f"Unable to claim invocation temp directory '{path}': it changed during creation.")
 
 
 def _owned_directory_collision_error(path: Path) -> str:
@@ -224,9 +222,7 @@ def prune_log_files(
     # flat log directories, but never let it split a metadata-backed bundle.
     try:
         if any(
-            (child / "run.json").is_file()
-            for child in log_dir.iterdir()
-            if child.is_dir() and not child.is_symlink()
+            (child / "run.json").is_file() for child in log_dir.iterdir() if child.is_dir() and not child.is_symlink()
         ):
             return
     except OSError:

@@ -24,9 +24,7 @@ def _option_for(command: Any, declaration: str) -> Any:
         )
     ]
     if len(matches) != 1:
-        raise AssertionError(
-            f"expected exactly one option for {declaration!r}, found {len(matches)}"
-        )
+        raise AssertionError(f"expected exactly one option for {declaration!r}, found {len(matches)}")
     return matches[0]
 
 
@@ -164,9 +162,7 @@ class LifecycleOptionsTests(unittest.TestCase):
         cases = (
             (
                 "renamed-debug-user-default",
-                base_cli.LifecycleOptions(
-                    debug=base_cli.LifecycleOption("--trace")
-                ),
+                base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--trace")),
                 "--debug",
                 ["--debug"],
                 False,
@@ -335,9 +331,7 @@ class LifecycleOptionsTests(unittest.TestCase):
                     name=f"without-{field_name.replace('_', '-')}",
                     version="3.4.5",
                     log_to_file=False,
-                    lifecycle_options=base_cli.LifecycleOptions(
-                        **{field_name: None}
-                    ),
+                    lifecycle_options=base_cli.LifecycleOptions(**{field_name: None}),
                 )
 
                 @app.command()
@@ -466,9 +460,7 @@ class LifecycleOptionsTests(unittest.TestCase):
         app = base_cli.App(
             name="derived-name",
             log_to_file=False,
-            lifecycle_options=base_cli.LifecycleOptions(
-                debug=base_cli.LifecycleOption("--diagnostic-mode")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--diagnostic-mode")),
         )
 
         @app.command()
@@ -572,9 +564,7 @@ class LifecycleOptionsTests(unittest.TestCase):
     def test_lifecycle_alias_cannot_replace_implicit_help(self) -> None:
         app = base_cli.App(
             name="implicit-help-collision",
-            lifecycle_options=base_cli.LifecycleOptions(
-                debug=base_cli.LifecycleOption("--help")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--help")),
         )
 
         @app.command()
@@ -600,9 +590,7 @@ class LifecycleOptionsTests(unittest.TestCase):
         original_parameters = tuple(command.params)
         app = base_cli.App(
             name="configured-help-collision",
-            lifecycle_options=base_cli.LifecycleOptions(
-                debug=base_cli.LifecycleOption("--assist")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--assist")),
         )
 
         with self.assertRaisesRegex(
@@ -625,9 +613,7 @@ class LifecycleOptionsTests(unittest.TestCase):
 
         app = base_cli.App(
             name="default-help-names",
-            lifecycle_options=base_cli.LifecycleOptions(
-                debug=base_cli.LifecycleOption("--trace")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--trace")),
         )
         app.attach(command)
 
@@ -640,9 +626,7 @@ class LifecycleOptionsTests(unittest.TestCase):
     def test_static_token_normalizer_participates_in_collision_checks(self) -> None:
         app = base_cli.App(
             name="normalized-alias-collision",
-            lifecycle_options=base_cli.LifecycleOptions(
-                debug=base_cli.LifecycleOption("--TRACE")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--TRACE")),
         )
 
         @app.command(context_settings={"token_normalize_func": str.casefold})
@@ -691,9 +675,7 @@ class LifecycleOptionsTests(unittest.TestCase):
     def test_invalid_derived_destination_fails_consistently(self) -> None:
         import click
 
-        lifecycle_options = base_cli.LifecycleOptions(
-            debug=base_cli.LifecycleOption("--")
-        )
+        lifecycle_options = base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--"))
         native = base_cli.App(
             name="invalid-native-destination",
             lifecycle_options=lifecycle_options,
@@ -716,9 +698,12 @@ class LifecycleOptionsTests(unittest.TestCase):
             ("native", lambda: native.click_command),
             ("attached", lambda: attached.attach(attached_command)),
         ):
-            with self.subTest(pathway=pathway), self.assertRaisesRegex(
-                RuntimeError,
-                r"(derive|determine|destination|name).*debug|debug.*(derive|determine|destination|name)",
+            with (
+                self.subTest(pathway=pathway),
+                self.assertRaisesRegex(
+                    RuntimeError,
+                    r"(derive|determine|destination|name).*debug|debug.*(derive|determine|destination|name)",
+                ),
             ):
                 operation()
 
@@ -729,11 +714,7 @@ class LifecycleOptionsTests(unittest.TestCase):
             with self.subTest(field=key):
                 declaration = key.replace("_", "-")
                 lifecycle_options = base_cli.LifecycleOptions(
-                    **{
-                        key: base_cli.LifecycleOption(
-                            f"--{declaration}/--no-{declaration}"
-                        )
-                    }
+                    **{key: base_cli.LifecycleOption(f"--{declaration}/--no-{declaration}")}
                 )
                 native = base_cli.App(
                     name=f"native-{declaration}-shape",
@@ -1044,18 +1025,14 @@ class LifecycleOptionsTests(unittest.TestCase):
             callback=vendor_callback,
         )
         def command(vendor_debug: bool) -> None:
-            command_values.append(
-                (vendor_debug, base_cli.get_lifecycle_values().debug)
-            )
+            command_values.append((vendor_debug, base_cli.get_lifecycle_values().debug))
 
         vendor_option = _option_for(command, "--trace")
         original_callback = vendor_option.callback
         app = base_cli.App(
             name="attached-adoption",
             log_to_file=False,
-            lifecycle_options=base_cli.LifecycleOptions(
-                debug=base_cli.LifecycleOption("--trace")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--trace")),
         )
         app.attach(command)
 
@@ -1114,9 +1091,7 @@ class LifecycleOptionsTests(unittest.TestCase):
         original_parameters = tuple(command.params)
         app = base_cli.App(
             name="attached-missing-alias",
-            lifecycle_options=base_cli.LifecycleOptions(
-                debug=base_cli.LifecycleOption("--trace", "-t")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(debug=base_cli.LifecycleOption("--trace", "-t")),
         )
 
         with self.assertRaisesRegex(
@@ -1200,9 +1175,7 @@ class LifecycleOptionsTests(unittest.TestCase):
                 app = base_cli.App(
                     name=f"attached-version-{name}",
                     version="1.2.3",
-                    lifecycle_options=base_cli.LifecycleOptions(
-                        version=version_option
-                    ),
+                    lifecycle_options=base_cli.LifecycleOptions(version=version_option),
                 )
 
                 with self.assertRaisesRegex(RuntimeError, message):
@@ -1322,9 +1295,7 @@ class LifecycleOptionsTests(unittest.TestCase):
 
         app = base_cli.App(
             name="attached-preview",
-            lifecycle_options=base_cli.LifecycleOptions(
-                dry_run=base_cli.LifecycleOption("--preview")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(dry_run=base_cli.LifecycleOption("--preview")),
         )
         app.attach(command)
 
@@ -1341,9 +1312,7 @@ class LifecycleOptionsTests(unittest.TestCase):
     def test_native_conventional_dry_run_conflicts_with_global_policy(self) -> None:
         app = base_cli.App(
             name="duplicate-dry-run-source",
-            lifecycle_options=base_cli.LifecycleOptions(
-                dry_run=base_cli.LifecycleOption("--simulate")
-            ),
+            lifecycle_options=base_cli.LifecycleOptions(dry_run=base_cli.LifecycleOption("--simulate")),
         )
 
         @app.command()
