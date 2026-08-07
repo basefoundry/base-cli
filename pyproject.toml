@@ -69,6 +69,7 @@ Homepage = "https://github.com/basefoundry/base-cli"
 Repository = "https://github.com/basefoundry/base-cli"
 Issues = "https://github.com/basefoundry/base-cli/issues"
 Documentation = "https://basefoundry.github.io/base-cli/"
+"Code of Conduct" = "https://github.com/basefoundry/base-cli/blob/main/CODE_OF_CONDUCT.md"
 
 [tool.setuptools]
 package-dir = {"" = "lib/python"}

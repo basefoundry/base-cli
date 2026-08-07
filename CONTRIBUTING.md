@@ -2,6 +2,8 @@
 
 Thank you for improving this project.
 
+Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+
 ## Workflow
 
 1. Create or choose a GitHub issue before starting implementation work.
