@@ -1,22 +1,22 @@
 from __future__ import annotations
 
 import functools
-import io
 import inspect
+import io
 import logging
 import os
 import stat
 import sys
 import time
 import traceback
-from collections.abc import Iterable
-from contextvars import ContextVar, Token
+from collections.abc import Callable, Iterable
 from contextlib import redirect_stdout
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
-from typing import Any, Callable, ParamSpec, TypeVar, cast
+from typing import Any, ParamSpec, TypeVar, cast
 
 from ._click_compat import dialect_for_command
 from ._lifecycle import (
@@ -41,7 +41,6 @@ from .errors import ConfigurationError
 from .exit_codes import ExitCode
 from .history import utc_now
 from .integrations import TelemetryOptions, TelemetrySession, finish_telemetry, start_telemetry
-from .logging import configure_logger, log_invocation
 from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import (
     LIFECYCLE_META_KEY,
@@ -49,12 +48,12 @@ from .lifecycle_options import (
     LifecycleOptions,
     LifecycleValues,
 )
+from .logging import configure_logger, log_invocation
 from .paths import (
     current_working_dir,
     normalize_cli_name,
 )
 from .profile import CliProfile
-from .runtime import RetentionPolicy
 from .redaction import (
     REDACTED,
     RedactionPlan,
@@ -63,6 +62,7 @@ from .redaction import (
     parameter_name_from_decls,
     redact_argv,
 )
+from .runtime import RetentionPolicy
 
 _STANDARD_OPTION_KEYS = ("debug", "quiet", "environment", "config", "keep_temp", "log_file", "json")
 _FLAG_LIFECYCLE_OPTION_KEYS = frozenset({"debug", "quiet", "keep_temp", "dry_run", "json"})
@@ -2427,7 +2427,7 @@ def _selected_click_path(
             if current is root_context:
                 contexts.reverse()
                 selected: list[tuple[str, Any]] = []
-                for parent, child in zip(contexts, contexts[1:]):
+                for parent, child in zip(contexts, contexts[1:], strict=False):
                     resolutions = resolved_children.get(id(parent), [])
                     recorded = next(
                         (
@@ -3222,7 +3222,8 @@ def option(
     def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         specs = list(getattr(func, "__base_cli_param_specs__", []))
         specs.append(("option", param_decls, attrs, sensitive))
-        setattr(func, "__base_cli_param_specs__", specs)
+        typed_func = cast(Any, func)
+        typed_func.__base_cli_param_specs__ = specs
         if dry_run:
             dry_run_parameter = parameter_name_from_decls(param_decls)
             existing_dry_run_parameter = getattr(func, "__base_cli_dry_run_parameter__", None)
@@ -3231,7 +3232,7 @@ def option(
                     f"{func.__name__} already designates '{existing_dry_run_parameter}' as dry-run. "
                     "only one option can be designated dry_run=True."
                 )
-            setattr(func, "__base_cli_dry_run_parameter__", dry_run_parameter)
+            typed_func.__base_cli_dry_run_parameter__ = dry_run_parameter
         return func
 
     return decorator
@@ -3245,7 +3246,7 @@ def argument(
     def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         specs = list(getattr(func, "__base_cli_param_specs__", []))
         specs.append(("argument", param_decls, attrs, sensitive))
-        setattr(func, "__base_cli_param_specs__", specs)
+        cast(Any, func).__base_cli_param_specs__ = specs
         return func
 
     return decorator

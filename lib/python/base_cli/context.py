@@ -3,14 +3,13 @@ from __future__ import annotations
 import contextvars
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from ._cleanup import remove_owned_temp_directory
 from .config import FrameworkConfig
-
 
 _current_context: contextvars.ContextVar[Context[Any, Any, Any] | None] = contextvars.ContextVar(
     "base_cli_current_context",

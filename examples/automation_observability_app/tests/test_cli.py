@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import base_cli
-
 from automation_observability_app.cli import app
 
 

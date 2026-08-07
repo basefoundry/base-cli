@@ -8,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-
 EXAMPLES = (
     "minimal_cli",
     "nested_click_app",

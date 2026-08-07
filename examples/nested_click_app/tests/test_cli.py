@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import base_cli
-
 from nested_click_app.cli import command
 
 

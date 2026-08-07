@@ -14,7 +14,6 @@ from typing import Any, Generic, Protocol, TypeVar
 
 from .context import Context
 
-
 __all__ = [
     "AttachmentAdapter",
     "AttachmentContextFactory",

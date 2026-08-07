@@ -21,7 +21,6 @@ from ._private_files import restrict_file, write_private_json
 from .context import Context
 from .redaction import REDACTED, is_secret_key, option_name_to_parameter, redact_argv, redact_text_value
 
-
 __all__ = [
     "HISTORY_SCOPE_INTERNAL",
     "HISTORY_SCOPE_PRIMARY",

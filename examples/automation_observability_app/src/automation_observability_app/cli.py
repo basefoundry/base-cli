@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import click
 import base_cli
-
+import click
 
 app = base_cli.App(
     name="base-automation",

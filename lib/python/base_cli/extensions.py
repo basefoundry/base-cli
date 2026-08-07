@@ -14,7 +14,6 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Protocol, cast
 
-
 COMMAND_ENTRY_POINT_GROUP = "base_cli.commands"
 PROFILE_ENTRY_POINT_GROUP = "base_cli.profiles"
 PLUGIN_ENTRY_POINT_GROUP = "base_cli.plugins"
@@ -50,7 +49,7 @@ class ExtensionsDisabledError(ExtensionDiscoveryError):
 class ExtensionCollisionError(ExtensionDiscoveryError):
     """Raised when more than one distribution claims the same extension name."""
 
-    def __init__(self, group: str, name: str, descriptors: Sequence["ExtensionDescriptor"]) -> None:
+    def __init__(self, group: str, name: str, descriptors: Sequence[ExtensionDescriptor]) -> None:
         self.group = group
         self.name = name
         self.descriptors = tuple(descriptors)
@@ -67,7 +66,7 @@ class ExtensionCollisionError(ExtensionDiscoveryError):
 class ExtensionLoadError(ExtensionDiscoveryError):
     """Wrap an extension import failure without hiding its source metadata."""
 
-    def __init__(self, descriptor: "ExtensionDescriptor", cause: BaseException) -> None:
+    def __init__(self, descriptor: ExtensionDescriptor, cause: BaseException) -> None:
         self.descriptor = descriptor
         self.cause = cause
         super().__init__(

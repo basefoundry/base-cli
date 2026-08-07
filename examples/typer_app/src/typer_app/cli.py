@@ -5,7 +5,6 @@ from __future__ import annotations
 import base_cli
 import typer
 
-
 cli = typer.Typer(help="A typed application with a shared lifecycle.")
 
 

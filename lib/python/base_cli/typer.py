@@ -10,8 +10,8 @@ lifecycle.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any, Callable, TYPE_CHECKING
+from collections.abc import Callable, Iterable
+from typing import TYPE_CHECKING, Any
 
 from ._click_compat import dialect_for_typer, mark_command_dialect
 from .app import App, attach

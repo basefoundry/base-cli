@@ -4,9 +4,7 @@ import io
 import json
 import unittest
 
-from base_cli.output import OutputFormatError
-from base_cli.output import render_records
-from base_cli.output import resolve_output_format
+from base_cli.output import OutputFormatError, render_records, resolve_output_format
 
 
 class _Stream(io.StringIO):

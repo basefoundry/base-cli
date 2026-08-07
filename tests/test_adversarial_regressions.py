@@ -17,23 +17,22 @@ from threading import Lock
 from types import SimpleNamespace
 
 import base_cli
-from hypothesis import given, settings, strategies as st
-
 from base_cli._private_files import write_private_json
 from base_cli._runtime import prune_run_bundles
 from base_cli.command_protocol import (
     BOOLEAN,
-    CommandProtocolError,
-    CommandSchemaRegistry,
     NULLABLE_STRING,
     STRING,
+    CommandProtocolError,
+    CommandSchemaRegistry,
     dumps_records,
     loads_records,
 )
 from base_cli.history import append_history_line
 from base_cli.redaction import REDACTED, redact_argv
 from base_cli.testing import invoke
-
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 SEEDS = (17, 29, 41, 53)
 _SAFE_TEXT = st.text(

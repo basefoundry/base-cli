@@ -5,7 +5,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeAlias
 
-
 __all__ = [
     "CommandFilterNormalizer",
     "command_matches",

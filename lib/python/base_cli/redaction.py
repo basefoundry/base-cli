@@ -31,7 +31,7 @@ class _CommandSpec:
     options: tuple[_OptionSpec, ...]
     option_aliases: Mapping[str, _OptionSpec]
     arguments: tuple[_ArgumentSpec, ...]
-    subcommands: Mapping[str, "_CommandSpec"]
+    subcommands: Mapping[str, _CommandSpec]
     allow_interspersed_args: bool
     ignore_unknown_options: bool
     token_normalize_func: Callable[[str], str] | None
@@ -374,7 +374,7 @@ def _redact_command(
 ) -> list[int]:
     positional_indices = _scan_options(argv, token_indices, command, result)
     argument_spans, extra_indices = _allocate_argument_spans(positional_indices, command.arguments)
-    for argument, span in zip(command.arguments, argument_spans):
+    for argument, span in zip(command.arguments, argument_spans, strict=False):
         if argument.sensitive:
             for index in span:
                 result[index] = REDACTED

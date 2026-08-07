@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import click
 import base_cli
+import click
 
 
 @click.group(name="base-nested", help="A nested Click app with safe plugins.")

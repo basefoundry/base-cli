@@ -3,19 +3,20 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from base_cli.command_protocol import BOOLEAN
-from base_cli.command_protocol import CommandCodec
-from base_cli.command_protocol import CommandProtocolError
-from base_cli.command_protocol import CommandSchemaRegistry
-from base_cli.command_protocol import DEFAULT_SCHEMA_REGISTRY
-from base_cli.command_protocol import NULLABLE_STRING
-from base_cli.command_protocol import RECORD_SCHEMAS
-from base_cli.command_protocol import STRING
-from base_cli.command_protocol import dumps_record
-from base_cli.command_protocol import dumps_records
-from base_cli.command_protocol import loads_records
-from base_cli.command_protocol import register_record_schema
-
+from base_cli.command_protocol import (
+    BOOLEAN,
+    DEFAULT_SCHEMA_REGISTRY,
+    NULLABLE_STRING,
+    RECORD_SCHEMAS,
+    STRING,
+    CommandCodec,
+    CommandProtocolError,
+    CommandSchemaRegistry,
+    dumps_record,
+    dumps_records,
+    loads_records,
+    register_record_schema,
+)
 
 RECORD_TYPE = "test-record"
 RECORD_FIELDS = {

@@ -9,7 +9,6 @@ import re
 import sys
 from pathlib import Path
 
-
 EXPECTED_SLUGS = ("atlas_click", "beacon_typer", "cinder_automation")
 SCRIPT_PATTERN = re.compile(r"^\s*[a-z0-9-]+-consumer\s*=\s*\"[a-zA-Z0-9_.]+:[a-zA-Z0-9_]+\"\s*$", re.MULTILINE)
 

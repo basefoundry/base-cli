@@ -8,7 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "#")
 

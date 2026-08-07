@@ -3,7 +3,6 @@ from __future__ import annotations
 import unittest
 
 import click
-
 from base_cli.history import redact_history_argv
 from base_cli.redaction import (
     REDACTED,
@@ -16,7 +15,7 @@ from base_cli.redaction import (
 
 
 def _sensitive(parameter: object) -> object:
-    setattr(parameter, "_base_cli_sensitive", True)
+    parameter._base_cli_sensitive = True
     return parameter
 
 

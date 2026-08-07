@@ -6,10 +6,10 @@ from datetime import datetime
 from typing import Any
 
 from ._private_files import write_private_json
+from ._runtime import refresh_run_bundle_index
 from .context import Context
 from .exit_codes import ExitCode
 from .history import format_timestamp
-from ._runtime import refresh_run_bundle_index
 
 
 @dataclass(frozen=True)

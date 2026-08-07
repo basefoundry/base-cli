@@ -5,10 +5,11 @@ import logging
 import os
 import stat
 import time
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
-from typing import Any, Iterable, Iterator
 from pathlib import Path
+from typing import Any
 
 try:  # pragma: no cover - platform branch
     import fcntl as _fcntl
@@ -28,7 +29,6 @@ from ._private_files import (
 )
 from .paths import runtime_run_directory_name, runtime_slug
 from .runtime import RetentionPolicy, RuntimeLayout
-
 
 _LOG_INDEX_NAME = ".base-cli-log-index.json"
 _RUN_INDEX_NAME = ".base-cli-run-index.json"
