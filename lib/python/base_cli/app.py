@@ -2876,7 +2876,16 @@ def run_app(
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
                 bypass_token = _INVOCATION_MAIN_BYPASS.set(command)
-                output_capture = io.StringIO() if state.json_output else None
+                # A configured JSON option may be enabled by any Click-supported
+                # source (for example ``default_map`` or a combined short flag),
+                # so raw argv cannot determine capture eligibility.  Buffer the
+                # command whenever JSON mode exists and let the parsed lifecycle
+                # value decide whether to emit an envelope or replay human text.
+                output_capture = (
+                    io.StringIO()
+                    if app.lifecycle_options.json is not None
+                    else None
+                )
                 try:
                     if output_capture is None:
                         result = command.main(

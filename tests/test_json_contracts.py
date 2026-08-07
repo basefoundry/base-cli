@@ -189,6 +189,54 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(envelope["type"], "success")
         self.assertEqual(envelope["details"]["stdout"], "hello from env\n")
 
+    def test_json_mode_captures_combined_short_flags(self) -> None:
+        app = base_cli.App(
+            name="json-combined-short",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json", "-j"),
+            ),
+        )
+
+        @app.command()
+        @base_cli.option("-x", is_flag=True)
+        def main(ctx: base_cli.Context, x: bool) -> None:
+            del ctx, x
+            print("hello from combined flags")
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["-xj"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["type"], "success")
+        self.assertEqual(
+            envelope["details"]["stdout"],
+            "hello from combined flags\n",
+        )
+
+    def test_json_mode_captures_default_map_values(self) -> None:
+        app = base_cli.App(
+            name="json-default-map",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json"),
+            ),
+        )
+
+        @app.command(context_settings={"default_map": {"json": True}})
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            print("hello from default map")
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, [], home=Path(home))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["type"], "success")
+        self.assertEqual(envelope["details"]["stdout"], "hello from default map\n")
+
     def test_json_mode_is_opt_in_and_human_output_remains_unchanged(self) -> None:
         app = base_cli.App(name="human-default", log_to_file=False)
 
