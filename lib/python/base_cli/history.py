@@ -262,7 +262,7 @@ def display_command(cli_name: str, argv: list[str]) -> str:
 
 
 def parse_positive_int(option: str, value: str) -> int:
-    if not value.isdigit():
+    if not value.isdecimal():
         raise ValueError(f"Option '{option}' must be a positive integer.")
     amount = int(value)
     if amount <= 0:

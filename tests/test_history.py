@@ -58,6 +58,15 @@ class HistoryAppendTests(unittest.TestCase):
 
         self.assertEqual(fake_msvcrt.calls, [(_FakeMsvcrt.LK_LOCK, 1), (_FakeMsvcrt.LK_UNLCK, 1)])
 
+
+class PositiveIntegerTests(unittest.TestCase):
+    def test_parse_positive_int_rejects_digit_like_non_decimal_characters(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Option '--limit' must be a positive integer"):
+            history.parse_positive_int("--limit", "²")
+
+    def test_parse_positive_int_accepts_decimal_digits(self) -> None:
+        self.assertEqual(history.parse_positive_int("--limit", "١٢"), 12)
+
     def test_msvcrt_sidecar_initialization_race_is_tolerated(self) -> None:
         fake_msvcrt = _FakeMsvcrt()
         original_write = history.os.write
