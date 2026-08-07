@@ -102,9 +102,10 @@ def _elapsed_ms(started_ns: int) -> float:
 
 
 def _summary(samples: list[float]) -> dict[str, float]:
+    p95 = statistics.quantiles(samples, n=20, method="inclusive")[18]
     return {
         "median": statistics.median(samples),
-        "p95": max(samples),
+        "p95": p95,
         "maximum": max(samples),
     }
 
