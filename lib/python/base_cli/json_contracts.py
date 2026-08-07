@@ -132,7 +132,7 @@ class JsonLogFormatter(logging.Formatter):
             "message": message,
             "run_id": self.run_id,
         }
-        if record.exc_info:
+        if record.exc_info and record.exc_info[0] is not None:
             payload["details"] = {
                 "exception_type": record.exc_info[0].__name__,
             }

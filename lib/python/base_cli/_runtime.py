@@ -634,7 +634,7 @@ def _lock_retention_stream(stream: object) -> None:
     if _fcntl is not None:
         _fcntl.flock(fd, _fcntl.LOCK_EX)
     elif _msvcrt is not None:  # pragma: no cover - Windows
-        stream.seek(0)  # type: ignore[attr-defined]
+        stream.seek(0)
         _msvcrt.locking(fd, _msvcrt.LK_LOCK, 1)
 
 
@@ -643,7 +643,7 @@ def _unlock_retention_stream(stream: object) -> None:
     if _fcntl is not None:
         _fcntl.flock(fd, _fcntl.LOCK_UN)
     elif _msvcrt is not None:  # pragma: no cover - Windows
-        stream.seek(0)  # type: ignore[attr-defined]
+        stream.seek(0)
         _msvcrt.locking(fd, _msvcrt.LK_UNLCK, 1)
 
 

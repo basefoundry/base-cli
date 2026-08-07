@@ -5,8 +5,9 @@ import os
 import platform
 import sys
 import time
+from io import TextIOWrapper
 from pathlib import Path
-from typing import BinaryIO, TextIO
+from typing import BinaryIO, TextIO, cast
 
 try:
     import fcntl as _fcntl
@@ -121,13 +122,16 @@ class SecureLogFileHandler(logging.FileHandler):
         self._lock_path = Path(filename).with_name(f".{Path(filename).name}.lock")
         super().__init__(filename, *args, **kwargs)  # type: ignore[arg-type]
 
-    def _open(self) -> TextIO:
+    def _open(self) -> TextIOWrapper:
         fd = os.open(self.baseFilename, _secure_log_file_open_flags(self.mode), 0o600)
         try:
             fchmod = getattr(os, "fchmod", None)
             if os.name != "nt" and fchmod is not None:
                 fchmod(fd, 0o600)
-            return open(fd, self.mode, encoding=self.encoding, errors=self.errors, closefd=True)
+            return cast(
+                TextIOWrapper,
+                open(fd, self.mode, encoding=self.encoding, errors=self.errors, closefd=True),
+            )
         except BaseException:
             os.close(fd)
             raise

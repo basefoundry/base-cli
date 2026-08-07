@@ -41,6 +41,7 @@ dev = [
   "hypothesis>=6.100,<7",
   "mypy>=1.17,<2",
   "pytest>=8.0",
+  "types-PyYAML>=6.0,<7",
 ]
 typer = [
   # Typer 0.26+ ships a private Click fork; the adapter selects the matching
@@ -87,6 +88,19 @@ base_cli = ["py.typed"]
 addopts = "-q"
 testpaths = ["tests"]
 pythonpath = ["lib/python"]
+
+[tool.mypy]
+python_version = "3.10"
+# Type-check the portable POSIX baseline consistently across CI runners. The
+# runtime suite still exercises native Windows behavior separately.
+platform = "linux"
+strict = true
+warn_unused_ignores = true
+mypy_path = ["lib/python"]
+
+[[tool.mypy.overrides]]
+module = ["opentelemetry", "opentelemetry.*"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 branch = true
