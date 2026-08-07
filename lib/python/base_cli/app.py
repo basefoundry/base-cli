@@ -3165,6 +3165,14 @@ def _current_invocation_argv() -> list[str]:
 
 
 def delegated_display_command(default: str | None = None) -> str | None:
+    """Return the wrapper display label or ``default`` when none is set.
+
+    ``BASE_CLI_DISPLAY_COMMAND`` is intended for launchers and delegated
+    invocations that need a user-facing command label different from the
+    consumer's internal module or entry-point name. Blank environment values
+    are ignored, and the returned value can be supplied as a profile's
+    ``display_command`` resolver.
+    """
     display_command = os.environ.get(DISPLAY_COMMAND_ENV, "").strip()
     if display_command:
         return display_command

@@ -80,6 +80,35 @@ translate internal entry-point names into user-facing labels. The generic
 default only replaces underscores with hyphens; it does not know any product's
 command aliases.
 
+## Delegated display labels
+
+Launchers and wrapper commands can use `delegated_display_command()` when the
+user-facing command label should come from the invoking environment. It returns
+the trimmed value of `BASE_CLI_DISPLAY_COMMAND` when that variable is set to a
+non-blank value, and otherwise returns the supplied default. Pass it as a
+profile's `display_command` resolver when a delegated invocation should retain
+the wrapper's label in lifecycle-facing usage and invocation metadata:
+
+```python
+from dataclasses import replace
+
+import base_cli
+
+
+profile = replace(
+    base_cli.CliProfile.generic(),
+    display_command=base_cli.delegated_display_command,
+)
+app = base_cli.App(name="deploy", profile=profile)
+```
+
+For example, a launcher can select its public label without changing the
+consumer's entry point:
+
+```bash
+BASE_CLI_DISPLAY_COMMAND="myorg deploy" python -m myapp deploy --env prod
+```
+
 ## Batteries-included profile
 
 Applications that want conventional configuration discovery can opt in without
