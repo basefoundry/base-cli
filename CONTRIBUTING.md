@@ -2,6 +2,27 @@
 
 Thank you for improving this project.
 
+## Development setup
+
+The `basectl` shortcuts below are optional. Contributors working outside the
+Base workspace can run the same checks with the project’s standard Python
+tooling:
+
+```bash
+python3 -m pip install -e ".[dev,typer,quality]"
+python3 -m pytest
+ruff format --check scripts examples
+ruff check lib/python/base_cli scripts examples tests
+python3 -m mypy --strict examples/typed_consumer.py
+python3 scripts/validate_docs.py
+python3 -m compileall -q examples
+python3 -m build
+```
+
+Use the Python interpreter from your active virtual environment in place of
+`python3` when necessary. The strict mypy command covers the supported typed
+consumer fixture; the framework-wide typing gate is tracked separately.
+
 ## Workflow
 
 1. Create or choose a GitHub issue before starting implementation work.
@@ -41,6 +62,8 @@ Thank you for improving this project.
    ```
 
 Useful commands:
+
+These shortcuts are available to contributors using the Base workspace:
 
 ```bash
 basectl check base-cli
