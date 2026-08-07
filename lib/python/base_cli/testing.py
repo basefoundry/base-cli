@@ -5,7 +5,7 @@ import os
 import sys
 from pathlib import Path
 from threading import RLock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from .paths import use_working_dir
 
@@ -50,7 +50,7 @@ def invoke(
     runner_kwargs = {}
     if "mix_stderr" in inspect.signature(CliRunner).parameters:
         runner_kwargs["mix_stderr"] = False
-    runner = CliRunner(**runner_kwargs)
+    runner = cast(Any, CliRunner)(**runner_kwargs)
     command = _RunAppInvocation(
         app,
         invocation_argv,
@@ -58,14 +58,14 @@ def invoke(
     )
     if cwd_path is None:
         with use_working_dir(None):
-            return runner.invoke(command, [], env=invoke_env)
+            return cast("Result", runner.invoke(command, [], env=invoke_env))
 
     with _INVOKE_CWD_LOCK:
         with use_working_dir(cwd_path):
             original_cwd = Path.cwd()
             os.chdir(cwd_path)
             try:
-                return runner.invoke(command, [], env=invoke_env)
+                return cast("Result", runner.invoke(command, [], env=invoke_env))
             finally:
                 os.chdir(original_cwd)
 

@@ -486,20 +486,20 @@ def _match_option(value: str, command: _CommandSpec) -> _OptionMatch | None:
     elif exact is not None:
         return _OptionMatch(exact)
 
-    prefix = value[:1]
+    short_prefix = value[:1]
     short_prefixes = {
         alias[:1]
         for option in command.options
         for alias in option.aliases
         if len(alias) == 2 and len(_split_option(alias)[0]) == 1
     }
-    if prefix not in short_prefixes or value[1:2] == prefix or len(value) <= 2:
+    if short_prefix not in short_prefixes or value[1:2] == short_prefix or len(value) <= 2:
         return None
     last_option: _OptionSpec | None = None
     has_unknown = False
     for position, character in enumerate(value[1:]):
         short_option = aliases.get(
-            _normalize_option_token(f"{prefix}{character}", command.token_normalize_func)
+            _normalize_option_token(f"{short_prefix}{character}", command.token_normalize_func)
         )
         if short_option is None:
             if command.ignore_unknown_options:
@@ -509,10 +509,10 @@ def _match_option(value: str, command: _CommandSpec) -> _OptionMatch | None:
         last_option = short_option
         if short_option.takes_value:
             attached = value[position + 2 :]
-            prefix = value[: position + 2] if attached else None
-            if prefix is not None and attached.startswith("="):
-                prefix += "="
-            return _OptionMatch(short_option, prefix, has_unknown)
+            attached_prefix = value[: position + 2] if attached else None
+            if attached_prefix is not None and attached.startswith("="):
+                attached_prefix += "="
+            return _OptionMatch(short_option, attached_prefix, has_unknown)
     return _OptionMatch(last_option, has_unknown=has_unknown) if last_option is not None else None
 
 

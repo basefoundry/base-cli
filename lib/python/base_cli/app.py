@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from threading import RLock
-from typing import Any, Callable, ParamSpec, TypeVar
+from typing import Any, Callable, ParamSpec, TypeVar, cast
 
 from ._click_compat import dialect_for_command
 from ._lifecycle import (
@@ -389,7 +389,7 @@ def _reset_active_context(context: Context[Any, Any, Any], token: Any) -> None:
             pass
 
 
-def _require_click():
+def _require_click() -> Any:
     try:
         import click
     except ImportError as exc:
@@ -439,7 +439,7 @@ def _click_command_decorator(
     args_after_name = command_args[1:] if command_args else ()
     attrs = dict(command_kwargs)
     attrs.pop("name", None)
-    return click.command(name, *args_after_name, **attrs)
+    return cast(Callable[[Callable[..., Any]], Any], click.command(name, *args_after_name, **attrs))
 
 
 def _require_materialized_command_name(
@@ -551,8 +551,7 @@ class App:
             self._ensure_registration_open()
             self._lifecycle_options = value
 
-    @name.setter
-    def name(self, value: str) -> None:
+    def _set_name(self, value: str) -> None:
         normalized = normalize_cli_name(value)
         with self._registration_lock:
             self._ensure_registration_open()
@@ -570,6 +569,8 @@ class App:
                     f"its registered command explicitly uses '{explicit_name}'."
                 )
             self._name = normalized
+
+    name = name.setter(_set_name)  # type: ignore[attr-defined]
 
     def _ensure_registration_open(self) -> None:
         if self._registration_state == _REGISTRATION_MATERIALIZING:
@@ -966,7 +967,7 @@ class App:
         dry_run_parameter = explicit_dry_run_parameter or "dry_run"
 
         @functools.wraps(func)
-        def wrapper(**kwargs: Any):
+        def wrapper(**kwargs: Any) -> Any:
             if _ATTACHED_INVOCATION.get() is not None:
                 raise RuntimeError(
                     f"base_cli command '{self.name}' cannot run inside an attached "
@@ -1179,7 +1180,7 @@ class App:
         run_metadata_path = layout.run_root / "run.json" if owns_run_metadata else None
         temp_dir_was_new = not layout.temp_dir.exists()
         logger = logging.getLogger(f"base_cli.{self.name}")
-        context = Context(
+        context: Context[dict[str, Any], Any, Any] = Context(
             cli_name=self.name,
             run_id=run_id,
             runtime_owner=runtime_owner,
@@ -1955,6 +1956,8 @@ def _install_native_lifecycle_options(
 
 def _parameter_source_rank(source: Any) -> int:
     name = getattr(source, "name", None)
+    if not isinstance(name, str):
+        return 0
     return {
         "COMMANDLINE": 4,
         "PROMPT": 4,
@@ -2073,10 +2076,14 @@ def _resolve_lifecycle_values(
             )
         else:
             candidate = context_captures.get(key)
-        raw[key] = _prefer_lifecycle_value(raw.get(key), candidate)
+        selected = _prefer_lifecycle_value(raw.get(key), candidate)
+        if selected is not None:
+            raw[key] = selected
 
     for key, candidate in (extra_values or {}).items():
-        raw[key] = _prefer_lifecycle_value(raw.get(key), candidate)
+        selected = _prefer_lifecycle_value(raw.get(key), candidate)
+        if selected is not None:
+            raw[key] = selected
 
     resolution = _LifecycleResolution(
         values=_normalize_lifecycle_values(click, raw),
@@ -2192,11 +2199,11 @@ def _add_attached_standard_options(
                 token_normalize_func,
             )
             if missing_declarations:
-                aliases = ", ".join(sorted(missing_declarations))
+                alias_text = ", ".join(sorted(missing_declarations))
                 raise RuntimeError(
                     f"Existing '{parameter.opts[0]}' option is incompatible with "
                     f"LifecycleOptions.{key}; it does not expose configured "
-                    f"declaration(s) {aliases} with the required flag polarity. "
+                    f"declaration(s) {alias_text} with the required flag polarity. "
                     "Add compatible aliases to the vendor option, or rename/disable "
                     "the lifecycle option."
                 )
@@ -2355,10 +2362,10 @@ def _add_attached_standard_options(
                 token_normalize_func,
             )
             if missing_declarations:
-                aliases = ", ".join(sorted(missing_declarations))
+                alias_text = ", ".join(sorted(missing_declarations))
                 raise RuntimeError(
                     "Existing lifecycle version option does not expose configured "
-                    f"declaration(s) {aliases} with the required flag polarity. "
+                f"declaration(s) {alias_text} with the required flag polarity. "
                     "Add compatible aliases to the vendor option, or rename/disable "
                     "the lifecycle version option."
                 )
@@ -2737,7 +2744,7 @@ def _restore_attached_click_main(command: Any) -> None:
             pass
 
 
-def get_command_app(command_func: Callable[..., Any]) -> App:
+def get_command_app(command_func: Any) -> App:
     """Return the :class:`App` owning a registered function or attached tree."""
 
     with _CLICK_ATTACHMENT_LOCK:
@@ -2756,11 +2763,11 @@ def get_command_app(command_func: Callable[..., Any]) -> App:
                 ):
                     return owner
     with _COMMAND_APP_LOCK:
-        owner = getattr(command_func, _COMMAND_APP_ATTRIBUTE, None)
-        if isinstance(owner, App):
-            with owner._registration_lock:  # pylint: disable=protected-access
-                if owner._command_func is command_func:  # pylint: disable=protected-access
-                    return owner
+        registered_owner = getattr(command_func, _COMMAND_APP_ATTRIBUTE, None)
+        if isinstance(registered_owner, App):
+            with registered_owner._registration_lock:  # pylint: disable=protected-access
+                if registered_owner._command_func is command_func:  # pylint: disable=protected-access
+                    return registered_owner
     raise TypeError(
         "Expected a base_cli.App, an attached Click command, or a function "
         "registered with @base_cli.command()."
@@ -3215,7 +3222,7 @@ def option(
     def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         specs = list(getattr(func, "__base_cli_param_specs__", []))
         specs.append(("option", param_decls, attrs, sensitive))
-        func.__base_cli_param_specs__ = specs
+        setattr(func, "__base_cli_param_specs__", specs)
         if dry_run:
             dry_run_parameter = parameter_name_from_decls(param_decls)
             existing_dry_run_parameter = getattr(func, "__base_cli_dry_run_parameter__", None)
@@ -3224,7 +3231,7 @@ def option(
                     f"{func.__name__} already designates '{existing_dry_run_parameter}' as dry-run. "
                     "only one option can be designated dry_run=True."
                 )
-            func.__base_cli_dry_run_parameter__ = dry_run_parameter
+            setattr(func, "__base_cli_dry_run_parameter__", dry_run_parameter)
         return func
 
     return decorator
@@ -3238,14 +3245,14 @@ def argument(
     def decorator(func: Callable[_P, _R]) -> Callable[_P, _R]:
         specs = list(getattr(func, "__base_cli_param_specs__", []))
         specs.append(("argument", param_decls, attrs, sensitive))
-        func.__base_cli_param_specs__ = specs
+        setattr(func, "__base_cli_param_specs__", specs)
         return func
 
     return decorator
 
 
 def _explicit_config_path_type(click: Any) -> Any:
-    class ExplicitConfigPath(click.Path):
+    class ExplicitConfigPath(click.Path):  # type: ignore[misc]
         def convert(self, value: Any, param: Any, ctx: Any) -> Path:
             try:
                 expanded = Path(value).expanduser()
@@ -3259,7 +3266,7 @@ def _explicit_config_path_type(click: Any) -> Any:
                 self.fail(f"Path {str(expanded)!r} does not exist.", param, ctx)
             if not stat.S_ISREG(mode):
                 self.fail(f"Path {str(expanded)!r} is not a regular file.", param, ctx)
-            return converted
+            return cast(Path, converted)
 
     return ExplicitConfigPath(
         exists=True,
@@ -3281,7 +3288,7 @@ def _validate_standard_options(
 
 
 def _build_group_wrapper(click: Any) -> Callable[..., None]:
-    @click.pass_context
+    @click.pass_context  # type: ignore[untyped-decorator]
     def group_wrapper(context: Any, **kwargs: Any) -> None:
         del kwargs
         bindings = getattr(
@@ -3291,4 +3298,4 @@ def _build_group_wrapper(click: Any) -> Callable[..., None]:
         )
         _resolve_lifecycle_values(click, context, bindings)
 
-    return group_wrapper
+    return cast(Callable[..., None], group_wrapper)

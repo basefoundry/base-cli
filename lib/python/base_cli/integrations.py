@@ -71,7 +71,7 @@ def try_render_rich_table(
         for header in headers:
             table.add_column(header, overflow="ellipsis")
         for row in rows:
-            table.add_row(*(Text.from_plain(value) for value in row))
+            table.add_row(*(Text(value) for value in row))
 
         console_kwargs: dict[str, Any] = {
             "file": stream,
