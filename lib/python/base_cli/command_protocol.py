@@ -4,7 +4,6 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-
 __all__ = [
     "BOOLEAN",
     "CommandCodec",

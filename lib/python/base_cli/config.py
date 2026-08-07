@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import stat
 import re
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,7 +10,6 @@ from typing import Any, Final
 
 from ._dependencies import require_yaml
 from .errors import ConfigurationError
-
 
 __all__ = [
     "BatteriesIncludedConfigLoader",

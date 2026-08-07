@@ -6,7 +6,6 @@ import os
 
 import pytest
 
-
 _WINDOWS_SKIP_MODULES = frozenset(
     {
         "tests/test_app_run_metadata.py",

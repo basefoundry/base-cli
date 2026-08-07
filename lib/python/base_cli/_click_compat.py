@@ -9,9 +9,9 @@ fork.  This module keeps that boundary in one place instead of spreading
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
-
+from typing import Any, cast
 
 _DIALECT_ATTRIBUTE = "__base_cli_click_dialect__"
 
@@ -79,7 +79,7 @@ def _vendor_version_option_factory(
             )
             params = list(getattr(source, "__click_params__", ()))
             params.append(parameter)
-            setattr(source, "__click_params__", params)
+            cast(Any, source).__click_params__ = params
             return source
 
         return decorator

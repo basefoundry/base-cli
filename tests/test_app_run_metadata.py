@@ -87,7 +87,10 @@ class AppRunMetadataTests(unittest.TestCase):
                 app = base_cli.App(name=f"metadata-{name}")
 
                 @app.command()
-                def main(ctx: base_cli.Context) -> int | None:
+                def main(
+                    ctx: base_cli.Context,
+                    returned: int | None = returned,
+                ) -> int | None:
                     del ctx
                     return returned
 
@@ -204,7 +207,10 @@ class AppRunMetadataTests(unittest.TestCase):
                 app = base_cli.App(name=f"metadata-{name}")
 
                 @app.command()
-                def main(ctx: base_cli.Context) -> None:
+                def main(
+                    ctx: base_cli.Context,
+                    raised: BaseException = raised,
+                ) -> None:
                     del ctx
                     raise raised
 
@@ -238,7 +244,10 @@ class AppRunMetadataTests(unittest.TestCase):
                 app = base_cli.App(name=f"metadata-{name}")
 
                 @app.command()
-                def main(ctx: base_cli.Context) -> None:
+                def main(
+                    ctx: base_cli.Context,
+                    raised: BaseException = raised,
+                ) -> None:
                     del ctx
                     raise raised
 
@@ -570,7 +579,10 @@ class AppRunMetadataTests(unittest.TestCase):
                 app = base_cli.App(name=f"metadata-finalize-{name}")
 
                 @app.command()
-                def main(ctx: base_cli.Context) -> None:
+                def main(
+                    ctx: base_cli.Context,
+                    fail_command: bool = fail_command,
+                ) -> None:
                     del ctx
                     if fail_command:
                         raise RuntimeError("command failure")

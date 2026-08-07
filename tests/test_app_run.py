@@ -61,7 +61,11 @@ class RunAppTests(unittest.TestCase):
             with self.subTest(field=field_name), tempfile.TemporaryDirectory() as tmpdir:
                 detail = f"private {field_name} detail"
 
-                def fail_callback(*_args: object) -> object:
+                def fail_callback(
+                    *_args: object,
+                    error_type: type[Exception] = error_type,
+                    detail: str = detail,
+                ) -> object:
                     raise error_type(detail)
 
                 profile = replace(base_cli.CliProfile.generic(), **{field_name: fail_callback})

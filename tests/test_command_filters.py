@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from base_cli.command_filters import command_matches
-from base_cli.command_filters import normalize_command_filter
-from base_cli.command_filters import normalize_command_filters
+from base_cli.command_filters import command_matches, normalize_command_filter, normalize_command_filters
 
 
 def strip_tool_prefix(value: str) -> str:

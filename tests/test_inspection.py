@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import json
 
-from base_cli.inspection import inspection_envelope
-from base_cli.inspection import render_inspection_json
+from base_cli.inspection import inspection_envelope, render_inspection_json
 
 
 def test_inspection_envelope_has_stable_v1_shape() -> None:

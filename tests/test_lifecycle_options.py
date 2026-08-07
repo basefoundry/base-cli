@@ -789,7 +789,10 @@ class LifecycleOptionsTests(unittest.TestCase):
                 )
 
                 @app.subcommand()
-                def status(ctx: base_cli.Context) -> None:
+                def status(
+                    ctx: base_cli.Context,
+                    seen: dict[str, Any] = seen,
+                ) -> None:
                     click_context = click.get_current_context()
                     values = base_cli.get_lifecycle_values()
                     seen.update(

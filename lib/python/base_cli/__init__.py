@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from importlib.metadata import PackageNotFoundError, version as distribution_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as distribution_version
 from pathlib import Path
 
 
@@ -41,14 +42,6 @@ from . import (
     json_contracts,
     testing,
 )
-from .attachment import (
-    AttachmentAdapter,
-    AttachmentContextFactory,
-    AttachmentContract,
-    AttachmentServiceFactory,
-)
-from .config import BatteriesIncludedConfigLoader, ConfigSnapshot, FrameworkConfig
-from .deprecations import BaseCliDeprecationWarning, deprecated
 from .app import (
     App,
     argument,
@@ -59,22 +52,34 @@ from .app import (
     option,
     run_app,
 )
-from .command_filters import CommandFilterNormalizer, command_matches, normalize_command_filter, normalize_command_filters
+from .attachment import (
+    AttachmentAdapter,
+    AttachmentContextFactory,
+    AttachmentContract,
+    AttachmentServiceFactory,
+)
+from .command_filters import (
+    CommandFilterNormalizer,
+    command_matches,
+    normalize_command_filter,
+    normalize_command_filters,
+)
 from .command_protocol import (
     BOOLEAN,
     DEFAULT_SCHEMA_REGISTRY,
-    CommandCodec,
     NULLABLE_STRING,
+    RECORD_SCHEMAS,
     STRING,
+    CommandCodec,
     CommandProtocolError,
     CommandSchemaRegistry,
     FieldSpec,
-    RECORD_SCHEMAS,
     dumps_record,
     dumps_records,
     loads_records,
     register_record_schema,
 )
+from .config import BatteriesIncludedConfigLoader, ConfigSnapshot, FrameworkConfig
 from .context import (
     ApplicationStateT,
     ConfigT,
@@ -82,7 +87,9 @@ from .context import (
     ServicesT,
     get_current_context,
 )
+from .deprecations import BaseCliDeprecationWarning, deprecated
 from .errors import ConfigurationError
+from .exit_codes import ExitCode
 from .extensions import (
     COMMAND_ENTRY_POINT_GROUP,
     ENTRY_POINT_GROUPS,
@@ -96,7 +103,6 @@ from .extensions import (
     ExtensionLoadResult,
     ExtensionsDisabledError,
 )
-from .exit_codes import ExitCode
 from .inspection import inspection_envelope, render_inspection_json
 from .integrations import TelemetryOptions, TelemetrySession, try_render_rich_table
 from .json_contracts import (
@@ -104,14 +110,13 @@ from .json_contracts import (
     JSON_ERROR_SCHEMA,
     JSON_LOG_SCHEMA,
     JSON_OUTPUT_SCHEMA,
-    JsonLogFormatter,
     MAX_JSON_LOG_MESSAGE_LENGTH,
+    JsonLogFormatter,
     dumps_envelope,
     error_envelope,
     redact_json_value,
     success_envelope,
 )
-from .logging import configure_logger, log_critical, log_debug, log_error, log_info, log_warning
 from .lifecycle_options import (
     LIFECYCLE_META_KEY,
     LifecycleOption,
@@ -119,9 +124,10 @@ from .lifecycle_options import (
     LifecycleValues,
     get_lifecycle_values,
 )
+from .logging import configure_logger, log_critical, log_debug, log_error, log_info, log_warning
 from .output import (
-    OutputFormatError,
     PUBLIC_OUTPUT_FORMATS,
+    OutputFormatError,
     is_terminal,
     output_format_choices,
     render_document,

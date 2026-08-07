@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base_cli
 
-
 app = base_cli.App(
     name="base-minimal",
     version="0.1.0",

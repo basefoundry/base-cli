@@ -8,13 +8,12 @@ import os
 import re
 import shutil
 import sys
+import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any, TextIO
-import unicodedata
 
 from ._dependencies import require_yaml
 from .integrations import try_render_rich_table
-
 
 PUBLIC_OUTPUT_FORMATS = ("text", "csv", "tsv", "yaml", "json")
 _ANSI_ESCAPE_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
@@ -234,7 +233,7 @@ def _write_table(
         for index, header in enumerate(headers)
     ]
     for row in table_rows:
-        widths = [max(width, _display_width(value)) for width, value in zip(widths, row)]
+        widths = [max(width, _display_width(value)) for width, value in zip(widths, row, strict=False)]
 
     if max_cell_width is not None:
         if max_cell_width < 1:
@@ -256,11 +255,19 @@ def _write_table(
         return
 
     stream.write(
-        "  ".join(_pad_cell(_truncate(header, width), width) for header, width in zip(headers, widths)).rstrip()
+        "  ".join(
+            _pad_cell(_truncate(header, width), width)
+            for header, width in zip(headers, widths, strict=False)
+        ).rstrip()
     )
     stream.write("\n")
     for row in table_rows:
-        stream.write("  ".join(_pad_cell(_truncate(value, width), width) for value, width in zip(row, widths)).rstrip())
+        stream.write(
+            "  ".join(
+                _pad_cell(_truncate(value, width), width)
+                for value, width in zip(row, widths, strict=False)
+            ).rstrip()
+        )
         stream.write("\n")
     if footer:
         stream.write(f"\n{footer}\n")

@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 __all__ = [
     "LIFECYCLE_META_KEY",
     "LifecycleOption",

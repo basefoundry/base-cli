@@ -11,8 +11,8 @@ from threading import Event, Thread
 from unittest import mock
 
 import base_cli
-import base_cli.app as app_module
 import base_cli._runtime as runtime_module
+import base_cli.app as app_module
 from base_cli._runtime import RuntimeDirectoryError, runtime_layout
 from base_cli.redaction import REDACTED
 from base_cli.testing import invoke

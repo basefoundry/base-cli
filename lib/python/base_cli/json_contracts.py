@@ -11,12 +11,12 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Mapping
 from datetime import datetime, timezone
 from logging import LogRecord
-from typing import Any, Mapping
+from typing import Any
 
 from .redaction import REDACTED, redact_text_value
-
 
 JSON_CONTRACT_VERSION = 1
 JSON_LOG_SCHEMA = "base-cli.log"

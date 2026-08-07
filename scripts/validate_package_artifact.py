@@ -12,7 +12,6 @@ import zipfile
 from pathlib import Path
 from typing import NoReturn
 
-
 PACKAGE_NAME = "base-cli"
 IMPORT_NAME = "base_cli"
 MINIMUM_PYTHON = ">=3.10"

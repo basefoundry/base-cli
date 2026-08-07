@@ -10,7 +10,6 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-
 PRIVATE_FILE_MODE = 0o600
 PRIVATE_DIRECTORY_MODE = 0o700
 

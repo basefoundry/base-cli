@@ -8,10 +8,8 @@ generated Click tree.
 
 from __future__ import annotations
 
-import typer
-
 import base_cli
-
+import typer
 
 cli = typer.Typer(help="A small Typer application with a shared lifecycle.")
 

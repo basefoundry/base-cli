@@ -28,7 +28,7 @@ class RetentionPolicy:
     max_total_bytes: int | None = None
 
     @classmethod
-    def safe_defaults(cls) -> "RetentionPolicy":
+    def safe_defaults(cls) -> RetentionPolicy:
         """Return the bounded policy used by a durable :class:`App` by default."""
 
         return cls(

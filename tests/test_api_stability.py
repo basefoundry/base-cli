@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import warnings
 import unittest
+import warnings
 
 import base_cli
 from base_cli import command_protocol, json_contracts
-
 
 EXPECTED_FACADE_EXPORTS = frozenset(
     {
