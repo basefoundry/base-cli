@@ -2,6 +2,8 @@
 
 Thank you for improving this project.
 
+Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+
 ## Development setup
 
 The `basectl` shortcuts below are optional. Contributors working outside the
