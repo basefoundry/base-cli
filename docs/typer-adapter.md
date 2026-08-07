@@ -65,6 +65,11 @@ adapter = base_cli.TyperAdapter(cli)
 command = adapter.attach(name="example")
 ```
 
+`adapter.command` exposes the cached Click command returned by the most recent
+`attach()` call. Reuse that object when the application needs to inspect or
+pass the generated command to another integration boundary; calling
+`attach()` again refreshes the cached command.
+
 Typer is an optional extra and is imported lazily.  Importing `base_cli` and
 using the Click integration never imports or requires Typer.
 
