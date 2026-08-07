@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 import base_cli
+from base_cli import history
 from base_cli.testing import invoke
 
 
@@ -117,6 +118,11 @@ class GenericProfileTests(unittest.TestCase):
         profile = base_cli.CliProfile.generic(history_display_command=formatter)
 
         self.assertIs(profile.history_display_command, formatter)
+
+    def test_generic_profile_uses_shared_history_display_command(self) -> None:
+        profile = base_cli.CliProfile.generic()
+
+        self.assertIs(profile.history_display_command, history.display_command)
 
     def test_generic_profile_accepts_a_public_runtime_resolver(self) -> None:
         def resolve_runtime(

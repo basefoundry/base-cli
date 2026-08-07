@@ -5,7 +5,7 @@ import os
 import platform
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 try:
     import fcntl as _fcntl
@@ -18,8 +18,10 @@ except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
     _msvcrt = None  # type: ignore[assignment]
 
 from ._private_files import restrict_file, write_private_json
-from .context import Context
 from .redaction import REDACTED, is_secret_key, option_name_to_parameter, redact_argv, redact_text_value
+
+if TYPE_CHECKING:
+    from .context import Context
 
 __all__ = [
     "HISTORY_SCOPE_INTERNAL",

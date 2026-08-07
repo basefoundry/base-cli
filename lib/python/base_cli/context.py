@@ -10,6 +10,7 @@ from typing import Any, Generic, TypeVar
 
 from ._cleanup import remove_owned_temp_directory
 from .config import FrameworkConfig
+from .history import display_command as _default_history_display_command
 
 _current_context: contextvars.ContextVar[Context[Any, Any, Any] | None] = contextvars.ContextVar(
     "base_cli_current_context",
@@ -30,10 +31,6 @@ __all__ = [
     "reset_current_context",
     "set_current_context",
 ]
-
-
-def _default_history_display_command(cli_name: str, _argv: list[str]) -> str:
-    return cli_name.replace("_", "-")
 
 
 @dataclass

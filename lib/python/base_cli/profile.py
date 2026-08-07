@@ -12,6 +12,7 @@ from .config import (
     load_yaml_file,
 )
 from .context import Context
+from .history import display_command as _generic_history_display_command
 from .paths import default_cache_root, default_config_root, make_run_id, normalize_cli_name
 from .runtime import RuntimeLayout
 
@@ -138,10 +139,6 @@ def _no_workspace_root(_user_config: object | None) -> Path | None:
     return None
 
 
-def _generic_history_display_command(cli_name: str, _argv: list[str]) -> str:
-    return cli_name.replace("_", "-")
-
-
 @dataclass(frozen=True)
 class CliProfile:
     """Policy boundary between the generic CLI lifecycle and its consumer.
@@ -157,10 +154,7 @@ class CliProfile:
     resolve_runtime: RuntimeResolver
     history_writer: HistoryWriter | None = None
     display_command: DisplayCommandResolver = _no_display_command
-    history_display_command: HistoryDisplayResolver = cast(
-        HistoryDisplayResolver,
-        _generic_history_display_command,
-    )
+    history_display_command: HistoryDisplayResolver = _generic_history_display_command
     resolve_workspace_root: WorkspaceRootResolver = cast(
         WorkspaceRootResolver,
         _no_workspace_root,
@@ -191,8 +185,7 @@ class CliProfile:
             load_config=load_config or cast(ConfigLoader, _load_explicit_config),
             resolve_runtime=resolve_runtime or _generic_runtime_resolver(cache_root, application_home),
             display_command=_no_display_command,
-            history_display_command=history_display_command
-            or cast(HistoryDisplayResolver, _generic_history_display_command),
+            history_display_command=history_display_command or _generic_history_display_command,
             resolve_workspace_root=resolve_workspace_root or cast(WorkspaceRootResolver, _no_workspace_root),
         )
 
