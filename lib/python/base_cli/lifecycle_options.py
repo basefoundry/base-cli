@@ -53,14 +53,8 @@ class LifecycleOption:
             )
         if len(set(param_decls)) != len(param_decls):
             raise ValueError("LifecycleOption declarations must be unique.")
-        if name is not None and (
-            not isinstance(name, str)
-            or not name
-            or not name.isidentifier()
-        ):
-            raise TypeError(
-                "LifecycleOption name must be a non-empty Python identifier or None."
-            )
+        if name is not None and (not isinstance(name, str) or not name or not name.isidentifier()):
+            raise TypeError("LifecycleOption name must be a non-empty Python identifier or None.")
         if help is not None and not isinstance(help, str):
             raise TypeError("LifecycleOption help must be a string or None.")
         if metavar is not None and not isinstance(metavar, str):
@@ -69,22 +63,14 @@ class LifecycleOption:
             try:
                 envvar = tuple(envvar)
             except TypeError as exc:
-                raise TypeError(
-                    "LifecycleOption envvar must be a string, a sequence of strings, or None."
-                ) from exc
+                raise TypeError("LifecycleOption envvar must be a string, a sequence of strings, or None.") from exc
             if not all(isinstance(value, str) and value for value in envvar):
-                raise TypeError(
-                    "LifecycleOption envvar sequences must contain non-empty strings."
-                )
+                raise TypeError("LifecycleOption envvar sequences must contain non-empty strings.")
         if isinstance(envvar, str) and not envvar:
             raise TypeError("LifecycleOption envvar must not be empty.")
         if not isinstance(show_envvar, bool):
             raise TypeError("LifecycleOption show_envvar must be a bool.")
-        if not (
-            show_default is None
-            or isinstance(show_default, bool)
-            or isinstance(show_default, str)
-        ):
+        if not (show_default is None or isinstance(show_default, bool) or isinstance(show_default, str)):
             raise TypeError("LifecycleOption show_default must be a bool, string, or None.")
         if not isinstance(hidden, bool):
             raise TypeError("LifecycleOption hidden must be a bool.")
@@ -175,9 +161,7 @@ class LifecycleOptions:
         ):
             value = getattr(self, key)
             if value is not None and not isinstance(value, LifecycleOption):
-                raise TypeError(
-                    f"LifecycleOptions.{key} must be a LifecycleOption or None."
-                )
+                raise TypeError(f"LifecycleOptions.{key} must be a LifecycleOption or None.")
 
 
 @dataclass(frozen=True)
@@ -201,17 +185,11 @@ def get_lifecycle_values(click_context: Any | None = None) -> LifecycleValues:
         try:
             import click
         except ImportError as exc:
-            raise RuntimeError(
-                "Click is required to inspect lifecycle option values."
-            ) from exc
+            raise RuntimeError("Click is required to inspect lifecycle option values.") from exc
         click_context = click.get_current_context(silent=True)
     if click_context is None:
-        raise RuntimeError(
-            "Lifecycle option values are not available outside a Click invocation."
-        )
+        raise RuntimeError("Lifecycle option values are not available outside a Click invocation.")
     value = getattr(click_context, "meta", {}).get(LIFECYCLE_META_KEY)
     if not isinstance(value, LifecycleValues):
-        raise RuntimeError(
-            "Lifecycle option values are not available for this Click context."
-        )
+        raise RuntimeError("Lifecycle option values are not available for this Click context.")
     return value

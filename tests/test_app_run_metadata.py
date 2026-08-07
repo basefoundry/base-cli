@@ -22,13 +22,16 @@ from base_cli._runtime import runtime_layout
 
 def _run(app: base_cli.App, home: Path, args: list[str] | None = None) -> tuple[int, str]:
     stderr = io.StringIO()
-    with mock.patch.dict(
-        os.environ,
-        {
-            "HOME": str(home),
-            "BASE_CLI_CACHE_DIR": str(home / "cache"),
-        },
-    ), redirect_stderr(stderr):
+    with (
+        mock.patch.dict(
+            os.environ,
+            {
+                "HOME": str(home),
+                "BASE_CLI_CACHE_DIR": str(home / "cache"),
+            },
+        ),
+        redirect_stderr(stderr),
+    ):
         status = base_cli.run_app(app, args or [])
     return status, stderr.getvalue()
 

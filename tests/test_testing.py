@@ -33,11 +33,7 @@ class PackageExportTests(unittest.TestCase):
         env = os.environ.copy()
         pythonpath = str(Path(__file__).resolve().parents[1] / "lib" / "python")
         existing_pythonpath = env.get("PYTHONPATH")
-        env["PYTHONPATH"] = (
-            pythonpath
-            if not existing_pythonpath
-            else f"{pythonpath}{os.pathsep}{existing_pythonpath}"
-        )
+        env["PYTHONPATH"] = pythonpath if not existing_pythonpath else f"{pythonpath}{os.pathsep}{existing_pythonpath}"
 
         result = subprocess.run(
             [

@@ -207,10 +207,9 @@ class ClickTreeAttachmentTests(unittest.TestCase):
         self.assertIs(admin.commands["deploy"], deploy)
         self.assertIs(root.callback, root_callback)
         self.assertIs(admin.callback, admin_callback)
-        self.assertTrue(all(
-            any(candidate is parameter for candidate in deploy.params)
-            for parameter in deploy_parameters
-        ))
+        self.assertTrue(
+            all(any(candidate is parameter for candidate in deploy.params) for parameter in deploy_parameters)
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             result = invoke(
@@ -300,9 +299,7 @@ class ClickTreeAttachmentTests(unittest.TestCase):
         def status() -> None:
             seen["base_debug"] = base_cli.get_current_context().debug
 
-        debug_parameter = next(
-            parameter for parameter in root.params if "--debug" in getattr(parameter, "opts", ())
-        )
+        debug_parameter = next(parameter for parameter in root.params if "--debug" in getattr(parameter, "opts", ()))
         app = _CountingApp(
             name="standard-options",
             version="3.2.1",
@@ -978,11 +975,7 @@ class ClickTreeAttachmentTests(unittest.TestCase):
                 home=home,
             )
 
-            log_texts = [
-                path.read_text(encoding="utf-8")
-                for path in calls["log_files"]
-                if path is not None
-            ]
+            log_texts = [path.read_text(encoding="utf-8") for path in calls["log_files"] if path is not None]
 
         self.assertEqual(first.exit_code, 0, first.output)
         self.assertEqual(second.exit_code, 0, second.output)
@@ -1026,14 +1019,16 @@ class ClickTreeAttachmentTests(unittest.TestCase):
                 events.append(("click-close", app.context_cleanup_count))
 
             click_context.call_on_close(close_click_context)
-            events.append((
-                "root",
+            events.append(
                 (
-                    click_context.obj,
-                    context.application_context,
-                    context.services,
-                ),
-            ))
+                    "root",
+                    (
+                        click_context.obj,
+                        context.application_context,
+                        context.services,
+                    ),
+                )
+            )
 
         @root.command(name="run")
         @click.pass_obj
@@ -1053,10 +1048,12 @@ class ClickTreeAttachmentTests(unittest.TestCase):
         @root.result_callback()
         def finish(result: Any) -> Any:
             context = base_cli.get_current_context()
-            events.append((
-                "result",
-                (context.application_context, context.services),
-            ))
+            events.append(
+                (
+                    "result",
+                    (context.application_context, context.services),
+                )
+            )
             return result
 
         def context_factory(context: base_cli.Context) -> object:
@@ -1550,11 +1547,7 @@ class ClickTreeAttachmentTests(unittest.TestCase):
                 inner_app.created_contexts[0].log_file,
             ]
             self.assertTrue(all(path is not None for path in log_paths))
-            log_texts = [
-                path.read_text(encoding="utf-8")
-                for path in log_paths
-                if path is not None
-            ]
+            log_texts = [path.read_text(encoding="utf-8") for path in log_paths if path is not None]
 
         self.assertEqual(status, 9)
         self.assertEqual(inner_calls, [None])

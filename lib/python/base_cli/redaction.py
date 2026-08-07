@@ -237,9 +237,7 @@ def _compile_command(
                 if key not in selected_children:
                     selected_children[key] = (child, [])
                 elif selected_children[key][0] is not child:
-                    raise RuntimeError(
-                        f"Selected command name '{key}' resolved to multiple Click commands."
-                    )
+                    raise RuntimeError(f"Selected command name '{key}' resolved to multiple Click commands.")
                 selected_children[key][1].append(path[1:])
             for command_name, (child, child_paths) in selected_children.items():
                 subcommands[command_name] = _compile_command(
@@ -498,9 +496,7 @@ def _match_option(value: str, command: _CommandSpec) -> _OptionMatch | None:
     last_option: _OptionSpec | None = None
     has_unknown = False
     for position, character in enumerate(value[1:]):
-        short_option = aliases.get(
-            _normalize_option_token(f"{short_prefix}{character}", command.token_normalize_func)
-        )
+        short_option = aliases.get(_normalize_option_token(f"{short_prefix}{character}", command.token_normalize_func))
         if short_option is None:
             if command.ignore_unknown_options:
                 has_unknown = True

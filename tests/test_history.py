@@ -50,9 +50,7 @@ class HistoryAppendTests(unittest.TestCase):
         fake_msvcrt = _FakeMsvcrt()
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
-            with mock.patch.object(history, "_fcntl", None), mock.patch.object(
-                history, "_msvcrt", fake_msvcrt
-            ):
+            with mock.patch.object(history, "_fcntl", None), mock.patch.object(history, "_msvcrt", fake_msvcrt):
                 history.append_history_line(path, '{"run": 1}\n')
 
             self.assertEqual(path.read_text(encoding="utf-8"), '{"run": 1}\n')
@@ -74,9 +72,11 @@ class HistoryAppendTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "history.jsonl"
-            with mock.patch.object(history, "_fcntl", None), mock.patch.object(
-                history, "_msvcrt", fake_msvcrt
-            ), mock.patch.object(history.os, "write", side_effect=write_with_initialization_race):
+            with (
+                mock.patch.object(history, "_fcntl", None),
+                mock.patch.object(history, "_msvcrt", fake_msvcrt),
+                mock.patch.object(history.os, "write", side_effect=write_with_initialization_race),
+            ):
                 history.append_history_line(path, '{"run": 1}\n')
 
             self.assertEqual(path.read_text(encoding="utf-8"), '{"run": 1}\n')

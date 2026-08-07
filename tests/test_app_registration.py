@@ -67,6 +67,7 @@ class AppRegistrationTests(unittest.TestCase):
         app = base_cli.App(name="authoritative-name")
 
         with self.assertRaisesRegex((RuntimeError, ValueError), "conflicting-name|authoritative-name"):
+
             @app.command("conflicting-name")
             def implementation(ctx: base_cli.Context) -> None:
                 del ctx
@@ -253,6 +254,7 @@ class AppRegistrationTests(unittest.TestCase):
             del ctx
 
         with self.assertRaisesRegex(RuntimeError, "deploy"):
+
             @app.subcommand(name="deploy")
             def deploy_secondary(ctx: base_cli.Context) -> None:
                 del ctx
@@ -281,6 +283,7 @@ class AppRegistrationTests(unittest.TestCase):
             del ctx
 
         with self.assertRaisesRegex(RuntimeError, "sync"):
+
             @app.subcommand()
             def sync_command(ctx: base_cli.Context) -> None:
                 del ctx
@@ -566,16 +569,19 @@ class AppRegistrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             home = Path(tmpdir)
             stderr = io.StringIO()
-            with mock.patch.dict(
-                os.environ,
-                {
-                    "HOME": str(home),
-                    "USERPROFILE": str(home),
-                    "LOCALAPPDATA": str(home / "AppData" / "Local"),
-                    "XDG_CACHE_HOME": str(home / ".cache"),
-                    "BASE_CLI_CACHE_DIR": str(home / ".cache"),
-                },
-            ), redirect_stderr(stderr):
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(home),
+                        "USERPROFILE": str(home),
+                        "LOCALAPPDATA": str(home / "AppData" / "Local"),
+                        "XDG_CACHE_HOME": str(home / ".cache"),
+                        "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                    },
+                ),
+                redirect_stderr(stderr),
+            ):
                 status = base_cli.run_app(greet, ["--name", "Ada"])
 
         self.assertEqual(status, 0, stderr.getvalue())

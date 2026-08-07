@@ -90,10 +90,13 @@ class AppRuntimeErrorTests(unittest.TestCase):
             not_a_directory.write_text("file", encoding="utf-8")
             log_file = not_a_directory / "primary.log"
             stderr = io.StringIO()
-            with mock.patch.dict(
-                os.environ,
-                {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(root / "cache")},
-            ), redirect_stderr(stderr):
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"HOME": str(home), "BASE_CLI_CACHE_DIR": str(root / "cache")},
+                ),
+                redirect_stderr(stderr),
+            ):
                 exit_code = base_cli.run_app(app, ["--log-file", str(log_file)])
 
         error = stderr.getvalue()

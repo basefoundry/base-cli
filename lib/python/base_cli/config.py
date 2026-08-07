@@ -60,9 +60,7 @@ def _validate_framework_config(values: Mapping[str, Any]) -> FrameworkConfig:
     if log_level_value is not None:
         if not isinstance(log_level_value, str) or log_level_value.lower() not in _LOG_LEVELS:
             supported = ", ".join(sorted(_LOG_LEVELS))
-            raise ConfigurationError(
-                f"Config key 'log_level' must be one of: {supported}."
-            )
+            raise ConfigurationError(f"Config key 'log_level' must be one of: {supported}.")
         log_level = log_level_value.lower()
     else:
         log_level = None
@@ -83,9 +81,7 @@ def _validate_environment_name(value: object) -> str:
         raise ConfigurationError("Config key 'environment' must be a string.")
     normalized = value.strip()
     if not normalized or _SAFE_NAME.fullmatch(normalized) is None:
-        raise ConfigurationError(
-            "Config key 'environment' must contain only letters, digits, '.', '_' or '-'."
-        )
+        raise ConfigurationError("Config key 'environment' must contain only letters, digits, '.', '_' or '-'.")
     return normalized
 
 
@@ -164,9 +160,7 @@ class BatteriesIncludedConfigLoader:
     ) -> tuple[Path, Path | None]:
         user_path = self.user_config_dir / self.environment_dir_name / f"{environment}.yaml"
         project_path = (
-            project_root / self.environment_dir_name / f"{environment}.yaml"
-            if project_root is not None
-            else None
+            project_root / self.environment_dir_name / f"{environment}.yaml" if project_root is not None else None
         )
         return user_path, project_path
 
@@ -195,11 +189,7 @@ class BatteriesIncludedConfigLoader:
             selected_environment,
         )
         user_environment = load_yaml_file(user_environment_path)
-        project_environment = (
-            load_yaml_file(project_environment_path)
-            if project_environment_path is not None
-            else {}
-        )
+        project_environment = load_yaml_file(project_environment_path) if project_environment_path is not None else {}
 
         merged: dict[str, Any] = {}
         provenance: dict[str, str] = {}
@@ -213,17 +203,9 @@ class BatteriesIncludedConfigLoader:
         ):
             _merge_mapping(merged, provenance, values, source)
 
-        framework_values = {
-            key: merged[key]
-            for key in _FRAMEWORK_KEYS
-            if key in merged
-        }
+        framework_values = {key: merged[key] for key in _FRAMEWORK_KEYS if key in merged}
         framework = _validate_framework_config(framework_values)
-        consumer_config = {
-            key: value
-            for key, value in merged.items()
-            if key not in _FRAMEWORK_KEYS
-        }
+        consumer_config = {key: value for key, value in merged.items() if key not in _FRAMEWORK_KEYS}
         return ConfigSnapshot(
             config=consumer_config,
             framework=framework,

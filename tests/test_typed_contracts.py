@@ -87,6 +87,7 @@ class TypedContractTests(unittest.TestCase):
             "__base_cli_main_instrumented__",
         ):
             with self.subTest(marker_name=marker_name):
+
                 @click.command(name=f"marker-{marker_name[-5:]}")
                 def command() -> None:
                     pass

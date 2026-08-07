@@ -50,9 +50,7 @@ def normalize_command_filters(
     parts = value.split(",")
     if any(not part.strip() for part in parts):
         raise ValueError("Option '--command' expects comma-separated command names without empty entries.")
-    normalized = tuple(
-        dict.fromkeys(normalize_command_filter(part, normalizer=normalizer) for part in parts)
-    )
+    normalized = tuple(dict.fromkeys(normalize_command_filter(part, normalizer=normalizer) for part in parts))
     if not normalized or any(not command for command in normalized):
         raise ValueError("Option '--command' expects at least one command name.")
     return normalized

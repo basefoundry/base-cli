@@ -128,8 +128,10 @@ def write_primary_record(
         "scope": scope,
     }
     resolved_bundle = Path(bundle_path).expanduser() if bundle_path else None
-    resolved_log = Path(log_path).expanduser() if log_path else (
-        resolved_bundle / "logs" / "primary.log" if resolved_bundle is not None else None
+    resolved_log = (
+        Path(log_path).expanduser()
+        if log_path
+        else (resolved_bundle / "logs" / "primary.log" if resolved_bundle is not None else None)
     )
     optional_fields = {
         "project": project,
@@ -329,5 +331,5 @@ def compact_home_text(value: str, *, home: Path | str | None = None) -> str:
     if comparison_value == comparison_home:
         return "~"
     if comparison_value.startswith(f"{comparison_home}/"):
-        return f"~/{normalized_value[len(normalized_home) + 1:]}"
+        return f"~/{normalized_value[len(normalized_home) + 1 :]}"
     return value

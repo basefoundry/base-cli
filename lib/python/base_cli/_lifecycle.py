@@ -81,10 +81,7 @@ class RunRecorder:
             return
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-            if (
-                isinstance(payload, dict)
-                and payload.get("run_id") == self.context.run_id
-            ):
+            if isinstance(payload, dict) and payload.get("run_id") == self.context.run_id:
                 path.unlink()
         except (UnicodeDecodeError, json.JSONDecodeError):
             try:

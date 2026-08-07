@@ -100,9 +100,7 @@ class RedactionPlanTests(unittest.TestCase):
     def test_plan_is_set_compatible_and_contains_destinations_and_aliases(self) -> None:
         self.assertIsInstance(self.plan, set)
         self.assertIsInstance(self.plan, RedactionPlan)
-        self.assertTrue(
-            {"credential", "-t", "--token", "root_token", "--root-token"}.issubset(self.plan)
-        )
+        self.assertTrue({"credential", "-t", "--token", "root_token", "--root-token"}.issubset(self.plan))
         self.assertTrue({"--auth", "--no-auth"}.issubset(self.plan))
 
     def test_recursive_plan_redacts_option_forms_and_positional_span(self) -> None:
