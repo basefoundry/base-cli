@@ -7,6 +7,16 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ## [Unreleased]
 
+### Planned
+
+- Continue compatibility hardening and adoption work for the next release.
+
+## [0.4.1] - 2026-08-07
+
+This is a compatible pre-1.0 patch release. It contains adoption polish,
+security hardening, correctness fixes, and CI improvements after 0.4.0; it does
+not introduce a new API or JSON-contract compatibility boundary.
+
 ### Added
 
 - Add the MkDocs documentation site configuration, strict documentation checks,
@@ -26,9 +36,32 @@ and versions are tracked in the repo-root `VERSION` file.
 - Document the intentional opaque `Context.user_config` boundary and the
   compatibility requirements for any future fourth context type parameter.
 
-### Planned
+- Expand CI quality gates with package-level strict mypy coverage, the full Ruff
+  format surface, and the updated benchmark percentile calculation.
+- Improve the public documentation for inspection envelopes, delegated display
+  labels, environment configuration, typed user configuration, Typer access,
+  release guidance, and contributor setup.
 
-- Continue compatibility hardening and adoption work for the next release.
+### Security
+
+- Compact home-relative paths in diagnostic `run.json` and `identity.json`
+  metadata so retained support bundles disclose less local path information.
+
+### Fixed
+
+- Capture command output consistently when JSON mode is supplied through Click's
+  `default_map` or combined short flags, preserving the single-envelope stdout
+  contract.
+- Preserve every first-seen document column when rendering heterogeneous records
+  instead of silently dropping fields found only in later rows.
+- Compute a real interpolated p95 in the runtime benchmark instead of reporting
+  the maximum under two names.
+- Reject Unicode digit-like input that is not a decimal integer while retaining
+  the friendly positive-integer error message.
+- Reuse one history display-command resolver across contexts, profiles, and
+  history records.
+- Correct release-facing examples, changelog structure, API documentation,
+  contribution guidance, and package-level formatting coverage.
 
 ## [0.4.0] - 2026-08-05
 
