@@ -11,6 +11,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Changed
+
+- Apply the profile-resolved display command to ambient production invocation
+  metadata so logs and history match the documented wrapper-label contract.
+
 ### Security
 
 - Compact the launcher path in retained invocation logs so diagnostic bundles

@@ -2740,7 +2740,6 @@ def run_app(
         print(f"ERROR: {exc}", file=sys.stderr)
         return ExitCode.FAILURE
 
-    explicit_argv = argv is not None
     args = list(sys.argv[1:] if argv is None else argv)
     leading_debug, leading_quiet = _leading_output_flags(
         args,
@@ -2760,7 +2759,7 @@ def run_app(
     try:
         try:
             display_command = app.profile.display_command()
-            invocation_argv = _effective_invocation_argv(app, args, explicit_argv, display_command)
+            invocation_argv = _effective_invocation_argv(app, args, display_command)
             command = app.click_command
             click = dialect_for_command(command)
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
@@ -3038,11 +3037,8 @@ def _leading_output_flags(
 def _effective_invocation_argv(
     app: App,
     args: list[str],
-    explicit_argv: bool,
     display_command: str | None,
 ) -> list[str]:
-    if not explicit_argv:
-        return list(sys.argv)
     return [display_command or app.name, *args]
 
 

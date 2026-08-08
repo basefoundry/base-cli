@@ -172,13 +172,58 @@ def _stable_stderr(observation: _Observation) -> str:
 
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
 class InvocationParityTests(unittest.TestCase):
+    def test_ambient_invocation_uses_display_command_in_logs_and_history(self) -> None:
+        observed_history_argv: list[str] = []
+
+        def history_writer(
+            _ctx: base_cli.Context,
+            argv: list[str],
+            _sensitive: set[str],
+            _started: object,
+            _exit_code: int,
+        ) -> None:
+            observed_history_argv.extend(argv)
+
+        profile = replace(_profile(), history_writer=history_writer)
+        app = base_cli.App(name="internal-tool", profile=profile)
+
+        @app.command()
+        @base_cli.option("--name", required=True)
+        def main(ctx: base_cli.Context, name: str) -> None:
+            del ctx
+            print(f"hello {name}")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = (Path(tmpdir) / "home").resolve()
+            home.mkdir()
+            launcher = home / ".venv" / "bin" / "internal-tool"
+            with mock.patch.object(app_module.sys, "argv", [str(launcher), "--name=Ada"]):
+                observation = _observe_production(app, None, home)
+
+        expected_argv = ["parity-tool", "--name=Ada"]
+        self.assertEqual(observation.logged_argv, expected_argv)
+        self.assertEqual(observed_history_argv, expected_argv)
+        self.assertNotIn(str(home), observation.log_text)
+
     def test_production_compacts_launcher_home_path_in_retained_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             home = (Path(tmpdir) / "home").resolve()
             home.mkdir()
             launcher = home / ".venv" / "bin" / "parity-tool"
+            profile = replace(
+                base_cli.CliProfile.generic(),
+                display_command=lambda: str(launcher),
+            )
+            app = base_cli.App(name="parity-tool", profile=profile)
+
+            @app.command()
+            @base_cli.option("--name", required=True)
+            def main(ctx: base_cli.Context, name: str) -> None:
+                del ctx
+                print(f"hello {name}")
+
             with mock.patch.object(app_module.sys, "argv", [str(launcher), "--name=Ada"]):
-                observation = _observe_production(_make_app("success"), None, home)
+                observation = _observe_production(app, None, home)
 
         self.assertEqual(observation.logged_argv[0], "~/.venv/bin/parity-tool")
         self.assertNotIn(str(home), observation.log_text)
