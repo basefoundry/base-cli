@@ -71,6 +71,7 @@ Continue with the framework guides:
 
 - [API overview](api-stability.md) for the supported public surface and
   compatibility policy.
-- [Reference applications](../examples/) for complete consumer patterns.
+- [Reference applications](https://github.com/basefoundry/base-cli/tree/main/examples)
+  for complete consumer patterns.
 - [Installation and packaging](adopter-readiness.md) for dependency extras,
   distribution checks, and release guidance.

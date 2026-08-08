@@ -23,6 +23,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Fix the published documentation link to the reference applications.
 - Classify a command that returns exit code `130` as `nonzero_return`; the
   `interrupted` outcome remains reserved for actual interrupt exceptions.
 
