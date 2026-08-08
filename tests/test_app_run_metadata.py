@@ -84,6 +84,7 @@ class AppRunMetadataTests(unittest.TestCase):
             ("zero", 0, 0, "ok", "success"),
             ("usage", 2, 2, "error", "usage_error"),
             ("nonzero", 7, 7, "error", "nonzero_return"),
+            ("returned-interrupted", 130, 130, "error", "nonzero_return"),
         )
         for name, returned, expected_code, expected_status, expected_outcome in cases:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
@@ -237,6 +238,7 @@ class AppRunMetadataTests(unittest.TestCase):
 
         cases = (
             ("click", click.exceptions.Exit(9), 9, "error", "nonzero_return", ""),
+            ("click-interrupted-code", click.exceptions.Exit(130), 130, "error", "nonzero_return", ""),
             ("system-none", SystemExit(None), 0, "ok", "system_exit", ""),
             ("system-success", SystemExit(0), 0, "ok", "system_exit", ""),
             ("system-failure", SystemExit(5), 5, "error", "system_exit", ""),
