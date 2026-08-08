@@ -116,8 +116,6 @@ def outcome_from_exit_code(exit_code: int) -> InvocationOutcome:
         return InvocationOutcome("success", "ok", exit_code)
     if exit_code == ExitCode.USAGE_ERROR:
         return InvocationOutcome("usage_error", "error", exit_code)
-    if exit_code == ExitCode.INTERRUPTED:
-        return InvocationOutcome("interrupted", "error", exit_code)
     return InvocationOutcome("nonzero_return", "error", exit_code)
 
 
