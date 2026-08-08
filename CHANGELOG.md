@@ -27,6 +27,11 @@ and versions are tracked in the repo-root `VERSION` file.
 - Classify a command that returns exit code `130` as `nonzero_return`; the
   `interrupted` outcome remains reserved for actual interrupt exceptions.
 
+### Documentation
+
+- Document the exported history, command-protocol, and context APIs and enforce
+  public-symbol docstrings in the API tests.
+
 ## [0.4.1] - 2026-08-07
 
 This is a compatible pre-1.0 patch release. It contains adoption polish,

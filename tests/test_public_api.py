@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,7 @@ from base_cli import (
     command_filters,
     command_protocol,
     config,
+    context,
     deprecations,
     experimental,
     history,
@@ -172,6 +174,15 @@ class PublicApiTests(unittest.TestCase):
         self.assertTrue(base_cli.attach.__doc__)
         self.assertTrue(base_cli.get_command_app.__doc__)
         self.assertTrue(base_cli.run_app.__doc__)
+
+    def test_exported_callables_have_docstrings(self) -> None:
+        for module in (history, command_protocol, context):
+            for name in module.__all__:
+                exported = getattr(module, name)
+                if not (inspect.isclass(exported) or inspect.isfunction(exported)):
+                    continue
+                with self.subTest(module=module.__name__, name=name):
+                    self.assertTrue(inspect.getdoc(exported), f"{module.__name__}.{name} needs a docstring")
 
 
 if __name__ == "__main__":

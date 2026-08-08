@@ -26,11 +26,15 @@ MAX_RECORD_COUNT = 1_000_000
 
 
 class CommandProtocolError(ValueError):
+    """Raised when a command-protocol schema or payload violates its contract."""
+
     pass
 
 
 @dataclass(frozen=True)
 class FieldSpec:
+    """Describe the wire type and nullability of one command-record field."""
+
     value_type: str
     nullable: bool = False
 
@@ -138,6 +142,7 @@ def dumps_record(
     protocol_header: str = PROTOCOL_HEADER,
     registry: CommandSchemaRegistry | None = None,
 ) -> str:
+    """Serialize one typed command record using the protocol framing."""
     return dumps_records(
         record_type,
         (record,),
@@ -153,6 +158,7 @@ def dumps_records(
     protocol_header: str = PROTOCOL_HEADER,
     registry: CommandSchemaRegistry | None = None,
 ) -> str:
+    """Serialize a sequence of typed command records using the protocol framing."""
     active_registry = registry or DEFAULT_SCHEMA_REGISTRY
     schema = active_registry.schema(record_type)
     if len(records) > MAX_RECORD_COUNT:
@@ -180,6 +186,7 @@ def loads_records(
     protocol_header: str = PROTOCOL_HEADER,
     registry: CommandSchemaRegistry | None = None,
 ) -> tuple[str, tuple[dict[str, RecordValue], ...]]:
+    """Validate and decode protocol-framed command records."""
     active_registry = registry or DEFAULT_SCHEMA_REGISTRY
     # The wire framing is LF-delimited. `str.splitlines()` also accepts CR,
     # vertical tab, form feed, and Unicode separators, which would make the

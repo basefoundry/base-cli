@@ -167,10 +167,12 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
 def set_current_context(
     context: Context[Any, Any, Any] | None,
 ) -> contextvars.Token[Context[Any, Any, Any] | None]:
+    """Set the active context and return a token that can restore the prior value."""
     return _current_context.set(context)
 
 
 def reset_current_context(token: contextvars.Token[Context[Any, Any, Any] | None]) -> None:
+    """Restore the context associated with a token, recovering safely if needed."""
     try:
         _current_context.reset(token)
     except BaseException:  # pylint: disable=broad-exception-caught
@@ -178,11 +180,13 @@ def reset_current_context(token: contextvars.Token[Context[Any, Any, Any] | None
 
 
 def recover_current_context(token: contextvars.Token[Context[Any, Any, Any] | None]) -> None:
+    """Best-effort restoration used when normal context-token reset fails."""
     previous = token.old_value
     _current_context.set(None if previous is contextvars.Token.MISSING else previous)
 
 
 def get_current_context() -> Context[Any, Any, Any]:
+    """Return the active command context or raise when called outside a command."""
     context = _current_context.get()
     if context is None:
         raise RuntimeError("base_cli context is not active. Run inside a base_cli.App command.")
