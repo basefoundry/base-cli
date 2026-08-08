@@ -21,6 +21,7 @@ except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
 
 from ._private_files import restrict_file
 from .context import get_current_context
+from .history import compact_home_text
 from .json_contracts import JsonLogFormatter
 from .paths import current_working_dir
 from .redaction import redact_argv
@@ -261,6 +262,11 @@ def log_invocation(
     sensitive_options: set[str] | None,
 ) -> None:
     safe_argv = list(argv) if sensitive_options is None else redact_argv(argv, sensitive_options)
+    if safe_argv:
+        # Invocation logs are retained in diagnostic bundles.  Keep the
+        # launcher path useful while avoiding disclosure of the local user's
+        # home directory and username.
+        safe_argv[0] = compact_home_text(safe_argv[0])
     logger.debug("argv=%s", safe_argv)
     logger.debug("platform=%s %s", platform.system(), platform.machine())
     logger.debug("python=%s", sys.version.replace("\n", " "))

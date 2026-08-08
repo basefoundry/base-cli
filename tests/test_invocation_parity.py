@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
+import base_cli.app as app_module
 from base_cli.testing import invoke
 
 
@@ -125,7 +126,7 @@ def _load_run_artifacts(home: Path) -> tuple[dict[str, object], list[str], str]:
     return metadata, logged_argv, log_text
 
 
-def _observe_production(app: base_cli.App, args: list[str], home: Path) -> _Observation:
+def _observe_production(app: base_cli.App, args: list[str] | None, home: Path) -> _Observation:
     stdout = io.StringIO()
     stderr = io.StringIO()
     with mock.patch.dict(os.environ, _isolated_environment(home)), redirect_stdout(stdout), redirect_stderr(stderr):
@@ -171,6 +172,17 @@ def _stable_stderr(observation: _Observation) -> str:
 
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
 class InvocationParityTests(unittest.TestCase):
+    def test_production_compacts_launcher_home_path_in_retained_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = (Path(tmpdir) / "home").resolve()
+            home.mkdir()
+            launcher = home / ".venv" / "bin" / "parity-tool"
+            with mock.patch.object(app_module.sys, "argv", [str(launcher), "--name=Ada"]):
+                observation = _observe_production(_make_app("success"), None, home)
+
+        self.assertEqual(observation.logged_argv[0], "~/.venv/bin/parity-tool")
+        self.assertNotIn(str(home), observation.log_text)
+
     def test_production_and_testing_match_parser_usage_errors_without_bundles(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

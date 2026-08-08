@@ -11,6 +11,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Security
+
+- Compact the launcher path in retained invocation logs so diagnostic bundles
+  do not disclose the local user's home directory or username.
+
 ## [0.4.1] - 2026-08-07
 
 This is a compatible pre-1.0 patch release. It contains adoption polish,
