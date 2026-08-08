@@ -52,6 +52,7 @@ HISTORY_SCOPE_INTERNAL = "internal"
 
 
 def utc_now() -> datetime:
+    """Return the current time as a timezone-aware UTC datetime."""
     return datetime.now(timezone.utc)
 
 
@@ -62,6 +63,7 @@ def build_finished_record(
     started_at: datetime,
     exit_code: int,
 ) -> dict[str, Any]:
+    """Build a redacted finished-invocation record from an active context."""
     ended_at = utc_now()
     safe_argv = redact_history_argv(argv, sensitive_options)
     record: dict[str, Any] = {
@@ -248,20 +250,24 @@ def write_all(fd: int, data: bytes) -> None:
 
 
 def format_timestamp(value: datetime) -> str:
+    """Format a datetime as a second-precision UTC ISO-8601 timestamp."""
     normalized = value.astimezone(timezone.utc)
     return normalized.isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def duration_ms(started_at: datetime, ended_at: datetime) -> int:
+    """Return the non-negative elapsed duration between two datetimes in milliseconds."""
     return max(0, round((ended_at - started_at).total_seconds() * 1000))
 
 
 def display_command(cli_name: str, argv: list[str]) -> str:
+    """Return the stable, human-readable command label used in history."""
     del argv
     return cli_name.replace("_", "-")
 
 
 def parse_positive_int(option: str, value: str) -> int:
+    """Parse a decimal option value and require it to be greater than zero."""
     if not value.isdecimal():
         raise ValueError(f"Option '{option}' must be a positive integer.")
     amount = int(value)
@@ -271,6 +277,7 @@ def parse_positive_int(option: str, value: str) -> int:
 
 
 def parse_finished_history_record_line(line: str) -> dict[str, Any] | None:
+    """Decode a line when it is a valid finished record for this schema version."""
     try:
         payload = json.loads(line)
     except json.JSONDecodeError:
@@ -283,10 +290,12 @@ def parse_finished_history_record_line(line: str) -> dict[str, Any] | None:
 
 
 def optional_string(value: Any) -> str | None:
+    """Return a non-empty string value, or ``None`` for other values."""
     return value if isinstance(value, str) and value else None
 
 
 def optional_int(value: Any) -> int | None:
+    """Return an integer value, or ``None`` when the value has another type."""
     return value if isinstance(value, int) else None
 
 
@@ -304,10 +313,12 @@ def current_shell() -> str | None:
 
 
 def redact_history_argv(argv: list[str], sensitive_options: set[str]) -> list[str]:
+    """Redact sensitive arguments and compact home paths for history storage."""
     return [redact_history_text(arg) for arg in redact_argv(argv, sensitive_options)]
 
 
 def redact_history_text(value: str) -> str:
+    """Redact sensitive option values and compact home paths in text."""
     key, separator, _value = value.partition("=")
     if separator and is_secret_key(option_name_to_parameter(key)):
         return f"{key}={REDACTED}"
@@ -315,16 +326,19 @@ def redact_history_text(value: str) -> str:
 
 
 def compact_optional_path(path: Path | None, *, home: Path | str | None = None) -> str | None:
+    """Return a compact path string, preserving ``None`` for absent paths."""
     if path is None:
         return None
     return compact_path(path, home=home)
 
 
 def compact_path(path: Path, *, home: Path | str | None = None) -> str:
+    """Resolve a path and replace the user's home directory with ``~``."""
     return compact_home_text(str(path.expanduser().resolve(strict=False)), home=home)
 
 
 def compact_home_text(value: str, *, home: Path | str | None = None) -> str:
+    """Replace a home-directory prefix in text with the portable ``~`` marker."""
     home_text = str(home) if home is not None else str(Path.home().expanduser().resolve(strict=False))
     normalized_value = value.replace("\\", "/")
     normalized_home = home_text.replace("\\", "/").rstrip("/")
