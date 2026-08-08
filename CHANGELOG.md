@@ -11,6 +11,13 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+## [0.4.2] - 2026-08-08
+
+This is a compatible pre-1.0 patch release. It contains correctness fixes,
+security hardening, documentation improvements, and adoption polish after
+0.4.1; it does not introduce a new API or JSON-contract compatibility
+boundary.
+
 ### Changed
 
 - Apply the profile-resolved display command to ambient production invocation
