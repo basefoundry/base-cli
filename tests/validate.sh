@@ -23,6 +23,7 @@ required_files=(
   docs/releasing.md
   docs/index.md
   docs/api-stability.md
+  docs/dependency-support.md
   docs/user-config-typing.md
   docs/migrations.md
   docs/security-threat-model.md

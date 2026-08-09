@@ -15,7 +15,8 @@ from typing import NoReturn
 PACKAGE_NAME = "base-cli"
 IMPORT_NAME = "base_cli"
 MINIMUM_PYTHON = ">=3.10"
-REQUIRED_DEPENDENCIES = ("click<9,>=8.1", "PyYAML<7,>=6.0")
+REQUIRED_DEPENDENCIES = ("click<9,>=8.1",)
+YAML_DEPENDENCY_PREFIX = "PyYAML<7,>=6.0"
 DOCUMENTATION_URL = "Documentation, https://basefoundry.github.io/base-cli/"
 ALLOWED_WHEEL_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", "top_level.txt", "entry_points.txt"})
 ALLOWED_SDIST_FILES = frozenset(
@@ -88,6 +89,19 @@ def validate_wheel(path: Path, expected_version: str, package_files: set[str]) -
         for dependency in REQUIRED_DEPENDENCIES:
             if dependency not in dependencies:
                 fail(f"{path.name} is missing runtime dependency {dependency!r}")
+        if metadata.get("Provides-Extra") != "yaml":
+            extras = metadata.get_all("Provides-Extra", [])
+            if "yaml" not in extras:
+                fail(f"{path.name} does not advertise the yaml optional extra")
+        yaml_dependencies = {
+            dependency
+            for dependency in dependencies
+            if dependency.startswith(YAML_DEPENDENCY_PREFIX) and 'extra == "yaml"' in dependency
+        }
+        if not yaml_dependencies:
+            fail(f"{path.name} does not bind PyYAML to the yaml optional extra")
+        if any(dependency == YAML_DEPENDENCY_PREFIX for dependency in dependencies):
+            fail(f"{path.name} makes PyYAML a core dependency instead of an optional extra")
         if DOCUMENTATION_URL not in metadata.get_all("Project-URL", []):
             fail(f"{path.name} is missing the canonical Documentation project URL")
 

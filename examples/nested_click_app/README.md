@@ -22,7 +22,8 @@ silently read global files or environment variables.
 ## Output and errors
 
 `base-nested status --format json` emits stable records suitable for automation;
-`text`, `csv`, `tsv`, and `yaml` are also supported. Click retains its normal
+`text`, `csv`, and `tsv` are available from the core package. Install
+`base-cli[yaml]` to enable `yaml` output. Click retains its normal
 usage errors and exit codes. Plugin import failures are reported per plugin so
 a broken optional extension cannot hide healthy ones.
 

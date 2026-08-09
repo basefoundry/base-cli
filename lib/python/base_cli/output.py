@@ -106,7 +106,10 @@ def render_records(
         return resolved
 
     if resolved == "yaml":
-        yaml = require_yaml("PyYAML is required for YAML output.")
+        try:
+            yaml = require_yaml("PyYAML is required for YAML output.")
+        except RuntimeError as exc:
+            raise OutputFormatError(str(exc)) from exc
         target.write(yaml.safe_dump(record_list, sort_keys=False, allow_unicode=True))
         return resolved
 
@@ -148,7 +151,10 @@ def render_document(
         target.write("\n")
         return resolved
     if resolved == "yaml":
-        yaml = require_yaml("PyYAML is required for YAML output.")
+        try:
+            yaml = require_yaml("PyYAML is required for YAML output.")
+        except RuntimeError as exc:
+            raise OutputFormatError(str(exc)) from exc
         target.write(yaml.safe_dump(dict(document), sort_keys=False, allow_unicode=True))
         return resolved
 
