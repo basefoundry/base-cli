@@ -30,6 +30,8 @@ and versions are tracked in the repo-root `VERSION` file.
   production-lifecycle positioning for Click and Typer adopters.
 - Add deterministic SPDX SBOMs, artifact checksums, and OIDC-backed GitHub
   attestations to protected release workflows.
+- Add a generated public API reference and a strict CI drift check so every
+  stable facade export remains searchable and documented.
 
 ### Changed
 

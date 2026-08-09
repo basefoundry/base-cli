@@ -60,6 +60,8 @@ application.
   production evaluation.
 - Read [API stability](api-stability.md) and the [migration guide](migrations.md)
   before upgrading across a compatibility boundary.
+- Browse the [complete public API reference](api-reference.md) for exported
+  symbols, signatures, and usage shapes.
 - Follow [consumer profiles](consumer-profiles.md) when your application owns
   project discovery or configuration policy.
 - Use the [Typer adapter](typer-adapter.md) to bring an existing Typer command
