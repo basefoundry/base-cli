@@ -34,6 +34,16 @@ include the operating system, distribution or WSL version when relevant,
 Python version, and whether paths live on the native filesystem or a mounted
 filesystem.
 
+## Dependency support
+
+The core runtime dependency contract is Click `>=8.1,<9` and PyYAML
+`>=6.0,<7`. The lower bound is the oldest supported line; the upper bound
+prevents an unreviewed major release from entering a production install. The
+CI [dependency matrix](https://github.com/basefoundry/base-cli/actions/workflows/dependency-matrix.yml)
+exercises the supported Click lines on the oldest and newest supported Python
+versions. Optional integrations have independent extras and version windows;
+see [`api-stability.md`](api-stability.md).
+
 ## WSL2
 
 WSL2 is supported when Python runs inside the Linux distribution. Validate a

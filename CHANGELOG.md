@@ -11,6 +11,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Changed
+
+- Bound the core Click and PyYAML dependency windows, publish the tested
+  compatibility matrix, and document the dependency update policy.
+
 ### Added
 
 - Add a framework choice guide, five-minute evaluation path, and clearer
