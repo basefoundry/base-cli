@@ -15,7 +15,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_ROOT = ROOT / "lib" / "python"
 REFERENCE = ROOT / "docs" / "api-reference.md"
