@@ -29,7 +29,39 @@ redaction, protocol framing, persistence, concurrency, retention, and signal
 cleanup.
 
 The publish job downloads that same reviewed artifact; it does not rebuild
-during publication.
+during publication. The build also emits a deterministic `SHA256SUMS` file and
+an SPDX 2.3 `SBOM.spdx.json` release artifact. On tag and protected dispatch
+runs, GitHub's OIDC-backed `actions/attest` job records both build provenance
+and an SBOM attestation for the exact artifact digests; no PyPI token or other
+long-lived publish secret is used.
+
+## Independent verification
+
+Download the release metadata artifact from the successful Package workflow
+run (the artifact is named `base-cli-release-metadata-<run-id>`), alongside
+the wheel or sdist you downloaded from PyPI:
+
+```bash
+gh run download <run-id> \
+  --repo basefoundry/base-cli \
+  --name base-cli-release-metadata-<run-id> \
+  --dir release-metadata
+sha256sum -c release-metadata/SHA256SUMS
+```
+
+The SPDX document's namespace and comment include the source revision used by
+the workflow. For a tagged release, verify the matching GitHub attestations
+with the GitHub CLI:
+
+```bash
+gh attestation verify base_cli-<version>-py3-none-any.whl \
+  --repo basefoundry/base-cli
+```
+
+The same command can verify the sdist. A clean-room verifier should compare
+the downloaded artifact's digest with `SHA256SUMS`, confirm the SBOM namespace
+contains the expected tag commit, and inspect the attestation's workflow and
+repository identity before installation.
 
 ## Documentation site
 

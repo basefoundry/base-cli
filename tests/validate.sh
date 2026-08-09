@@ -35,6 +35,8 @@ required_files=(
   scripts/validate_docs.py
   scripts/validate_examples.py
   scripts/validate_consumers.py
+  scripts/generate_release_metadata.py
+  scripts/validate_release_metadata.py
   scripts/benchmark_runtime.py
   tests/conftest.py
   compatibility/README.md
