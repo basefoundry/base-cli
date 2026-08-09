@@ -18,6 +18,7 @@ required_files=(
   .github/workflows/package.yml
   .github/workflows/examples.yml
   .github/workflows/compatibility.yml
+  .github/workflows/dependency-matrix.yml
   .github/ISSUE_TEMPLATE/support.md
   docs/releasing.md
   docs/index.md

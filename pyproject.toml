@@ -41,8 +41,8 @@ classifiers = [
   "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-  "click>=8.1",
-  "PyYAML>=6.0",
+  "click>=8.1,<9",
+  "PyYAML>=6.0,<7",
 ]
 
 [project.optional-dependencies]

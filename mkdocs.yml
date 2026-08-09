@@ -37,6 +37,7 @@ nav:
       - Consumer profiles: consumer-profiles.md
   - API and contracts:
       - API stability: api-stability.md
+      - Dependency support: dependency-support.md
       - Migration guide: migrations.md
       - Output contracts: output-contracts.md
       - JSON contracts: json-contracts.md
