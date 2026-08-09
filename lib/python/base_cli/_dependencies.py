@@ -6,10 +6,12 @@ from typing import Any
 
 
 def require_yaml(error_message: str) -> Any:
-    """Import PyYAML or raise the caller's feature-specific error."""
+    """Import PyYAML or explain how to enable the optional YAML feature."""
 
     try:
         import yaml
     except ImportError as exc:
-        raise RuntimeError(error_message) from exc
+        raise RuntimeError(
+            f"{error_message} Install the optional dependency with `python -m pip install 'base-cli[yaml]'`."
+        ) from exc
     return yaml

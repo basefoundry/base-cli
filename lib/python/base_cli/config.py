@@ -232,7 +232,10 @@ def load_yaml_file(path: Path, *, required: bool = False) -> dict[str, Any]:
     elif not path.is_file():
         return {}
 
-    yaml = require_yaml("PyYAML is required to load the explicit CLI configuration file.")
+    try:
+        yaml = require_yaml("PyYAML is required to load the explicit CLI configuration file.")
+    except RuntimeError as exc:
+        raise ConfigurationError(str(exc)) from exc
 
     try:
         contents = path.read_text(encoding="utf-8")

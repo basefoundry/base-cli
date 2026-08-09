@@ -10,11 +10,10 @@ documents the versions covered by CI and the process for widening a window.
 | --- | --- | --- | --- |
 | Python | `>=3.10,<4` (CPython 3.10--3.14) | Every OS test job | Drop an end-of-life line only in a documented compatibility release |
 | Click | `>=8.1,<9` | 8.1 and 8.2 lines on Python 3.10 and 3.14 | Review the next major before widening the upper bound |
-| PyYAML | `>=6.0,<7` | 6.0 line on Python 3.10 and 3.14 | Keep YAML optionality and parser behavior covered by profile tests |
+| YAML extra | `PyYAML>=6.0,<7` | 6.0 line on Python 3.10 and 3.14 | Install `base-cli[yaml]`; keep parser behavior covered by profile tests |
 
-The `base-cli[yaml]` extra is planned as the minimal installation for YAML
-profiles. Until that extra is released, PyYAML remains part of the core
-runtime metadata.
+The `base-cli[yaml]` extra is the minimal installation for YAML profiles.
+Generic consumers can install the core package without PyYAML.
 
 ## Optional integrations
 

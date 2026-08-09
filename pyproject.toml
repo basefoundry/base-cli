@@ -42,14 +42,17 @@ classifiers = [
 ]
 dependencies = [
   "click>=8.1,<9",
-  "PyYAML>=6.0,<7",
 ]
 
 [project.optional-dependencies]
+yaml = [
+  "PyYAML>=6.0,<7",
+]
 dev = [
   "build>=1.2",
   "hypothesis>=6.100,<7",
   "mypy>=1.17,<2",
+  "PyYAML>=6.0,<7",
   "pytest>=8.0",
   "types-PyYAML>=6.0,<7",
 ]

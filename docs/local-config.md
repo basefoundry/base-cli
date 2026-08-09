@@ -15,7 +15,8 @@ The consumer owns the configuration schema, merge semantics, and operational
 choice of whether to back up or synchronize its machine-local files.
 
 Applications that prefer conventional policy can opt into
-`CliProfile.batteries_included("tool")`. It loads optional platform-aware user,
+`CliProfile.batteries_included("tool")` after installing the `base-cli[yaml]`
+extra. It loads optional platform-aware user,
 project, environment, and explicit YAML layers with documented precedence and
 records the winning source for each key in `Context.config_provenance`. Its
 reserved lifecycle keys are validated separately as `Context.framework_config`;

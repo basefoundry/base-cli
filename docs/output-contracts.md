@@ -1,7 +1,8 @@
 # Output contracts
 
 `base_cli.output.render_records()` supports `text`, `csv`, `tsv`, `yaml`, and
-`json` formats. The requested `text` format is presentation-aware: it renders
+`json` formats. Install `base-cli[yaml]` before selecting `yaml`; the other
+formats are available from the core package. The requested `text` format is presentation-aware: it renders
 a table on a TTY and tab-delimited rows when stdout is redirected or piped.
 
 Delimited output is intentionally automation-friendly:

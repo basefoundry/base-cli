@@ -15,6 +15,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Bound the core Click and PyYAML dependency windows, publish the tested
   compatibility matrix, and document the dependency update policy.
+- Move PyYAML behind the optional `base-cli[yaml]` extra and provide an
+  actionable installation hint when YAML configuration or output is selected.
 
 ### Added
 

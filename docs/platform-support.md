@@ -36,7 +36,8 @@ filesystem.
 
 ## Dependency support
 
-The core runtime dependency contract is Click `>=8.1,<9` and PyYAML
+The core runtime dependency contract is Click `>=8.1,<9`. YAML configuration
+and YAML output use the optional `base-cli[yaml]` extra, which supplies PyYAML
 `>=6.0,<7`. The lower bound is the oldest supported line; the upper bound
 prevents an unreviewed major release from entering a production install. The
 CI [dependency matrix](https://github.com/basefoundry/base-cli/actions/workflows/dependency-matrix.yml)

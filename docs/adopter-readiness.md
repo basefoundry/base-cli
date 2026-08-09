@@ -11,7 +11,8 @@ Before the first production pilot, the adopter should be able to check every
 box below:
 
 - [ ] Pin a supported `base-cli` minor release (for example, `~=0.4.0`) and
-  record Click, PyYAML, and any optional integration versions in a lock file.
+  record Click, the optional YAML extra (when used), and any other integration
+  versions in a lock file.
 - [ ] Run the adopter's command suite on CPython 3.10--3.14 on every platform
   the product supports; retain at least one installed-wheel smoke job.
 - [ ] Use only the documented `base_cli` facade and module `__all__` exports;
