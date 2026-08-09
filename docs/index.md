@@ -5,6 +5,11 @@ professional command-line applications. It gives commands a consistent
 lifecycle, context, logging, cleanup, configuration, and test boundary while
 leaving application policy in the consuming project.
 
+In one sentence: **base-cli is the production lifecycle layer for a Click or
+Typer CLI**. It keeps parsing and command policy familiar while making the
+operational contract—context, logs, cleanup, configuration, and automation
+output—repeatable across commands.
+
 ## Quick start
 
 Install the package:
@@ -49,6 +54,8 @@ application.
 
 ## Choose a path
 
+- Use the [framework choice guide](framework-choice.md) to compare base-cli
+  with the underlying parser and decide whether its lifecycle boundary fits.
 - Start with the [adopter readiness guide](adopter-readiness.md) for a
   production evaluation.
 - Read [API stability](api-stability.md) and the [migration guide](migrations.md)
