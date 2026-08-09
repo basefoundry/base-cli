@@ -10,12 +10,15 @@ import shutil
 import sys
 import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any, TextIO
+from dataclasses import dataclass
+from typing import Any, Protocol, TextIO, TypeAlias
 
 from ._dependencies import require_yaml
 from .integrations import try_render_rich_table
 
-PUBLIC_OUTPUT_FORMATS = ("text", "csv", "tsv", "yaml", "json")
+PUBLIC_OUTPUT_FORMATS = ("text", "csv", "tsv", "yaml", "json", "ndjson")
+NDJSON_SCHEMA = "base-cli.record"
+NDJSON_SCHEMA_VERSION = 1
 _ANSI_ESCAPE_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
 _DEFAULT_TERMINAL_WIDTH = 120
 _DEFAULT_MAX_CELL_WIDTH = 80
@@ -23,6 +26,45 @@ _DEFAULT_MAX_CELL_WIDTH = 80
 
 class OutputFormatError(ValueError):
     """Raised when a public output format is not supported."""
+
+
+StructuredRecord: TypeAlias = Mapping[str, Any]
+
+
+class StructuredResultWriter(Protocol):
+    """Typed sink for one structured result at a time."""
+
+    def write(self, record: StructuredRecord) -> None:
+        """Write one record without retaining the stream in memory."""
+
+
+@dataclass
+class NdjsonWriter:
+    """Write versioned structured records as newline-delimited JSON."""
+
+    stream: TextIO
+    schema: str = NDJSON_SCHEMA
+    schema_version: int = NDJSON_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if not self.schema.strip():
+            raise ValueError("schema must be a non-empty string")
+        if self.schema_version < 1:
+            raise ValueError("schema_version must be greater than 0")
+
+    def write(self, record: StructuredRecord) -> None:
+        """Write one record and flush it for pipeline consumers."""
+
+        if not isinstance(record, Mapping):
+            raise TypeError(f"structured records must be mappings, got {type(record).__name__}")
+        payload = {
+            "schema_version": self.schema_version,
+            "schema": self.schema,
+            "record": dict(record),
+        }
+        self.stream.write(json.dumps(payload, separators=(",", ":")))
+        self.stream.write("\n")
+        self.stream.flush()
 
 
 def output_format_choices() -> str:
@@ -80,9 +122,9 @@ def render_records(
 
     The returned format name is also written to *stream* when supplied (or
     stdout when omitted). JSON and YAML retain the mapping shape supplied by
-    the caller; delimited formats stream one row at a time, use the explicit
-    ``columns`` order, sanitize terminal control sequences, and never emit a
-    header or footer. ``minimum_widths`` applies only to terminal table
+    the caller; NDJSON and delimited formats stream one row at a time, use the
+    explicit ``columns`` order where applicable, sanitize terminal control
+    sequences, and never emit a header or footer. ``minimum_widths`` applies only to terminal table
     columns. Terminal cells use Unicode display-cell widths and are bounded by
     ``terminal_width`` and ``max_cell_width`` with deterministic ellipsis
     truncation. ``rich=True`` opts terminal text into the optional Rich
@@ -97,6 +139,12 @@ def render_records(
         writer = csv.writer(target, delimiter=delimiter, lineterminator="\n")
         for record in records:
             writer.writerow([_delimited_value(record.get(key)) for _header, key in columns])
+        return resolved
+
+    if resolved == "ndjson":
+        ndjson_writer = NdjsonWriter(target)
+        for record in records:
+            ndjson_writer.write(record)
         return resolved
 
     record_list = [dict(record) for record in records]

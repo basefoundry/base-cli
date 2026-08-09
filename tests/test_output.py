@@ -4,7 +4,15 @@ import io
 import json
 import unittest
 
-from base_cli.output import OutputFormatError, render_document, render_records, resolve_output_format
+from base_cli.output import (
+    NDJSON_SCHEMA,
+    NDJSON_SCHEMA_VERSION,
+    NdjsonWriter,
+    OutputFormatError,
+    render_document,
+    render_records,
+    resolve_output_format,
+)
 
 
 class _Stream(io.StringIO):
@@ -31,6 +39,16 @@ class _CountingSink(io.StringIO):
     def write(self, value: str) -> int:
         self.rows += value.count("\n")
         return len(value)
+
+
+class _FlushTrackingSink(io.StringIO):
+    def __init__(self) -> None:
+        super().__init__()
+        self.flushes = 0
+
+    def flush(self) -> None:
+        self.flushes += 1
+        super().flush()
 
     def isatty(self) -> bool:
         return False
@@ -219,6 +237,31 @@ class OutputTest(unittest.TestCase):
 
         self.assertEqual(json.loads(stream.getvalue()), list(RECORDS))
 
+    def test_ndjson_streams_versioned_records_and_flushes_each_row(self) -> None:
+        stream = _FlushTrackingSink()
+        render_records(
+            (record for record in RECORDS),
+            requested_format="ndjson",
+            columns=(),
+            stream=stream,
+        )
+
+        lines = [json.loads(line) for line in stream.getvalue().splitlines()]
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(
+            lines[0],
+            {"schema_version": NDJSON_SCHEMA_VERSION, "schema": NDJSON_SCHEMA, "record": dict(RECORDS[0])},
+        )
+        self.assertEqual(stream.flushes, 2)
+
+    def test_ndjson_writer_rejects_invalid_schema_and_records(self) -> None:
+        stream = io.StringIO()
+        with self.assertRaisesRegex(ValueError, "schema_version"):
+            NdjsonWriter(stream, schema_version=0)
+        writer = NdjsonWriter(stream)
+        with self.assertRaisesRegex(TypeError, "mappings"):
+            writer.write([("name", "invalid")])  # type: ignore[arg-type]
+
     def test_yaml_preserves_record_shape(self) -> None:
         import yaml
 
@@ -229,7 +272,7 @@ class OutputTest(unittest.TestCase):
         self.assertEqual(yaml.safe_load(stream.getvalue()), list(RECORDS))
 
     def test_resolve_rejects_unknown_format(self) -> None:
-        with self.assertRaisesRegex(OutputFormatError, "Expected one of: text, csv, tsv, yaml, json"):
+        with self.assertRaisesRegex(OutputFormatError, "Expected one of: text, csv, tsv, yaml, json, ndjson"):
             resolve_output_format("xml")
 
     def test_empty_tty_result_keeps_footer(self) -> None:
