@@ -17,6 +17,7 @@ from typing import Any, Protocol, cast
 COMMAND_ENTRY_POINT_GROUP = "base_cli.commands"
 PROFILE_ENTRY_POINT_GROUP = "base_cli.profiles"
 PLUGIN_ENTRY_POINT_GROUP = "base_cli.plugins"
+EXTENSION_API_VERSION = "1"
 ENTRY_POINT_GROUPS = (
     COMMAND_ENTRY_POINT_GROUP,
     PROFILE_ENTRY_POINT_GROUP,
@@ -25,7 +26,10 @@ ENTRY_POINT_GROUPS = (
 
 __all__ = [
     "COMMAND_ENTRY_POINT_GROUP",
+    "CommandExtension",
     "ENTRY_POINT_GROUPS",
+    "EXTENSION_API_VERSION",
+    "ExtensionCompatibilityError",
     "ExtensionCollisionError",
     "ExtensionDescriptor",
     "ExtensionDiscovery",
@@ -34,6 +38,8 @@ __all__ = [
     "ExtensionLoadResult",
     "ExtensionsDisabledError",
     "PLUGIN_ENTRY_POINT_GROUP",
+    "PluginExtension",
+    "ProfileExtension",
     "PROFILE_ENTRY_POINT_GROUP",
 ]
 
@@ -63,6 +69,19 @@ class ExtensionCollisionError(ExtensionDiscoveryError):
         )
 
 
+class ExtensionCompatibilityError(ExtensionDiscoveryError):
+    """Raised when an extension declares an unsupported SDK version."""
+
+    def __init__(self, descriptor: ExtensionDescriptor, supported: Sequence[str]) -> None:
+        self.descriptor = descriptor
+        self.supported = tuple(supported)
+        expected = ", ".join(self.supported)
+        super().__init__(
+            f"Extension '{descriptor.key}' declares API version {descriptor.api_version!r}; "
+            f"supported versions are: {expected}. Install a compatible extension release."
+        )
+
+
 class ExtensionLoadError(ExtensionDiscoveryError):
     """Wrap an extension import failure without hiding its source metadata."""
 
@@ -86,6 +105,8 @@ class ExtensionDescriptor:
     distribution: str | None
     version: str | None
     extras: tuple[str, ...] = ()
+    api_version: str = EXTENSION_API_VERSION
+    capabilities: tuple[str, ...] = ()
 
     @property
     def key(self) -> str:
@@ -113,6 +134,24 @@ class EntryPointProvider(Protocol):
     def __call__(self) -> Iterable[Any]: ...
 
 
+class CommandExtension(Protocol):
+    """Callable contract for ``base_cli.commands`` entry points."""
+
+    def __call__(self, app: Any) -> None: ...
+
+
+class ProfileExtension(Protocol):
+    """Callable contract for ``base_cli.profiles`` entry points."""
+
+    def __call__(self, name: str) -> Any: ...
+
+
+class PluginExtension(Protocol):
+    """Callable contract for ``base_cli.plugins`` entry points."""
+
+    def __call__(self, app: Any) -> None: ...
+
+
 class ExtensionDiscovery:
     """Discover and lazily load command, profile, and plugin entry points.
 
@@ -130,6 +169,7 @@ class ExtensionDiscovery:
         allowlist: Iterable[str] | None = None,
         entry_points: Iterable[Any] | EntryPointProvider | None = None,
         paths: Iterable[Path] | None = None,
+        supported_api_versions: Iterable[str] = (EXTENSION_API_VERSION,),
     ) -> None:
         if entry_points is not None and paths is not None:
             raise ValueError("pass either entry_points or paths, not both")
@@ -137,6 +177,9 @@ class ExtensionDiscovery:
         self.allowlist = frozenset(allowlist) if allowlist is not None else None
         self._entry_points = entry_points
         self._paths = tuple(Path(path) for path in paths) if paths is not None else None
+        self.supported_api_versions = frozenset(str(version) for version in supported_api_versions)
+        if not self.supported_api_versions:
+            raise ValueError("supported_api_versions must contain at least one version")
         self._raw_cache: tuple[Any, ...] | None = None
         self._metadata_cache: tuple[ExtensionDescriptor, ...] | None = None
         self._descriptor_cache: dict[str, tuple[ExtensionDescriptor, ...]] = {}
@@ -190,6 +233,8 @@ class ExtensionDiscovery:
             if key in self._loaded_cache:
                 return self._loaded_cache[key]
         descriptor = matches[0]
+        if descriptor.api_version not in self.supported_api_versions:
+            raise ExtensionCompatibilityError(descriptor, tuple(sorted(self.supported_api_versions)))
         try:
             value = self._load_descriptor(descriptor)
         except BaseException as exc:  # isolate third-party import failures
@@ -211,6 +256,8 @@ class ExtensionDiscovery:
             except ExtensionLoadError as exc:
                 results.append(ExtensionLoadResult(descriptor, error=exc))
             except ExtensionCollisionError as exc:
+                results.append(ExtensionLoadResult(descriptor, error=ExtensionLoadError(descriptor, exc)))
+            except ExtensionCompatibilityError as exc:
                 results.append(ExtensionLoadResult(descriptor, error=ExtensionLoadError(descriptor, exc)))
         return tuple(results)
 
@@ -301,6 +348,21 @@ def _descriptor_from_entry_point(entry_point: Any) -> ExtensionDescriptor:
             if distribution_metadata is not None:
                 distribution_name = distribution_metadata.get("Name")
     extras = getattr(entry_point, "extras", ()) or ()
+    api_versions = tuple(
+        extra.removeprefix("base-cli-api-v")
+        for extra in extras
+        if isinstance(extra, str) and extra.startswith("base-cli-api-v")
+    )
+    if len(api_versions) > 1:
+        raise ValueError("an extension entry point may declare only one base-cli-api-vN extra")
+    api_version = api_versions[0] if api_versions else EXTENSION_API_VERSION
+    capabilities = tuple(
+        sorted(
+            extra.removeprefix("base-cli-cap-")
+            for extra in extras
+            if isinstance(extra, str) and extra.startswith("base-cli-cap-")
+        )
+    )
     return ExtensionDescriptor(
         group=cast(str, entry_point.group),
         name=cast(str, entry_point.name),
@@ -308,6 +370,8 @@ def _descriptor_from_entry_point(entry_point: Any) -> ExtensionDescriptor:
         distribution=distribution_name,
         version=str(version) if version is not None else None,
         extras=tuple(str(extra) for extra in extras),
+        api_version=api_version,
+        capabilities=capabilities,
     )
 
 

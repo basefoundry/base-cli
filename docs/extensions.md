@@ -31,6 +31,30 @@ application. `base-cli` intentionally discovers metadata without imposing a
 single command-tree or profile-construction shape; this keeps Click, Typer,
 and consumer-owned composition boundaries independent.
 
+## Typed SDK and compatibility
+
+The supported callable protocols are exported as `CommandExtension`,
+`ProfileExtension`, and `PluginExtension`. They are intentionally small:
+consumers own the concrete `App`, `CliProfile`, and service composition types,
+while plugin packages type-check against a stable callback boundary.
+
+Declare the SDK version and capabilities in the entry-point extras. The
+`base-cli-api-v1` extra selects the current protocol version; additional
+`base-cli-cap-<name>` extras advertise optional behavior without importing the
+plugin:
+
+```toml
+[project.entry-points."base_cli.plugins"]
+telemetry = "acme_cli.telemetry:install [base-cli-api-v1, base-cli-cap-tracing]"
+```
+
+`ExtensionDescriptor.api_version` and `.capabilities` expose this metadata.
+`ExtensionDiscovery` rejects an unsupported API version before loading the
+entry point and reports the supported versions in the error. This is a
+negotiation boundary, not an installation-order heuristic; the consumer can
+select another plugin release or widen its `supported_api_versions` policy
+after running its compatibility suite.
+
 ## Determinism and safety
 
 Descriptors are ordered by group, entry-point name, distribution, version, and

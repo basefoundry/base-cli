@@ -21,6 +21,8 @@ and versions are tracked in the repo-root `VERSION` file.
   deterministic async callbacks without changing the synchronous core.
 - Add versioned NDJSON output and typed writer protocols for bounded,
   flush-per-record machine output.
+- Formalize typed extension callback protocols, entry-point capability metadata,
+  and pre-load API-version negotiation.
 
 ### Added
 
