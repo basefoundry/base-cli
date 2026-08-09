@@ -89,6 +89,8 @@ The supported public facade, compatibility promises, deprecation warning
 mechanism, and migration requirements are documented in
 [`docs/api-stability.md`](https://basefoundry.github.io/base-cli/api-stability/) and
 [`docs/migrations.md`](https://basefoundry.github.io/base-cli/migrations/).
+The complete generated facade is listed in the
+[`public API reference`](https://basefoundry.github.io/base-cli/api-reference/).
 
 Security reporting, runtime trust boundaries, threat assumptions, and the
 release security checklist are documented in [`SECURITY.md`](SECURITY.md),

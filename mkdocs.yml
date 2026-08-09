@@ -36,6 +36,7 @@ nav:
       - Platform support: platform-support.md
       - Consumer profiles: consumer-profiles.md
   - API and contracts:
+      - Public API reference: api-reference.md
       - API stability: api-stability.md
       - Dependency support: dependency-support.md
       - Migration guide: migrations.md

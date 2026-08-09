@@ -23,6 +23,7 @@ required_files=(
   docs/releasing.md
   docs/index.md
   docs/api-stability.md
+  docs/api-reference.md
   docs/dependency-support.md
   docs/user-config-typing.md
   docs/migrations.md
@@ -33,6 +34,7 @@ required_files=(
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py
   scripts/validate_docs.py
+  scripts/generate_api_reference.py
   scripts/validate_examples.py
   scripts/validate_consumers.py
   scripts/generate_release_metadata.py
