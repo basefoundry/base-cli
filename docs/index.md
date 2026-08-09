@@ -64,6 +64,9 @@ application.
   project discovery or configuration policy.
 - Use the [Typer adapter](typer-adapter.md) to bring an existing Typer command
   tree under the same lifecycle.
+- Use `@app.async_command()` when a command calls async APIs; see the
+  [consumer profile contract](consumer-profiles.md) for loop ownership and
+  cancellation rules.
 - Review the [JSON contracts](json-contracts.md) and [output contracts](output-contracts.md)
   before building automation around command output.
 

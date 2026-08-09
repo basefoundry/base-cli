@@ -9,6 +9,7 @@ from base_cli import command_protocol, json_contracts
 EXPECTED_FACADE_EXPORTS = frozenset(
     {
         "App",
+        "asyncio_adapter",
         "__version__",
         "AttachmentAdapter",
         "AttachmentContextFactory",
@@ -110,6 +111,7 @@ EXPECTED_FACADE_EXPORTS = frozenset(
         "redact_json_value",
         "resolve_output_format",
         "run_app",
+        "run_async",
         "success_envelope",
         "RuntimeBinding",
         "ServicesT",

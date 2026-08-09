@@ -28,6 +28,7 @@ def _resolve_version() -> str:
 __version__ = _resolve_version()
 
 from . import (
+    asyncio_adapter,
     command_filters,
     command_protocol,
     deprecations,
@@ -48,6 +49,7 @@ from .app import (
     option,
     run_app,
 )
+from .asyncio_adapter import run_async
 from .attachment import (
     AttachmentAdapter,
     AttachmentContextFactory,
@@ -149,6 +151,7 @@ from .typer import TyperAdapter, attach_typer, get_typer_command
 
 __all__ = [
     "App",
+    "asyncio_adapter",
     "__version__",
     "AttachmentAdapter",
     "AttachmentContextFactory",
@@ -213,6 +216,7 @@ __all__ = [
     "render_inspection_json",
     "testing",
     "argument",
+    "run_async",
     "attach",
     "attach_typer",
     "command",

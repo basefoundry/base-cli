@@ -9,7 +9,7 @@ import stat
 import sys
 import time
 import traceback
-from collections.abc import Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from contextlib import redirect_stdout
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
@@ -34,6 +34,7 @@ from ._runtime import (
     prune_log_files,
     prune_run_bundles,
 )
+from .asyncio_adapter import run_async
 from .attachment import AttachmentContract
 from .config import ConfigSnapshot
 from .context import Context, recover_current_context, reset_current_context, set_current_context
@@ -616,6 +617,32 @@ class App:
                 self._command_args = tuple(command_args)
                 self._command_kwargs = dict(command_kwargs)
             return func
+
+        return decorator
+
+    def async_command(
+        self,
+        *command_args: Any,
+        **command_kwargs: Any,
+    ) -> Callable[[Callable[_P, Awaitable[_R]]], Callable[_P, _R]]:
+        """Register an async callback through the explicit asyncio adapter.
+
+        The callback remains an ordinary Click command from the lifecycle's
+        perspective: ``run_async`` owns one event loop for the invocation,
+        waits for the callback, and returns its normal synchronous result for
+        exit-code normalization. Native ``@app.command`` callbacks remain
+        synchronous and continue to reject unadapted coroutines.
+        """
+
+        def decorator(func: Callable[_P, Awaitable[_R]]) -> Callable[_P, _R]:
+            if not inspect.iscoroutinefunction(func):
+                raise TypeError("@app.async_command() requires an async def callback.")
+
+            @functools.wraps(func)
+            def synchronous_callback(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+                return run_async(func(*args, **kwargs))
+
+            return self.command(*command_args, **command_kwargs)(synchronous_callback)
 
         return decorator
 

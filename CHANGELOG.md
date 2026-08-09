@@ -17,6 +17,8 @@ and versions are tracked in the repo-root `VERSION` file.
   compatibility matrix, and document the dependency update policy.
 - Move PyYAML behind the optional `base-cli[yaml]` extra and provide an
   actionable installation hint when YAML configuration or output is selected.
+- Add an explicit `App.async_command()` adapter and `run_async()` helper for
+  deterministic async callbacks without changing the synchronous core.
 
 ### Added
 
