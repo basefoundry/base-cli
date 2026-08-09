@@ -32,6 +32,10 @@ and versions are tracked in the repo-root `VERSION` file.
   attestations to protected release workflows.
 - Add a generated public API reference and a strict CI drift check so every
   stable facade export remains searchable and documented.
+- Add a permissioned-adopter evidence policy and dated compatibility-run
+  artifacts without presenting maintained fixtures as customer adoption.
+- Add a permissioned-adopter evidence policy and dated compatibility-run
+  artifacts without presenting maintained fixtures as customer adoption.
 
 ### Changed
 

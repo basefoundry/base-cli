@@ -66,3 +66,12 @@ jobs:
           for tests in compatibility/consumers/*/tests; do
             python -m pytest "$tests"
           done
+      - name: Record dated compatibility evidence
+        run: python scripts/record_compatibility_evidence.py > compatibility-evidence.json
+      - name: Upload compatibility evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: base-cli-compatibility-evidence-${{ github.run_id }}
+          path: compatibility-evidence.json
+          if-no-files-found: error
+          retention-days: 90

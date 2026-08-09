@@ -73,18 +73,18 @@ release-blocking finding back to the compatibility register.
 
 ## Evidence and downstream compatibility
 
-The repository does not claim a customer identity without permission. Until an
-external team authorizes a public case study, three independent consumer
-fixtures provide the reviewable evidence:
+The repository does not claim a customer identity without permission. Three
+maintained reference fixtures provide compatibility evidence, but they are not
+independent adopters or customer outcomes:
 
 - **Atlas** — a Click inventory command migrated without rebuilding its tree;
 - **Beacon** — a typed Typer deployment command using the optional adapter; and
 - **Cinder** — a scheduled reconciliation command with dry-run and JSON output.
 
 Each fixture has its own package metadata and tests, is installed against the
-published framework wheel in CI, and records a stable invocation outcome. A
-permissioned adopter can replace a fixture with a public case study without
-changing the compatibility test contract.
+published framework wheel in CI, and records a stable invocation outcome. The
+[adoption and compatibility evidence](adoption-evidence.md) guide defines the
+permissioned adopter program and the public-claim boundary.
 
 ## Adoption friction and release gate
 

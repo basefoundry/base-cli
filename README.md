@@ -24,6 +24,9 @@ python -m pip install base-cli
 Read the complete documentation at
 <https://basefoundry.github.io/base-cli/>.
 
+Compatibility results and the permissioned-adopter policy are documented in
+the [adoption and compatibility evidence guide](https://basefoundry.github.io/base-cli/adoption-evidence/).
+
 ## Quick start
 
 Create a small command with a consistent context, logging, and cleanup

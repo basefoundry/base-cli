@@ -30,6 +30,7 @@ required_files=(
   docs/security-threat-model.md
   docs/security-review.md
   docs/adopter-readiness.md
+  docs/adoption-evidence.md
   MANIFEST.in
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py
@@ -39,6 +40,7 @@ required_files=(
   scripts/validate_consumers.py
   scripts/generate_release_metadata.py
   scripts/validate_release_metadata.py
+  scripts/record_compatibility_evidence.py
   scripts/benchmark_runtime.py
   tests/conftest.py
   compatibility/README.md
