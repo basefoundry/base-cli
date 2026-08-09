@@ -18,12 +18,13 @@ def _entry_point(
     group: str = base_cli.COMMAND_ENTRY_POINT_GROUP,
     distribution: str = "sample-package",
     version: str = "1.0",
+    extras: tuple[str, ...] = (),
 ) -> SimpleNamespace:
     return SimpleNamespace(
         name=name,
         value=value,
         group=group,
-        extras=(),
+        extras=extras,
         dist=SimpleNamespace(name=distribution, version=version),
     )
 
@@ -43,6 +44,8 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         descriptors = discovery.list_commands()
         self.assertEqual(descriptors[0].key, "base_cli.commands:audit")
         self.assertEqual(descriptors[0].distribution, "sample-package")
+        self.assertEqual(descriptors[0].api_version, base_cli.EXTENSION_API_VERSION)
+        self.assertEqual(descriptors[0].capabilities, ())
         self.assertEqual(calls, [None])
         self.assertEqual(discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "audit"), "command")
         self.assertEqual(discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "audit"), "command")
@@ -86,6 +89,29 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         self.assertTrue(results[1].ok)
         self.assertFalse(results[0].ok)
         self.assertIn("missing optional dependency", str(results[0].error))
+
+    def test_api_version_and_capabilities_are_negotiated_from_entry_point_extras(self) -> None:
+        compatible = _entry_point(
+            "telemetry",
+            "one:install",
+            group=base_cli.PLUGIN_ENTRY_POINT_GROUP,
+            extras=("base-cli-api-v1", "base-cli-cap-tracing", "base-cli-cap-metrics"),
+        )
+        discovery = base_cli.ExtensionDiscovery(entry_points=(compatible,))
+        descriptor = discovery.list_plugins()[0]
+        self.assertEqual(descriptor.api_version, "1")
+        self.assertEqual(descriptor.capabilities, ("metrics", "tracing"))
+
+        incompatible = _entry_point(
+            "future",
+            "two:install",
+            group=base_cli.PLUGIN_ENTRY_POINT_GROUP,
+            extras=("base-cli-api-v2",),
+        )
+        incompatible.load = lambda: self.fail("incompatible extensions must not load")
+        future = base_cli.ExtensionDiscovery(entry_points=(incompatible,))
+        with self.assertRaisesRegex(base_cli.ExtensionCompatibilityError, "API version '2'"):
+            future.load(base_cli.PLUGIN_ENTRY_POINT_GROUP, "future")
 
     def test_real_distribution_metadata_is_discovered_from_a_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
