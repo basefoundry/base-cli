@@ -124,8 +124,13 @@ from .lifecycle_options import (
 )
 from .logging import configure_logger, log_critical, log_debug, log_error, log_info, log_warning
 from .output import (
+    NDJSON_SCHEMA,
+    NDJSON_SCHEMA_VERSION,
     PUBLIC_OUTPUT_FORMATS,
+    NdjsonWriter,
     OutputFormatError,
+    StructuredRecord,
+    StructuredResultWriter,
     is_terminal,
     output_format_choices,
     render_document,
@@ -205,6 +210,9 @@ __all__ = [
     "JSON_OUTPUT_SCHEMA",
     "JsonLogFormatter",
     "MAX_JSON_LOG_MESSAGE_LENGTH",
+    "NDJSON_SCHEMA",
+    "NDJSON_SCHEMA_VERSION",
+    "NdjsonWriter",
     "dumps_envelope",
     "dumps_record",
     "dumps_records",
@@ -237,6 +245,8 @@ __all__ = [
     "normalize_command_filters",
     "OutputFormatError",
     "PUBLIC_OUTPUT_FORMATS",
+    "StructuredRecord",
+    "StructuredResultWriter",
     "ProjectInfo",
     "ProjectDiscovery",
     "RECORD_SCHEMAS",

@@ -45,6 +45,11 @@ ANSI escapes as a second stdout record.
 context, otherwise it is `null`. Unexpected failures intentionally expose only
 the generic message `Unexpected internal error.`; diagnostics stay in logs.
 
+For large or long-running record sets, use the `ndjson` output contract in
+[`output-contracts.md`](output-contracts.md). NDJSON is intentionally a stream
+of versioned records rather than a single success/error envelope; command
+errors and diagnostics still use the normal stderr and exit-code boundary.
+
 The lower-level `success_envelope()`, `error_envelope()`, `dumps_envelope()`,
 and `redact_json_value()` helpers are public for commands that need to publish
 their own structured `details` records. Secret-looking keys (`token`,

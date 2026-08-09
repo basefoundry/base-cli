@@ -19,6 +19,8 @@ and versions are tracked in the repo-root `VERSION` file.
   actionable installation hint when YAML configuration or output is selected.
 - Add an explicit `App.async_command()` adapter and `run_async()` helper for
   deterministic async callbacks without changing the synchronous core.
+- Add versioned NDJSON output and typed writer protocols for bounded,
+  flush-per-record machine output.
 
 ### Added
 
