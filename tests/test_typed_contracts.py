@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import tempfile
 import unittest
@@ -12,6 +13,42 @@ from base_cli.testing import invoke
 
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
 class TypedContractTests(unittest.TestCase):
+    def test_async_command_runs_with_adapter_owned_event_loop(self) -> None:
+        app = base_cli.App(name="async-adapter", log_to_file=False)
+        seen: list[str] = []
+
+        @app.async_command()
+        async def command(_context: base_cli.Context[Any, Any, Any]) -> int:
+            await asyncio.sleep(0)
+            seen.append("called")
+            return 0
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(app, [], home=Path(tmpdir))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(seen, ["called"])
+
+    def test_async_command_requires_async_callback(self) -> None:
+        app = base_cli.App(name="async-adapter-type", log_to_file=False)
+
+        with self.assertRaisesRegex(TypeError, "requires an async def"):
+
+            @app.async_command()
+            def command(_context: base_cli.Context[Any, Any, Any]) -> int:
+                return 0
+
+    def test_run_async_rejects_nested_event_loop_and_closes_coroutine(self) -> None:
+        async def pending() -> None:
+            await asyncio.sleep(0)
+
+        async def outer() -> None:
+            coroutine = pending()
+            with self.assertRaisesRegex(RuntimeError, "owns the event loop"):
+                base_cli.run_async(coroutine)
+
+        asyncio.run(outer())
+
     def test_attachment_contract_is_public_and_preserves_command_identity(self) -> None:
         import click
 

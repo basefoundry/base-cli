@@ -8,6 +8,7 @@ from unittest import mock
 
 import base_cli
 from base_cli import (
+    asyncio_adapter,
     attachment,
     command_filters,
     command_protocol,
@@ -88,6 +89,8 @@ class PublicApiTests(unittest.TestCase):
         self.assertIs(base_cli.json_contracts, json_contracts)
         self.assertIs(base_cli.deprecations, deprecations)
         self.assertIs(base_cli.experimental, experimental)
+        self.assertIs(base_cli.asyncio_adapter, asyncio_adapter)
+        self.assertEqual(set(asyncio_adapter.__all__), {"run_async"})
         self.assertTrue(issubclass(base_cli.ConfigurationError, ValueError))
 
     def test_module_all_surfaces_are_explicit(self) -> None:

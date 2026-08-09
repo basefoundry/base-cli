@@ -238,6 +238,8 @@ generic parameter is reserved for a future compatibility boundary and is not
 part of the 0.4.x API.
 
 The core lifecycle is synchronous by design. Native `async def` callbacks and
-callbacks that return awaitables are rejected with an actionable error. An
-adapter that owns an event loop may run asynchronous work explicitly at its
-boundary and return a normal synchronous callback result to base-cli.
+callbacks that return awaitables are rejected with an actionable error. Use
+`@app.async_command()` (or `base_cli.run_async()` in a consumer adapter) when
+an application needs asynchronous work. The adapter owns one event loop for
+the invocation, preserves normal context/logging/exit-code handling, and
+rejects nested event loops so cancellation and cleanup remain deterministic.
