@@ -28,6 +28,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Add a framework choice guide, five-minute evaluation path, and clearer
   production-lifecycle positioning for Click and Typer adopters.
+- Add deterministic SPDX SBOMs, artifact checksums, and OIDC-backed GitHub
+  attestations to protected release workflows.
 
 ### Changed
 
