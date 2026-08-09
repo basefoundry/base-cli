@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the three independent downstream consumer fixtures."""
+"""Validate the three maintained downstream reference consumer fixtures."""
 
 from __future__ import annotations
 
@@ -65,7 +65,7 @@ def main() -> None:
         seen.add(str(record["slug"]))
     if seen != set(EXPECTED_SLUGS):
         fail(f"manifest slugs must be {EXPECTED_SLUGS!r}")
-    print(f"Validated {len(records)} independent downstream consumer fixtures.")
+    print(f"Validated {len(records)} downstream reference consumer fixtures.")
 
 
 if __name__ == "__main__":

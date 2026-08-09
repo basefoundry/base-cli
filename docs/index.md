@@ -58,6 +58,8 @@ application.
   with the underlying parser and decide whether its lifecycle boundary fits.
 - Start with the [adopter readiness guide](adopter-readiness.md) for a
   production evaluation.
+- See the [adoption and compatibility evidence guide](adoption-evidence.md)
+  for dated CI results and the permissioned-adopter program.
 - Read [API stability](api-stability.md) and the [migration guide](migrations.md)
   before upgrading across a compatibility boundary.
 - Browse the [complete public API reference](api-reference.md) for exported
