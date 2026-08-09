@@ -115,7 +115,12 @@ def render(base_cli: Any) -> str:
         f"The facade currently documents **{len(base_cli.__all__)}** public symbols.",
         "",
     ]
-    for title, kind in (("Classes and protocols", "class"), ("Functions", "function"), ("Modules", "module"), ("Constants and typing helpers", "constant/type")):
+    for title, kind in (
+        ("Classes and protocols", "class"),
+        ("Functions", "function"),
+        ("Modules", "module"),
+        ("Constants and typing helpers", "constant/type"),
+    ):
         lines.extend([f"## {title}", "", *sections[kind]])
     return "\n".join(lines).rstrip() + "\n"
 
