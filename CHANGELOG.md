@@ -11,6 +11,16 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Added
+
+- Add a framework choice guide, five-minute evaluation path, and clearer
+  production-lifecycle positioning for Click and Typer adopters.
+
+### Changed
+
+- Improve PyPI description and search keywords to make the framework's
+  lifecycle, logging, configuration, and CLI integration surface discoverable.
+
 ## [0.4.2] - 2026-08-08
 
 This is a compatible pre-1.0 patch release. It contains correctness fixes,

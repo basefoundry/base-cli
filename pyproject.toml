@@ -7,10 +7,20 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "base-cli"
 dynamic = ["version"]
-description = "A small, consumer-neutral Python CLI framework"
+description = "A production lifecycle framework for Click and Typer Python CLIs"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
+keywords = [
+  "cli",
+  "command-line",
+  "click",
+  "typer",
+  "framework",
+  "lifecycle",
+  "logging",
+  "configuration",
+]
 authors = [
   { name = "Base Foundry" },
 ]

@@ -31,6 +31,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Getting started:
+      - Framework choice: framework-choice.md
       - Adopter readiness: adopter-readiness.md
       - Platform support: platform-support.md
       - Consumer profiles: consumer-profiles.md

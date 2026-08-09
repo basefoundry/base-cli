@@ -9,7 +9,11 @@
 | --- | --- | --- | --- |
 | `0.4.2` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.4.2](https://github.com/basefoundry/base-cli/releases/tag/v0.4.2) |
 
-`base-cli` is the PyPI distribution; import it in Python as `base_cli`.
+`base-cli` is a production lifecycle framework for Python CLIs built with
+Click or Typer. It standardizes context, logging, configuration, cleanup, and
+machine-readable contracts while leaving command and product policy in the
+consumer application. The PyPI distribution is `base-cli`; import it in
+Python as `base_cli`.
 
 Install it with:
 
@@ -56,10 +60,9 @@ documented in [`docs/releasing.md`](https://basefoundry.github.io/base-cli/relea
 The package is distributed under the Apache License 2.0. Base itself remains
 licensed separately under AGPL-3.0-or-later.
 
-`base_cli` is a small Python framework for writing command-line tools with
-a consistent lifecycle. It is designed to be embedded by applications rather
-than to define an application's project model. Base is one consumer of the
-library, not part of its generic contract.
+`base_cli` is designed to be embedded by applications rather than to define
+an application's project model. Base is one consumer of the library, not part
+of its generic contract.
 
 It is intentionally thin. Click still owns argument parsing and command
 execution, while `base_cli` provides reusable lifecycle behavior:
@@ -231,6 +234,10 @@ For complete installable applications, see the [reference application
 catalog](examples/README.md). It covers a minimal command, nested/plugin Click,
 Typer, and automation/observability flows; each example has its own packaging,
 tests, completion, release, and troubleshooting guidance.
+
+Teams comparing frameworks can start with the [framework choice guide](docs/framework-choice.md),
+which explains what base-cli adds to Click or Typer and when a different
+framework is a better fit.
 
 Teams evaluating adoption can follow the [adopter readiness and migration
 guide](https://basefoundry.github.io/base-cli/adopter-readiness/) and run the three independent
