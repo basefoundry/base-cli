@@ -327,11 +327,12 @@ def _capture_effective_output_options(
     state.json_output = json_output
 
 
-def _record_unexpected_traceback(context: Context[Any, Any, Any], outcome: InvocationOutcome) -> None:
-    if outcome.kind != "unexpected_error":
-        return
+def _record_lifecycle_diagnostic(context: Context[Any, Any, Any], outcome: InvocationOutcome) -> None:
     try:
-        context.log.debug("Unexpected command exception", exc_info=True)
+        if outcome.kind == "interrupted":
+            context.log.warning("Interrupted.")
+        elif outcome.kind == "unexpected_error":
+            context.log.debug("Unexpected command exception", exc_info=True)
     except BaseException:  # pylint: disable=broad-exception-caught
         pass
 
@@ -1045,7 +1046,7 @@ class App:
             except BaseException as exc:
                 if context is not None:
                     outcome = outcome_from_exception(click, exc)
-                    _record_unexpected_traceback(context, outcome)
+                    _record_lifecycle_diagnostic(context, outcome)
                 raise
             finally:
                 if context is not None:
@@ -1399,7 +1400,7 @@ class _AttachedLifecycleResource:
         except BaseException as exc:
             if self.context is not None:
                 self.outcome = outcome_from_exception(self.click, exc)
-                _record_unexpected_traceback(self.context, self.outcome)
+                _record_lifecycle_diagnostic(self.context, self.outcome)
                 self._finalize()
             raise
 
@@ -1445,7 +1446,7 @@ class _AttachedLifecycleResource:
             state.attached_completion = False
         if self.context is not None:
             self.outcome = outcome_from_exception(self.click, exc)
-            _record_unexpected_traceback(self.context, self.outcome)
+            _record_lifecycle_diagnostic(self.context, self.outcome)
 
     def __exit__(
         self,
