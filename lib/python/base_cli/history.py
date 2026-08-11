@@ -18,6 +18,7 @@ except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
     _msvcrt = None  # type: ignore[assignment]
 
 from ._private_files import restrict_file, write_private_json
+from .exit_codes import ExitCode
 from .redaction import REDACTED, is_secret_key, option_name_to_parameter, redact_argv, redact_text_value
 
 if TYPE_CHECKING:
@@ -40,6 +41,7 @@ __all__ = [
     "parse_positive_int",
     "redact_history_argv",
     "redact_history_text",
+    "status_for_exit_code",
     "utc_now",
     "write_history_record",
     "write_primary_record",
@@ -54,6 +56,15 @@ HISTORY_SCOPE_INTERNAL = "internal"
 def utc_now() -> datetime:
     """Return the current time as a timezone-aware UTC datetime."""
     return datetime.now(timezone.utc)
+
+
+def status_for_exit_code(exit_code: int) -> str:
+    """Map a process result to its terminal lifecycle status."""
+    if exit_code == ExitCode.SUCCESS:
+        return "ok"
+    if exit_code == ExitCode.INTERRUPTED:
+        return "aborted"
+    return "error"
 
 
 def build_finished_record(
@@ -77,7 +88,7 @@ def build_finished_record(
         "ended_at": format_timestamp(ended_at),
         "duration_ms": duration_ms(started_at, ended_at),
         "exit_code": exit_code,
-        "status": "ok" if exit_code == 0 else "error",
+        "status": status_for_exit_code(exit_code),
         "owner": context.runtime_owner,
         "bundle_path": compact_path(context.run_root or context.state_dir),
         "os": normalized_os(),
@@ -127,7 +138,7 @@ def write_primary_record(
         "ended_at": format_timestamp(ended_at),
         "duration_ms": duration_ms(started_at, ended_at),
         "exit_code": exit_code,
-        "status": "ok" if exit_code == 0 else "error",
+        "status": status_for_exit_code(exit_code),
         "os": normalized_os(),
         "scope": scope,
     }

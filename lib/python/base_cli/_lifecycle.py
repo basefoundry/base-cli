@@ -9,7 +9,7 @@ from ._private_files import write_private_json
 from ._runtime import refresh_run_bundle_index
 from .context import Context
 from .exit_codes import ExitCode
-from .history import compact_optional_path, format_timestamp
+from .history import compact_optional_path, format_timestamp, status_for_exit_code
 
 
 @dataclass(frozen=True)
@@ -116,17 +116,17 @@ def outcome_from_exit_code(exit_code: int) -> InvocationOutcome:
         return InvocationOutcome("success", "ok", exit_code)
     if exit_code == ExitCode.USAGE_ERROR:
         return InvocationOutcome("usage_error", "error", exit_code)
-    return InvocationOutcome("nonzero_return", "error", exit_code)
+    return InvocationOutcome("nonzero_return", status_for_exit_code(exit_code), exit_code)
 
 
 def outcome_from_exception(click: Any, exc: BaseException) -> InvocationOutcome:
     if isinstance(exc, KeyboardInterrupt):
-        return InvocationOutcome("interrupted", "error", ExitCode.INTERRUPTED)
+        return InvocationOutcome("interrupted", "aborted", ExitCode.INTERRUPTED)
     if isinstance(exc, EOFError):
         return InvocationOutcome("aborted", "error", ExitCode.FAILURE)
     if isinstance(exc, click.Abort):
         if isinstance(exc.__cause__, KeyboardInterrupt):
-            return InvocationOutcome("interrupted", "error", ExitCode.INTERRUPTED)
+            return InvocationOutcome("interrupted", "aborted", ExitCode.INTERRUPTED)
         return InvocationOutcome("aborted", "error", ExitCode.FAILURE)
     if isinstance(exc, click.exceptions.Exit):
         exit_code = _click_exception_exit_code(exc)
@@ -137,15 +137,15 @@ def outcome_from_exception(click: Any, exc: BaseException) -> InvocationOutcome:
         exit_code = _click_exception_exit_code(exc)
         if exit_code is None:
             return InvocationOutcome("unexpected_error", "error", ExitCode.FAILURE)
-        return InvocationOutcome("usage_error", _status_for_exit_code(exit_code), exit_code)
+        return InvocationOutcome("usage_error", status_for_exit_code(exit_code), exit_code)
     if isinstance(exc, click.ClickException):
         exit_code = _click_exception_exit_code(exc)
         if exit_code is None:
             return InvocationOutcome("unexpected_error", "error", ExitCode.FAILURE)
-        return InvocationOutcome("click_error", _status_for_exit_code(exit_code), exit_code)
+        return InvocationOutcome("click_error", status_for_exit_code(exit_code), exit_code)
     if isinstance(exc, SystemExit):
         exit_code = system_exit_code(exc)
-        return InvocationOutcome("system_exit", _status_for_exit_code(exit_code), exit_code)
+        return InvocationOutcome("system_exit", status_for_exit_code(exit_code), exit_code)
     return InvocationOutcome("unexpected_error", "error", ExitCode.FAILURE)
 
 
@@ -155,10 +155,6 @@ def system_exit_code(exc: SystemExit) -> int:
     if isinstance(exc.code, int):
         return int(exc.code)
     return ExitCode.FAILURE
-
-
-def _status_for_exit_code(exit_code: int) -> str:
-    return "ok" if exit_code == ExitCode.SUCCESS else "error"
 
 
 def _click_exception_exit_code(exc: Any) -> int | None:
