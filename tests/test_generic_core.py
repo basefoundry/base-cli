@@ -93,6 +93,33 @@ class GenericCoreTests(unittest.TestCase):
 
         self.assertNotIn("log_path", record)
 
+    def test_finished_record_classifies_interrupt_exit_as_aborted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            context = Context(
+                cli_name="demo_tool",
+                run_id="run-1",
+                state_dir=root / "state",
+                log_dir=root / "logs",
+                cache_dir=root / "cache",
+                temp_dir=root / "tmp",
+                log_file=root / "logs" / "run.log",
+                config={},
+                environment="dev",
+                debug=False,
+                keep_temp=False,
+                log=logging.getLogger("generic-core-aborted-test"),
+            )
+            record = history.build_finished_record(
+                context,
+                ["demo_tool"],
+                set(),
+                history.utc_now() - timedelta(seconds=1),
+                base_cli.ExitCode.INTERRUPTED,
+            )
+
+        self.assertEqual(record["status"], "aborted")
+
     def test_base_specific_path_helpers_are_not_in_generic_module(self) -> None:
         import base_cli.paths as paths
 

@@ -84,7 +84,7 @@ class AppRunMetadataTests(unittest.TestCase):
             ("zero", 0, 0, "ok", "success"),
             ("usage", 2, 2, "error", "usage_error"),
             ("nonzero", 7, 7, "error", "nonzero_return"),
-            ("returned-interrupted", 130, 130, "error", "nonzero_return"),
+            ("returned-interrupted", 130, 130, "aborted", "nonzero_return"),
         )
         for name, returned, expected_code, expected_status, expected_outcome in cases:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
@@ -203,10 +203,10 @@ class AppRunMetadataTests(unittest.TestCase):
         import click
 
         cases = (
-            ("abort", click.Abort(), 1, "aborted", "Aborted!"),
-            ("interrupt", KeyboardInterrupt(), 130, "interrupted", "Interrupted."),
+            ("abort", click.Abort(), 1, "error", "aborted", "Aborted!"),
+            ("interrupt", KeyboardInterrupt(), 130, "aborted", "interrupted", "Interrupted."),
         )
-        for name, raised, expected_code, expected_outcome, expected_message in cases:
+        for name, raised, expected_code, expected_status, expected_outcome, expected_message in cases:
             with self.subTest(name=name), tempfile.TemporaryDirectory() as tmpdir:
                 app = base_cli.App(name=f"metadata-{name}")
 
@@ -231,7 +231,7 @@ class AppRunMetadataTests(unittest.TestCase):
                 _assert_terminal_metadata(
                     self,
                     metadata,
-                    status="error",
+                    status=expected_status,
                     outcome=expected_outcome,
                     exit_code=expected_code,
                 )
@@ -241,7 +241,7 @@ class AppRunMetadataTests(unittest.TestCase):
 
         cases = (
             ("click", click.exceptions.Exit(9), 9, "error", "nonzero_return", ""),
-            ("click-interrupted-code", click.exceptions.Exit(130), 130, "error", "nonzero_return", ""),
+            ("click-interrupted-code", click.exceptions.Exit(130), 130, "aborted", "nonzero_return", ""),
             ("system-none", SystemExit(None), 0, "ok", "system_exit", ""),
             ("system-success", SystemExit(0), 0, "ok", "system_exit", ""),
             ("system-failure", SystemExit(5), 5, "error", "system_exit", ""),
@@ -768,7 +768,7 @@ class AppRunMetadataTests(unittest.TestCase):
         self.assertEqual(status, 130)
         self.assertEqual(called, [])
         self.assertIn("Interrupted.", stderr)
-        _assert_terminal_metadata(self, metadata, status="error", outcome="interrupted", exit_code=130)
+        _assert_terminal_metadata(self, metadata, status="aborted", outcome="interrupted", exit_code=130)
         with self.assertRaisesRegex(RuntimeError, "context is not active"):
             base_cli.get_current_context()
 

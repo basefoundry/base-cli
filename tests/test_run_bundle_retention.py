@@ -93,6 +93,22 @@ class RunBundleRetentionTests(unittest.TestCase):
 
             self.assertFalse(stale.exists())
 
+    def test_aborted_bundle_is_indexed_as_terminal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            _bundle(root, "aborted", status="aborted")
+
+            prune_run_bundles(
+                root,
+                policy=RetentionPolicy(max_bundles=1),
+                logger=logging.getLogger(__name__),
+            )
+
+            payload = json.loads((root / ".base-cli-run-index.json").read_text(encoding="utf-8"))
+
+        self.assertEqual([bundle["status"] for bundle in payload["bundles"]], ["aborted"])
+
     def test_symlink_bundle_is_not_followed_or_removed(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir) / "runs"

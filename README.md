@@ -714,6 +714,10 @@ command execution as `130` without a traceback. After the command outcome has
 settled, history, metadata, and cleanup are best-effort teardown: even a second
 interrupt there cannot replace the primary result.
 
+Terminal lifecycle status is `ok` for exit code `0`, `aborted` for the
+interrupt exit code `130`, and `error` for other nonzero exit codes. The
+technical outcome remains precise: Ctrl+C is recorded as `interrupted`.
+
 An unexpected exception returns `1` with a stable, detail-free message. The run
 ID and diagnostic-log path are included when context and file logging are
 available. The traceback is kept in the persistent log when enabled and is

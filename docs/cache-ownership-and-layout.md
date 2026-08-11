@@ -29,8 +29,9 @@ The core lifecycle, rather than an optional history adapter, owns `run.json`.
 Once command context construction succeeds, the file is written with
 `status: "running"`. When persistence succeeds, the core writes a terminal
 snapshot containing `status`, `outcome`, `exit_code`, `ended_at`, and
-`duration_ms`. Terminal status is `ok` only for exit code zero; all other exit
-codes use `error`. The outcome discriminator is one of `success`,
+`duration_ms`. Terminal status is `ok` for exit code zero, `aborted` for the
+interrupt exit code 130, and `error` for other nonzero exit codes. The outcome
+discriminator is one of `success`,
 `usage_error`, `nonzero_return`, `click_error`, `aborted`, `interrupted`,
 `system_exit`, or `unexpected_error`.
 

@@ -385,7 +385,7 @@ def _discover_run_bundles(
         stale_running = running and max_age_seconds is not None and age >= max_age_seconds
         if running and not stale_running:
             continue
-        if status not in {"running", "ok", "error"}:
+        if status not in {"running", "ok", "aborted", "error"}:
             continue
         resolved = _safe_resolved_path(child)
         try:

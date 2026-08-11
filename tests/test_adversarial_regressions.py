@@ -287,7 +287,7 @@ class SignalRegressionTests(unittest.TestCase):
         self.assertIn("Interrupted.", log_text)
         self.assertEqual(len(metadata_paths), 1)
         self.assertEqual(payload["outcome"], "interrupted")
-        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["status"], "aborted")
         self.assertEqual(temp_contents, ())
         self.assertEqual(logger_handlers, [])
         with self.assertRaisesRegex(RuntimeError, "context is not active"):
@@ -385,7 +385,7 @@ class SignalRegressionTests(unittest.TestCase):
         self.assertIn("Interrupted.", log_text)
         self.assertEqual(len(metadata_paths), 1)
         self.assertEqual(payload["outcome"], "interrupted")
-        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["status"], "aborted")
         self.assertEqual(temp_contents, ())
 
 
