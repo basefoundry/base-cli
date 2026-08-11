@@ -277,12 +277,14 @@ class SignalRegressionTests(unittest.TestCase):
             result = invoke(app, [], home=home)
             metadata_paths = tuple((home / ".cache").rglob("run.json"))
             payload = json.loads(metadata_paths[0].read_text(encoding="utf-8"))
+            log_text = (metadata_paths[0].parent / "logs" / "primary.log").read_text(encoding="utf-8")
             temp_dir = Path(seen["temp_dir"])
             temp_contents = tuple(temp_dir.iterdir()) if temp_dir.is_dir() else ()
             logger_handlers = list(seen["logger"].handlers)  # type: ignore[union-attr]
 
         self.assertEqual(result.exit_code, base_cli.ExitCode.INTERRUPTED)
         self.assertIn("Interrupted.", result.stderr)
+        self.assertIn("Interrupted.", log_text)
         self.assertEqual(len(metadata_paths), 1)
         self.assertEqual(payload["outcome"], "interrupted")
         self.assertEqual(payload["status"], "error")
@@ -374,11 +376,13 @@ class SignalRegressionTests(unittest.TestCase):
 
             metadata_paths = tuple(cache.rglob("run.json"))
             payload = json.loads(metadata_paths[0].read_text(encoding="utf-8"))
+            log_text = (metadata_paths[0].parent / "logs" / "primary.log").read_text(encoding="utf-8")
             temp_dir = metadata_paths[0].parent / "tmp" / "signal-child" / payload["run_id"]
             temp_contents = tuple(temp_dir.iterdir())
 
         self.assertEqual(process.returncode, base_cli.ExitCode.INTERRUPTED, stderr)
         self.assertIn("Interrupted.", stderr)
+        self.assertIn("Interrupted.", log_text)
         self.assertEqual(len(metadata_paths), 1)
         self.assertEqual(payload["outcome"], "interrupted")
         self.assertEqual(payload["status"], "error")

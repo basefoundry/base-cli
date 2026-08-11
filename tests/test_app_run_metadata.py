@@ -220,11 +220,14 @@ class AppRunMetadataTests(unittest.TestCase):
 
                 home = Path(tmpdir)
                 status, stderr = _run(app, home)
-                _, metadata = _load_only_metadata(self, home)
+                metadata_path, metadata = _load_only_metadata(self, home)
+                log_text = (metadata_path.parent / "logs" / "primary.log").read_text(encoding="utf-8")
 
                 self.assertEqual(status, expected_code)
                 self.assertIn(expected_message, stderr)
                 self.assertNotIn("Traceback", stderr)
+                if expected_outcome == "interrupted":
+                    self.assertIn("Interrupted.", log_text)
                 _assert_terminal_metadata(
                     self,
                     metadata,
