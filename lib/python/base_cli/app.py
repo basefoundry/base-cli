@@ -2901,18 +2901,26 @@ def _json_requested(args: list[str], lifecycle_options: LifecycleOptions) -> boo
     option = lifecycle_options.json
     if option is None:
         return False
-    if option.default is True:
-        return True
+
+    positive_declarations, negative_declarations = _lifecycle_flag_declarations(option)
+    explicit_value: bool | None = None
+    for argument in args:
+        if any(
+            argument == declaration or argument.startswith(f"{declaration}=") for declaration in positive_declarations
+        ):
+            explicit_value = True
+        elif any(
+            argument == declaration or argument.startswith(f"{declaration}=") for declaration in negative_declarations
+        ):
+            explicit_value = False
+    if explicit_value is not None:
+        return explicit_value
+
     if option.envvar is not None:
         envvars = (option.envvar,) if isinstance(option.envvar, str) else option.envvar
         if any(os.environ.get(name, "").lower() in {"1", "true", "yes", "on"} for name in envvars):
             return True
-    declarations = tuple(declaration for declaration in option.param_decls if declaration.startswith(("-", "/")))
-    return any(
-        argument == declaration or argument.startswith(f"{declaration}=")
-        for argument in args
-        for declaration in declarations
-    )
+    return option.default is True
 
 
 def _captured_stdout(output_capture: io.StringIO | None) -> str:

@@ -30,6 +30,11 @@ and versions are tracked in the repo-root `VERSION` file.
   values, and header-style `key: value` arguments before they reach logs or
   persisted history.
 
+### Fixed
+
+- Honor combined positive/negative JSON option declarations and explicit
+  `--no-json` values when deciding whether pre-parse errors use JSON output.
+
 ### Added
 
 - Add a framework choice guide, five-minute evaluation path, and clearer
