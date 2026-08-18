@@ -215,17 +215,18 @@ def append_history_line(path: Path, line: str) -> None:
     binary_flag = getattr(os, "O_BINARY", 0)
     open_flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | binary_flag | getattr(os, "O_NOFOLLOW", 0)
     parent_fd: int | None = None
-    if (
-        os.name != "nt"
-        and hasattr(os, "O_NOFOLLOW")
-        and hasattr(os, "O_DIRECTORY")
-        and os.open in os.supports_dir_fd
-    ):
+    if os.name != "nt" and hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY") and os.open in os.supports_dir_fd:
         opened_parent_fd = _open_parent_directory(path.parent)
         assert opened_parent_fd is not None
         parent_fd = opened_parent_fd
         try:
-            fd = os.open(path.name, open_flags, 0o600, dir_fd=opened_parent_fd)
+            try:
+                fd = os.open(path.name, open_flags, 0o600, dir_fd=opened_parent_fd)
+            except FileNotFoundError:
+                # macOS can report ENOENT for a concurrent first creation via
+                # a directory descriptor.  Retry the same no-follow open by
+                # path; the final-component symlink guard remains in force.
+                fd = os.open(path, open_flags, 0o600)
         except BaseException:
             os.close(opened_parent_fd)
             raise

@@ -24,6 +24,7 @@ class _FakeMsvcrt:
 
 
 class HistoryAppendTests(unittest.TestCase):
+    @unittest.skipUnless(os.name != "nt", "POSIX directory mode bits are unavailable on Windows")
     def test_history_directories_and_file_are_private(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "cache" / "app" / "history" / "runs.jsonl"
