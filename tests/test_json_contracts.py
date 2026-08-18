@@ -215,6 +215,48 @@ class JsonContractTests(unittest.TestCase):
             "hello from combined flags\n",
         )
 
+    def test_json_preparse_errors_honor_combined_positive_declaration(self) -> None:
+        app = base_cli.App(
+            name="json-combined-declaration",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json/--no-json"),
+            ),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["--json", "--unknown"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 2)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["schema"], "base-cli.error")
+        self.assertEqual(result.stderr, "")
+        self.assertIn("No such option", envelope["message"])
+
+    def test_json_preparse_errors_honor_explicit_negative_declaration_over_true_default(self) -> None:
+        app = base_cli.App(
+            name="json-negative-declaration",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json/--no-json", default=True),
+            ),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["--no-json", "--unknown"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("No such option", result.stderr or result.output)
+
     def test_json_mode_captures_default_map_values(self) -> None:
         app = base_cli.App(
             name="json-default-map",
