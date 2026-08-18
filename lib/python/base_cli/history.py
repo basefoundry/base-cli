@@ -17,7 +17,7 @@ try:
 except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
     _msvcrt = None  # type: ignore[assignment]
 
-from ._private_files import restrict_file, write_private_json
+from ._private_files import _open_parent_directory, restrict_directory, restrict_file, write_private_json
 from .exit_codes import ExitCode
 from .redaction import REDACTED, is_secret_key, option_name_to_parameter, redact_argv, redact_text_value
 
@@ -164,9 +164,16 @@ def write_primary_record(
 
 def write_history_record(path: Path, record: dict[str, Any]) -> None:
     """Append one serialized record to a consumer-selected history path."""
+    missing: list[Path] = []
+    candidate = path.parent
+    while not candidate.exists():
+        missing.append(candidate)
+        candidate = candidate.parent
     path.parent.mkdir(parents=True, exist_ok=True)
+    if os.name != "nt":
+        for directory in [path.parent, *missing]:
+            restrict_directory(directory)
     append_history_line(path, f"{json.dumps(record, sort_keys=True)}\n")
-    restrict_file(path)
 
 
 def update_run_metadata(run_root: Path, record: dict[str, Any]) -> None:
@@ -206,10 +213,29 @@ def update_run_metadata(run_root: Path, record: dict[str, Any]) -> None:
 
 def append_history_line(path: Path, line: str) -> None:
     binary_flag = getattr(os, "O_BINARY", 0)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND | binary_flag, 0o600)
+    open_flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | binary_flag | getattr(os, "O_NOFOLLOW", 0)
+    parent_fd: int | None = None
+    if os.name != "nt" and hasattr(os, "O_NOFOLLOW") and hasattr(os, "O_DIRECTORY") and os.open in os.supports_dir_fd:
+        opened_parent_fd = _open_parent_directory(path.parent)
+        assert opened_parent_fd is not None
+        parent_fd = opened_parent_fd
+        try:
+            try:
+                fd = os.open(path.name, open_flags, 0o600, dir_fd=opened_parent_fd)
+            except FileNotFoundError:
+                # macOS can report ENOENT for a concurrent first creation via
+                # a directory descriptor.  Retry the same no-follow open by
+                # path; the final-component symlink guard remains in force.
+                fd = os.open(path, open_flags, 0o600)
+        except BaseException:
+            os.close(opened_parent_fd)
+            raise
+    else:
+        fd = os.open(path, open_flags, 0o600)
     lock_fd = fd
     sidecar_fd: int | None = None
     try:
+        _restrict_open_file(fd, path)
         if _fcntl is None and _msvcrt is not None:
             sidecar_path = path.with_name(f".{path.name}.lock")
             sidecar_fd = os.open(sidecar_path, os.O_RDWR | os.O_CREAT | binary_flag, 0o600)
@@ -222,7 +248,7 @@ def append_history_line(path: Path, line: str) -> None:
                     # for the subsequent blocking msvcrt lock; do not turn
                     # that expected initialization race into a command error.
                     pass
-            restrict_file(sidecar_path)
+            _restrict_open_file(sidecar_fd, sidecar_path)
             lock_fd = sidecar_fd
         lock_history_file(lock_fd)
         try:
@@ -233,6 +259,16 @@ def append_history_line(path: Path, line: str) -> None:
         if sidecar_fd is not None:
             os.close(sidecar_fd)
         os.close(fd)
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def _restrict_open_file(fd: int, path: Path) -> None:
+    fchmod = getattr(os, "fchmod", None)
+    if os.name != "nt" and fchmod is not None:
+        fchmod(fd, 0o600)
+    else:
+        restrict_file(path)
 
 
 def lock_history_file(fd: int) -> None:

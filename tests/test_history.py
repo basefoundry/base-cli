@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import stat
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -22,6 +24,30 @@ class _FakeMsvcrt:
 
 
 class HistoryAppendTests(unittest.TestCase):
+    @unittest.skipUnless(os.name != "nt", "POSIX directory mode bits are unavailable on Windows")
+    def test_history_directories_and_file_are_private(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "cache" / "app" / "history" / "runs.jsonl"
+            history.write_history_record(path, {"run": 1})
+
+            for directory in (path.parent, path.parent.parent, path.parent.parent.parent):
+                self.assertEqual(stat.S_IMODE(directory.stat().st_mode), 0o700)
+            self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+
+    @unittest.skipUnless(os.name != "nt" and hasattr(os, "O_NOFOLLOW"), "requires POSIX no-follow support")
+    def test_append_refuses_symlink_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            victim = root / "victim.jsonl"
+            victim.write_text("original\n", encoding="utf-8")
+            history_path = root / "history.jsonl"
+            history_path.symlink_to(victim)
+
+            with self.assertRaises(OSError):
+                history.append_history_line(history_path, "attacker\n")
+
+            self.assertEqual(victim.read_text(encoding="utf-8"), "original\n")
+
     def test_current_shell_falls_back_to_comspec(self) -> None:
         with mock.patch.dict("os.environ", {"COMSPEC": r"C:\Windows\System32\cmd.exe"}, clear=True):
             self.assertEqual(history.current_shell(), r"C:\Windows\System32\cmd.exe")
