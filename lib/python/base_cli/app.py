@@ -10,8 +10,8 @@ from __future__ import annotations
 import sys as _sys
 
 from . import _app_core as _implementation
-from ._app_core import App, argument, attach, command, delegated_display_command, get_command_app, option
-from ._run import run_app
+from ._app_core import App, argument, attach, command, get_command_app, option
+from ._run import delegated_display_command, run_app
 
 __all__ = [
     "App",
