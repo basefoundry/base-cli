@@ -10,6 +10,19 @@ from __future__ import annotations
 import sys as _sys
 
 from . import _app_core as _implementation
+from ._app_core import App, argument, attach, command, delegated_display_command, get_command_app, option
+from ._run import run_app
+
+__all__ = [
+    "App",
+    "argument",
+    "attach",
+    "command",
+    "delegated_display_command",
+    "get_command_app",
+    "option",
+    "run_app",
+]
 
 # Keep ``import base_cli.app as app_module`` patchable for existing consumers
 # and tests that intentionally inspect the private implementation boundary.
