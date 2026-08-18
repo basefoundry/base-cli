@@ -32,6 +32,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Honor combined positive/negative JSON option declarations and explicit
+  `--no-json` values when deciding whether pre-parse errors use JSON output.
 - Isolate malformed third-party entry-point metadata so one invalid extension
   cannot prevent healthy extensions from being discovered.
 
