@@ -86,6 +86,50 @@ class LegacySetRedactionTests(unittest.TestCase):
         self.assertEqual(redact_argv(argv, set()), expected)
         self.assertEqual(redact_history_argv(argv, set()), expected)
 
+    def test_embedded_secret_segments_are_redacted_without_registration(self) -> None:
+        cases = (
+            (
+                [
+                    "tool",
+                    "fetch",
+                    "--url",
+                    "https://api.example.test/resource?filter=active&token=SUPERSECRET123",
+                ],
+                [
+                    "tool",
+                    "fetch",
+                    "--url",
+                    "https://api.example.test/resource?filter=active&token=[REDACTED]",
+                ],
+            ),
+            (
+                ["tool", "run", "--env", "FOO=bar,SECRET_TOKEN=hunter2"],
+                ["tool", "run", "--env", "FOO=bar,SECRET_TOKEN=[REDACTED]"],
+            ),
+            (
+                ["tool", "call", "-H", "Authorization: Bearer sk-supersecrettoken123"],
+                ["tool", "call", "-H", "Authorization: [REDACTED]"],
+            ),
+            (
+                [
+                    "tool",
+                    "call",
+                    "--header",
+                    "X-Api-Key: hunter2,Accept: application/json",
+                ],
+                [
+                    "tool",
+                    "call",
+                    "--header",
+                    "X-Api-Key: [REDACTED],Accept: application/json",
+                ],
+            ),
+        )
+        for argv, expected in cases:
+            with self.subTest(argv=argv):
+                self.assertEqual(redact_argv(argv, set()), expected)
+                self.assertEqual(redact_history_argv(argv, set()), expected)
+
     def test_option_looking_values_follow_click_consumption(self) -> None:
         self.assertEqual(
             redact_argv(["tool", "--token", "--verbose"], {"token"}),

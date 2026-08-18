@@ -24,6 +24,12 @@ and versions are tracked in the repo-root `VERSION` file.
 - Formalize typed extension callback protocols, entry-point capability metadata,
   and pre-load API-version negotiation.
 
+### Security
+
+- Redact recognized secret keys embedded in query strings, comma-separated
+  values, and header-style `key: value` arguments before they reach logs or
+  persisted history.
+
 ### Added
 
 - Add a framework choice guide, five-minute evaluation path, and clearer

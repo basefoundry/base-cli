@@ -8,6 +8,15 @@ from typing import Any
 REDACTED = "[REDACTED]"
 SECRET_KEY_RE = re.compile(r"(token|password|secret|api[-_]?key|authorization)", re.IGNORECASE)
 URL_CREDENTIALS_RE = re.compile(r"(?P<prefix>[a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]+@")
+_INLINE_SEGMENT_END = r"(?=(?:[&,;]|\s+[A-Za-z][A-Za-z0-9_-]*\s*[=:])|$)"
+_INLINE_KEY_VALUE_RE = re.compile(
+    rf"(?P<key>(?<![A-Za-z0-9_-])[A-Za-z][A-Za-z0-9_-]*)(?P<separator>=)"
+    rf"(?P<value>[^\n]*?){_INLINE_SEGMENT_END}"
+)
+_INLINE_COLON_VALUE_RE = re.compile(
+    rf"(?P<key>(?<![A-Za-z0-9_-])[A-Za-z][A-Za-z0-9_-]*)"
+    rf"(?P<separator>\s*:(?!//)\s*)(?P<value>[^\n]*?){_INLINE_SEGMENT_END}"
+)
 
 
 @dataclass(frozen=True)
@@ -593,10 +602,16 @@ def _legacy_short_aliases(sensitive_options: Iterable[str]) -> tuple[str, ...]:
 
 
 def _redact_inline_text(value: str) -> str:
-    key, separator, _raw_value = value.partition("=")
-    if separator and is_secret_key(option_name_to_parameter(key)):
-        value = f"{key}={REDACTED}"
+    value = _INLINE_KEY_VALUE_RE.sub(_redact_inline_segment, value)
+    value = _INLINE_COLON_VALUE_RE.sub(_redact_inline_segment, value)
     return redact_text_value(value)
+
+
+def _redact_inline_segment(match: re.Match[str]) -> str:
+    key = match.group("key")
+    if not is_secret_key(option_name_to_parameter(key)):
+        return match.group(0)
+    return f"{key}{match.group('separator')}{REDACTED}"
 
 
 def _is_option_alias(value: str) -> bool:
