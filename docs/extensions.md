@@ -55,6 +55,11 @@ negotiation boundary, not an installation-order heuristic; the consumer can
 select another plugin release or widen its `supported_api_versions` policy
 after running its compatibility suite.
 
+An entry point must declare at most one `base-cli-api-vN` extra. Discovery
+skips an entry point with malformed metadata on a per-entry-point basis, so a
+bad third-party package cannot prevent healthy commands, profiles, or plugins
+from being listed and loaded.
+
 ## Determinism and safety
 
 Descriptors are ordered by group, entry-point name, distribution, version, and

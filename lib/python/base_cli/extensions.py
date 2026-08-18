@@ -280,7 +280,12 @@ class ExtensionDiscovery:
             value = getattr(entry_point, "value", None)
             if group not in ENTRY_POINT_GROUPS or not isinstance(name, str) or not isinstance(value, str):
                 continue
-            descriptor = _descriptor_from_entry_point(entry_point)
+            try:
+                descriptor = _descriptor_from_entry_point(entry_point)
+            except ValueError:
+                # Malformed metadata belongs to one third-party distribution;
+                # do not let it hide healthy extensions from discovery.
+                continue
             if self._allowed(descriptor):
                 descriptors.append(descriptor)
         descriptors.sort(key=_descriptor_sort_key)

@@ -76,6 +76,29 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         with self.assertRaises(base_cli.ExtensionsDisabledError):
             disabled.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "allowed")
 
+    def test_malformed_metadata_is_skipped_without_hiding_healthy_extensions(self) -> None:
+        malformed = _entry_point(
+            "broken",
+            "broken:register",
+            extras=("base-cli-api-v1", "base-cli-api-v2"),
+        )
+        healthy_command = _entry_point("healthy", "healthy:register")
+        healthy_profile = _entry_point(
+            "profile",
+            "healthy:profile",
+            group=base_cli.PROFILE_ENTRY_POINT_GROUP,
+        )
+        discovery = base_cli.ExtensionDiscovery(
+            entry_points=(malformed, healthy_command, healthy_profile),
+        )
+
+        self.assertEqual([item.name for item in discovery.list_commands()], ["healthy"])
+        self.assertEqual([item.name for item in discovery.list_profiles()], ["profile"])
+        self.assertEqual(
+            [result.descriptor.name for result in discovery.load_all(base_cli.COMMAND_ENTRY_POINT_GROUP)],
+            ["healthy"],
+        )
+
     def test_load_all_isolates_broken_extensions(self) -> None:
         healthy = _entry_point("healthy", "one:register")
         broken = _entry_point("broken", "two:register")

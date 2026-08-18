@@ -30,6 +30,11 @@ and versions are tracked in the repo-root `VERSION` file.
   values, and header-style `key: value` arguments before they reach logs or
   persisted history.
 
+### Fixed
+
+- Isolate malformed third-party entry-point metadata so one invalid extension
+  cannot prevent healthy extensions from being discovered.
+
 ### Added
 
 - Add a framework choice guide, five-minute evaluation path, and clearer
