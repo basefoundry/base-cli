@@ -13,6 +13,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Decompose the application implementation behind a compatibility facade into
+  focused core, lifecycle-installation, attachment, and invocation-runner
+  modules without changing the public import surface.
 - Bound the core Click and PyYAML dependency windows, publish the tested
   compatibility matrix, and document the dependency update policy.
 - Move PyYAML behind the optional `base-cli[yaml]` extra and provide an
