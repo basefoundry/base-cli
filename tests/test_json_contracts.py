@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 
 import base_cli
+from base_cli._private_files import write_private_json
 from base_cli.json_contracts import MAX_JSON_LOG_MESSAGE_LENGTH
 
 
@@ -17,6 +18,28 @@ class JsonContractTests(unittest.TestCase):
     def _lifecycle_options(self) -> base_cli.LifecycleOptions:
         return base_cli.LifecycleOptions(
             json=base_cli.LifecycleOption("--json"),
+        )
+
+    def _write_aged_bundle(self, home: Path, app_name: str) -> Path:
+        bundle = home / ".cache" / app_name / "runs" / "aged"
+        (bundle / "logs").mkdir(parents=True)
+        (bundle / "logs" / "primary.log").write_text("old\n", encoding="utf-8")
+        write_private_json(
+            bundle / "run.json",
+            {
+                "run_id": "aged",
+                "status": "ok",
+                "started_at": "2020-01-01T00:00:00Z",
+                "preserve": False,
+            },
+        )
+        return bundle
+
+    def _retention_app(self, name: str, **kwargs: object) -> base_cli.App:
+        return base_cli.App(
+            name=name,
+            lifecycle_options=self._lifecycle_options(),
+            **kwargs,
         )
 
     def test_envelopes_have_stable_fields_and_recursive_redaction(self) -> None:
@@ -292,6 +315,51 @@ class JsonContractTests(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "hello\n")
+
+    def test_implicit_json_retention_is_count_only(self) -> None:
+        app = self._retention_app("json-count-only")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            aged = self._write_aged_bundle(home, "json-count-only")
+            result = base_cli.testing.invoke(app, ["--json"], home=home)
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertTrue(aged.exists())
+
+    def test_explicit_json_retention_overrides_count_only_default(self) -> None:
+        app = self._retention_app(
+            "json-explicit-retention",
+            retention=base_cli.RetentionPolicy(max_age_seconds=60),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            aged = self._write_aged_bundle(home, "json-explicit-retention")
+            result = base_cli.testing.invoke(app, ["--json"], home=home)
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertFalse(aged.exists())
+
+    def test_implicit_human_retention_keeps_safe_defaults(self) -> None:
+        app = base_cli.App(name="human-safe-defaults")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            aged = self._write_aged_bundle(home, "human-safe-defaults")
+            result = base_cli.testing.invoke(app, home=home)
+            self.assertEqual(result.exit_code, 0, result.output)
+            self.assertFalse(aged.exists())
 
 
 if __name__ == "__main__":
