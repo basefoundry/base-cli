@@ -35,6 +35,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Apply the documented count-only 20-bundle retention default to implicit JSON
+  mode while preserving explicit retention policies, human-mode safe defaults,
+  and the `max_log_files` compatibility path.
 - Honor combined positive/negative JSON option declarations and explicit
   `--no-json` values when deciding whether pre-parse errors use JSON output.
 - Isolate malformed third-party entry-point metadata so one invalid extension

@@ -7,6 +7,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import base_cli
 from base_cli.json_contracts import MAX_JSON_LOG_MESSAGE_LENGTH
@@ -17,6 +18,13 @@ class JsonContractTests(unittest.TestCase):
     def _lifecycle_options(self) -> base_cli.LifecycleOptions:
         return base_cli.LifecycleOptions(
             json=base_cli.LifecycleOption("--json"),
+        )
+
+    def _retention_app(self, name: str, **kwargs: object) -> base_cli.App:
+        return base_cli.App(
+            name=name,
+            lifecycle_options=self._lifecycle_options(),
+            **kwargs,
         )
 
     def test_envelopes_have_stable_fields_and_recursive_redaction(self) -> None:
@@ -292,6 +300,51 @@ class JsonContractTests(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "hello\n")
+
+    def test_implicit_json_retention_is_count_only(self) -> None:
+        app = self._retention_app("json-count-only")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch("base_cli._app_core.prune_run_bundles") as prune:
+                result = base_cli.testing.invoke(app, ["--json"], home=Path(tmpdir))
+            self.assertEqual(result.exit_code, 0, result.output)
+            prune.assert_called_once()
+            self.assertEqual(prune.call_args.kwargs["policy"], base_cli.RetentionPolicy(max_bundles=20))
+
+    def test_explicit_json_retention_overrides_count_only_default(self) -> None:
+        app = self._retention_app(
+            "json-explicit-retention",
+            retention=base_cli.RetentionPolicy(max_age_seconds=60),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch("base_cli._app_core.prune_run_bundles") as prune:
+                result = base_cli.testing.invoke(app, ["--json"], home=Path(tmpdir))
+            self.assertEqual(result.exit_code, 0, result.output)
+            prune.assert_called_once()
+            self.assertEqual(prune.call_args.kwargs["policy"], base_cli.RetentionPolicy(max_age_seconds=60))
+
+    def test_implicit_human_retention_keeps_safe_defaults(self) -> None:
+        app = base_cli.App(name="human-safe-defaults")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch("base_cli._app_core.prune_run_bundles") as prune:
+                result = base_cli.testing.invoke(app, home=Path(tmpdir))
+            self.assertEqual(result.exit_code, 0, result.output)
+            prune.assert_called_once()
+            self.assertEqual(prune.call_args.kwargs["policy"], base_cli.RetentionPolicy.safe_defaults())
 
 
 if __name__ == "__main__":

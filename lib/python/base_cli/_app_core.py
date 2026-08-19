@@ -479,6 +479,9 @@ class App:
             value is not None for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
         ):
             raise ValueError("pass either retention or individual run retention bounds, not both.")
+        self._retention_explicit = retention is not None or any(
+            value is not None for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)
+        )
         if retention is not None:
             self.retention: RetentionPolicy | None = retention
         elif any(value is not None for value in (max_run_bundles, max_run_age_seconds, max_run_total_bytes)):
@@ -1240,7 +1243,7 @@ class App:
                 raise RuntimeDirectoryError(f"Unable to configure {target}: {exc}") from exc
             context.log.debug("cli=%s run_id=%s environment=%s", self.name, run_id, environment)
             if uses_default_log_file and log_file is not None:
-                if self.retention is not None:
+                if self.retention is not None and (self._retention_explicit or not context.json_output):
                     prune_run_bundles(
                         layout.owner_root / "runs",
                         layout.run_root,
