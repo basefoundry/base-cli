@@ -1071,8 +1071,9 @@ stdout or stderr for expected usage or application failures.
 
 `invoke()` sets `HOME` plus the relevant `USERPROFILE`, `LOCALAPPDATA`, and
 `XDG_CACHE_HOME` values when requested, and supplies `cwd` to the invocation for
-the duration of the test. Calls that use `cwd` are serialized and the caller's
-cwd is restored afterward, but this remains process-global: do not use it
+the duration of the test. All helper calls are serialized because `cwd` is
+process-global: a no-`cwd` call cannot observe another call's temporary
+directory, and the caller's cwd is restored afterward. Do not use it
 concurrently with code that changes cwd outside `invoke()` or from threads
 spawned by the invoked command. A generic profile should receive project
 fixtures through its `discover_project` callback. The helper does not create or

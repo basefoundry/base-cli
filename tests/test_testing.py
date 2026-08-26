@@ -220,3 +220,43 @@ class InvokeTests(unittest.TestCase):
         self.assertEqual(max_active_calls, 1)
         self.assertEqual(set(observed_cwds), {first_cwd.resolve(), second_cwd.resolve()})
         self.assertEqual(Path.cwd(), original_cwd)
+
+    def test_invoke_without_cwd_waits_for_process_cwd_mutation(self) -> None:
+        app = base_cli.App(name="testing-mixed-cwd-serialization", log_to_file=False)
+
+        @app.command()
+        def main() -> None:
+            return None
+
+        cwd_started = threading.Event()
+        release_cwd = threading.Event()
+        no_cwd_started = threading.Event()
+        observed_cwds: list[Path] = []
+
+        def fake_invoke(_runner: object, *_args: object, **_kwargs: object) -> object:
+            observed_cwds.append(Path.cwd())
+            if len(observed_cwds) == 1:
+                cwd_started.set()
+                if not release_cwd.wait(timeout=5):
+                    raise AssertionError("timed out waiting to release cwd invocation")
+            else:
+                no_cwd_started.set()
+            return mock.sentinel.result
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            isolated = Path(tmpdir) / "isolated"
+            isolated.mkdir()
+            original_cwd = Path.cwd()
+
+            with mock.patch("click.testing.CliRunner.invoke", new=fake_invoke):
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    cwd_call = executor.submit(invoke, app, cwd=isolated)
+                    self.assertTrue(cwd_started.wait(timeout=5))
+                    no_cwd_call = executor.submit(invoke, app)
+                    self.assertFalse(no_cwd_started.wait(timeout=0.1))
+                    release_cwd.set()
+                    self.assertIs(cwd_call.result(timeout=5), mock.sentinel.result)
+                    self.assertIs(no_cwd_call.result(timeout=5), mock.sentinel.result)
+
+        self.assertEqual(observed_cwds, [isolated.resolve(), original_cwd])
+        self.assertEqual(Path.cwd(), original_cwd)

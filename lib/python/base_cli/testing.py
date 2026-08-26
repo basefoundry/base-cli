@@ -56,11 +56,11 @@ def invoke(
         invocation_argv,
         reraise_unexpected=reraise_unexpected,
     )
-    if cwd_path is None:
-        with use_working_dir(None):
-            return cast("Result", runner.invoke(command, [], env=invoke_env))
-
     with _INVOKE_CWD_LOCK:
+        if cwd_path is None:
+            with use_working_dir(None):
+                return cast("Result", runner.invoke(command, [], env=invoke_env))
+
         with use_working_dir(cwd_path):
             original_cwd = Path.cwd()
             os.chdir(cwd_path)
