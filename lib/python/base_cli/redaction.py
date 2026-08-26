@@ -8,7 +8,13 @@ from typing import Any
 REDACTED = "[REDACTED]"
 SECRET_KEY_RE = re.compile(r"(token|password|secret|api[-_]?key|authorization)", re.IGNORECASE)
 URL_CREDENTIALS_RE = re.compile(r"(?P<prefix>[a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]+@")
-_INLINE_SEGMENT_END = r"(?=(?:[&,;]|\s+[A-Za-z][A-Za-z0-9_-]*\s*[=:])|$)"
+# Punctuation is part of a value unless it is immediately followed by another
+# assignment segment. This prevents ``PASSWORD=abc,def`` from exposing ``def``
+# while preserving readable output for ``PASSWORD=secret,LABEL=visible``.
+_INLINE_SEGMENT_END = (
+    r"(?=(?:[&,;]\s*(?=[A-Za-z][A-Za-z0-9_-]*\s*[=:])"
+    r"|\s+[A-Za-z][A-Za-z0-9_-]*\s*[=:])|$)"
+)
 _INLINE_KEY_VALUE_RE = re.compile(
     rf"(?P<key>(?<![A-Za-z0-9_-])[A-Za-z][A-Za-z0-9_-]*)(?P<separator>=)"
     rf"(?P<value>[^\n]*?){_INLINE_SEGMENT_END}"

@@ -124,6 +124,22 @@ class LegacySetRedactionTests(unittest.TestCase):
                     "X-Api-Key: [REDACTED],Accept: application/json",
                 ],
             ),
+            (
+                ["tool", "PASSWORD=abc,def"],
+                ["tool", f"PASSWORD={REDACTED}"],
+            ),
+            (
+                ["tool", "PASSWORD=abc;def"],
+                ["tool", f"PASSWORD={REDACTED}"],
+            ),
+            (
+                ["tool", "PASSWORD=abc,def;LABEL=visible"],
+                ["tool", f"PASSWORD={REDACTED};LABEL=visible"],
+            ),
+            (
+                ["tool", "PASSWORD=abc,def&LABEL=visible"],
+                ["tool", f"PASSWORD={REDACTED}&LABEL=visible"],
+            ),
         )
         for argv, expected in cases:
             with self.subTest(argv=argv):

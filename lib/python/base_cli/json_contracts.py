@@ -24,9 +24,13 @@ JSON_OUTPUT_SCHEMA = "base-cli.output"
 JSON_ERROR_SCHEMA = "base-cli.error"
 MAX_JSON_LOG_MESSAGE_LENGTH = 8192
 
+_SENSITIVE_ASSIGNMENT_BOUNDARY = (
+    r"(?=(?:[&,;]\s*(?=[A-Za-z][A-Za-z0-9_-]*\s*[=:])"
+    r"|\s+[A-Za-z][A-Za-z0-9_-]*\s*[=:])|\s|$)"
+)
 _SENSITIVE_ASSIGNMENT = re.compile(
     r"(?i)(\b(?:token|password|secret|api[-_]?key|authorization)\b\s*[:=]\s*)"
-    r"([^\s,;]+)"
+    rf"(\S+?){_SENSITIVE_ASSIGNMENT_BOUNDARY}"
 )
 
 __all__ = [

@@ -19,7 +19,7 @@ except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
 
 from ._private_files import _open_parent_directory, restrict_directory, restrict_file, write_private_json
 from .exit_codes import ExitCode
-from .redaction import REDACTED, is_secret_key, option_name_to_parameter, redact_argv, redact_text_value
+from .redaction import redact_argv
 
 if TYPE_CHECKING:
     from .context import Context
@@ -366,10 +366,7 @@ def redact_history_argv(argv: list[str], sensitive_options: set[str]) -> list[st
 
 def redact_history_text(value: str) -> str:
     """Redact sensitive option values and compact home paths in text."""
-    key, separator, _value = value.partition("=")
-    if separator and is_secret_key(option_name_to_parameter(key)):
-        return f"{key}={REDACTED}"
-    return compact_home_text(redact_text_value(value))
+    return compact_home_text(redact_argv([value], set())[0])
 
 
 def compact_optional_path(path: Path | None, *, home: Path | str | None = None) -> str | None:
