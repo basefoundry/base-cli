@@ -78,6 +78,21 @@ class CommandProtocolTests(unittest.TestCase):
         with self.assertRaisesRegex(CommandProtocolError, "unknown field 'name'"):
             second.loads_records(first_payload)
 
+    def test_isolated_schema_lookup_cannot_mutate_registered_state(self) -> None:
+        registry = CommandSchemaRegistry()
+        fields = {"name": STRING}
+        registry.register("immutable", fields)
+
+        fields["enabled"] = BOOLEAN
+        exposed = registry.schema("immutable")
+        exposed["enabled"] = BOOLEAN
+        exposed.pop("name")
+
+        self.assertEqual(registry.schema("immutable"), {"name": STRING})
+        codec = CommandCodec(registry)
+        payload = codec.dumps_record("immutable", {"name": "stable"})
+        self.assertEqual(codec.loads_records(payload), ("immutable", ({"name": "stable"},)))
+
     def test_default_helpers_remain_backwards_compatible_with_registry_alias(self) -> None:
         self.assertIs(RECORD_SCHEMAS, DEFAULT_SCHEMA_REGISTRY.schemas)
 
