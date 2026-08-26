@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -23,6 +24,14 @@ __all__ = [
 
 PROTOCOL_HEADER = "COMMAND_PROTOCOL_V1"
 MAX_RECORD_COUNT = 1_000_000
+
+
+def _validate_protocol_header(protocol_header: str) -> None:
+    """Reject headers that can alter the line-delimited wire framing."""
+    if not isinstance(protocol_header, str) or not protocol_header:
+        raise CommandProtocolError("protocol_header must be a non-empty framing-safe string")
+    if any(unicodedata.category(character) in {"Cc", "Cf"} for character in protocol_header):
+        raise CommandProtocolError("protocol_header must be a framing-safe single line")
 
 
 class CommandProtocolError(ValueError):
@@ -159,6 +168,7 @@ def dumps_records(
     registry: CommandSchemaRegistry | None = None,
 ) -> str:
     """Serialize a sequence of typed command records using the protocol framing."""
+    _validate_protocol_header(protocol_header)
     active_registry = registry or DEFAULT_SCHEMA_REGISTRY
     schema = active_registry.schema(record_type)
     if len(records) > MAX_RECORD_COUNT:
@@ -187,6 +197,7 @@ def loads_records(
     registry: CommandSchemaRegistry | None = None,
 ) -> tuple[str, tuple[dict[str, RecordValue], ...]]:
     """Validate and decode protocol-framed command records."""
+    _validate_protocol_header(protocol_header)
     active_registry = registry or DEFAULT_SCHEMA_REGISTRY
     # The wire framing is LF-delimited. `str.splitlines()` also accepts CR,
     # vertical tab, form feed, and Unicode separators, which would make the
