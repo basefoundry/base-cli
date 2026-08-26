@@ -10,6 +10,32 @@ from pathlib import Path
 
 LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 SKIP_PREFIXES = ("http://", "https://", "mailto:", "#")
+PUBLIC_DOCS = frozenset(
+    {
+        "adopter-readiness.md",
+        "adoption-evidence.md",
+        "api-reference.md",
+        "api-stability.md",
+        "cache-ownership-and-layout.md",
+        "consumer-profiles.md",
+        "dependency-support.md",
+        "extensions.md",
+        "framework-choice.md",
+        "index.md",
+        "integrations.md",
+        "json-contracts.md",
+        "local-config.md",
+        "migrations.md",
+        "output-contracts.md",
+        "performance.md",
+        "platform-support.md",
+        "releasing.md",
+        "security-review.md",
+        "security-threat-model.md",
+        "typer-adapter.md",
+        "user-config-typing.md",
+    }
+)
 
 
 def fail(message: str) -> None:
@@ -17,12 +43,29 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
+def find_unexpected_docs(root: Path) -> list[Path]:
+    """Return Markdown files under ``docs/`` that are outside the public nav."""
+    docs_root = root / "docs"
+    return sorted(
+        (
+            path.relative_to(root)
+            for path in docs_root.rglob("*.md")
+            if path.relative_to(docs_root).as_posix() not in PUBLIC_DOCS
+        ),
+        key=lambda path: path.as_posix(),
+    )
+
+
 def validate_links(root: Path) -> None:
+    unexpected_docs = find_unexpected_docs(root)
+    if unexpected_docs:
+        paths = ", ".join(path.as_posix() for path in unexpected_docs)
+        fail(f"Markdown files outside declared public navigation: {paths}")
     markdown_files = [
         root / "README.md",
         root / "CONTRIBUTING.md",
         root / "SECURITY.md",
-        *sorted((root / "docs").glob("*.md")),
+        *sorted((root / "docs").rglob("*.md")),
         *sorted((root / "examples").rglob("*.md")),
         *sorted((root / "compatibility").rglob("*.md")),
     ]
