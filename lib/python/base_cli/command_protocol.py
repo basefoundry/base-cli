@@ -253,7 +253,7 @@ def _lookup_schema(
     record_type: str,
 ) -> dict[str, FieldSpec]:
     try:
-        return schemas[record_type]
+        return dict(schemas[record_type])
     except KeyError as exc:
         supported = ", ".join(sorted(schemas))
         raise CommandProtocolError(f"unsupported record_type '{record_type}'; expected one of: {supported}") from exc
