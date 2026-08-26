@@ -51,6 +51,23 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(failure["message"], "authorization=[REDACTED]")
         self.assertEqual(json.loads(base_cli.dumps_envelope(failure)), failure)
 
+    def test_inline_secret_redaction_keeps_delimiters_inside_values(self) -> None:
+        for value in ("abc,def", "abc;def"):
+            with self.subTest(value=value):
+                envelope = base_cli.error_envelope(
+                    run_id=None,
+                    code="bad",
+                    message=f"PASSWORD={value}",
+                )
+                self.assertEqual(envelope["message"], "PASSWORD=[REDACTED]")
+
+        envelope = base_cli.error_envelope(
+            run_id=None,
+            code="bad",
+            message="PASSWORD=abc,def;LABEL=visible",
+        )
+        self.assertEqual(envelope["message"], "PASSWORD=[REDACTED];LABEL=visible")
+
     def test_json_log_formatter_is_bounded_redacted_and_color_free(self) -> None:
         stream = io.StringIO()
         logger = base_cli.configure_logger(
