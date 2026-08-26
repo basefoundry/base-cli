@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import csv
 import io
 import json
+import unicodedata
 import unittest
+from unittest import mock
 
 from base_cli.output import (
     NDJSON_SCHEMA,
@@ -139,7 +142,7 @@ class OutputTest(unittest.TestCase):
 
         self.assertEqual(
             stream.getvalue(),
-            "PROJECT   PATH\nbase      /work/base\ndemo,one  /work/demo\tone\n\n2 projects.\n",
+            "PROJECT   PATH\nbase      /work/base\ndemo,one  /work/demo one\n\n2 projects.\n",
         )
 
     def test_terminal_table_honors_minimum_widths(self) -> None:
@@ -195,7 +198,7 @@ class OutputTest(unittest.TestCase):
 
         render_records(RECORDS, requested_format="text", columns=COLUMNS, stream=stream, footer="ignored")
 
-        self.assertEqual(stream.getvalue(), 'base\t/work/base\ndemo,one\t"/work/demo\tone"\n')
+        self.assertEqual(stream.getvalue(), "base\t/work/base\ndemo,one\t/work/demo one\n")
 
     def test_redirected_text_sanitizes_ansi_and_control_characters(self) -> None:
         stream = _Stream(terminal=False)
@@ -228,7 +231,55 @@ class OutputTest(unittest.TestCase):
 
         render_records(RECORDS, requested_format="csv", columns=COLUMNS, stream=stream, footer="ignored")
 
-        self.assertEqual(stream.getvalue(), 'base,/work/base\n"demo,one",/work/demo\tone\n')
+        self.assertEqual(stream.getvalue(), 'base,/work/base\n"demo,one",/work/demo one\n')
+
+    def test_sanitizes_controls_bidi_and_tabs_before_width_and_emission(self) -> None:
+        stream = _Stream(terminal=True)
+        value = "safe\x00\x1b[31m\u202eexe\x1b[0m\u0085left\tright\nnext"
+
+        render_records(
+            ({"name": value, "path": "wide界"},),
+            requested_format="text",
+            columns=COLUMNS,
+            stream=stream,
+            terminal_width=80,
+        )
+
+        rows = stream.getvalue().splitlines()
+        self.assertEqual(rows[1], "safe  exe left right next  wide界")
+        for row in rows:
+            self.assertNotIn("\t", row)
+            self.assertFalse(any(unicodedata.category(character) in {"Cc", "Cf"} for character in row))
+
+    def test_rich_receives_the_same_sanitized_rows_as_builtin_renderer(self) -> None:
+        stream = _Stream(terminal=True)
+        with mock.patch("base_cli.output.try_render_rich_table", return_value=True) as rich_renderer:
+            render_records(
+                ({"name": "left\t\u202eright\nnext", "path": "value"},),
+                requested_format="text",
+                columns=COLUMNS,
+                stream=stream,
+                rich=True,
+            )
+
+        rich_renderer.assert_called_once()
+        self.assertEqual(rich_renderer.call_args.args[1], ["PROJECT", "PATH"])
+        self.assertEqual(rich_renderer.call_args.args[2], [["left  right next", "value"]])
+
+    def test_delimited_controls_are_replaced_and_remain_parseable(self) -> None:
+        for requested_format, delimiter in (("csv", ","), ("tsv", "\t")):
+            with self.subTest(requested_format=requested_format):
+                stream = _Stream(terminal=False)
+                render_records(
+                    ({"name": "left\t\u202eright\nnext", "path": "value"},),
+                    requested_format=requested_format,
+                    columns=COLUMNS,
+                    stream=stream,
+                )
+                parsed_rows = list(csv.reader(io.StringIO(stream.getvalue()), delimiter=delimiter))
+                self.assertEqual(len(parsed_rows), 1)
+                parsed = parsed_rows[0]
+                self.assertEqual(parsed, ["left  right next", "value"])
 
     def test_json_preserves_record_shape(self) -> None:
         stream = _Stream(terminal=True)
