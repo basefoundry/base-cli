@@ -138,6 +138,29 @@ class CommandProtocolTests(unittest.TestCase):
         )
         self.assertEqual(decoded, (generic_record(),))
 
+    def test_custom_framing_safe_header_round_trips(self) -> None:
+        header = "CUSTOM_COMMAND_PROTOCOL_V1"
+        payload = dumps_record(RECORD_TYPE, generic_record(), protocol_header=header)
+
+        self.assertEqual(
+            loads_records(payload, expected_record_type=RECORD_TYPE, protocol_header=header),
+            (RECORD_TYPE, (generic_record(),)),
+        )
+
+    def test_rejects_empty_and_control_bearing_protocol_headers(self) -> None:
+        payload = dumps_record(RECORD_TYPE, generic_record())
+        for header in ("", "BAD\nHEADER", "BAD\rHEADER", "BAD\0HEADER", "BAD\u202eHEADER"):
+            with self.subTest(header=repr(header)):
+                with self.assertRaisesRegex(CommandProtocolError, "framing-safe") as dump_error:
+                    dumps_record(RECORD_TYPE, generic_record(), protocol_header=header)
+                with self.assertRaisesRegex(CommandProtocolError, "framing-safe") as load_error:
+                    loads_records(payload, protocol_header=header)
+                for error in (dump_error.exception, load_error.exception):
+                    self.assertNotIn("\n", str(error))
+                    self.assertNotIn("\r", str(error))
+                    self.assertNotIn("\0", str(error))
+                    self.assertNotIn("\u202e", str(error))
+
     def test_protocol_has_stable_generic_version_and_explicit_field_names(self) -> None:
         payload = dumps_record(RECORD_TYPE, generic_record())
 
