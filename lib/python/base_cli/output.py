@@ -355,9 +355,7 @@ def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
 
 def _table_cell(value: str) -> str:
     value = _ANSI_ESCAPE_RE.sub("", value)
-    return "".join(
-        character if character == "\t" or (character >= " " and character != "\x7f") else " " for character in value
-    )
+    return "".join(" " if unicodedata.category(character) in {"Cc", "Cf"} else character for character in value)
 
 
 def _display_width(value: str) -> int:
