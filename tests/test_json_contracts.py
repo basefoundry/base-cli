@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
+from base_cli._run import _json_requested
 from base_cli.json_contracts import MAX_JSON_LOG_MESSAGE_LENGTH
 
 
@@ -239,6 +240,62 @@ class JsonContractTests(unittest.TestCase):
             envelope["details"]["stdout"],
             "hello from combined flags\n",
         )
+
+    def test_json_preparse_errors_honor_json_inside_short_option_cluster(self) -> None:
+        lifecycle_options = base_cli.LifecycleOptions(
+            json=base_cli.LifecycleOption("--json", "-j"),
+        )
+        self.assertTrue(_json_requested(["-xj", "--unknown"], lifecycle_options))
+        negative_options = base_cli.LifecycleOptions(
+            json=base_cli.LifecycleOption("-j/-n"),
+        )
+        self.assertFalse(_json_requested(["-xj", "-n"], negative_options))
+        self.assertTrue(_json_requested(["-n", "-j"], negative_options))
+        app = base_cli.App(
+            name="json-cluster-error",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json", "-j"),
+            ),
+        )
+
+        @app.command()
+        @base_cli.option("-x", is_flag=True)
+        def main(ctx: base_cli.Context, x: bool) -> None:
+            del ctx, x
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["-xj", "--unknown"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 2)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["schema"], "base-cli.error")
+        self.assertEqual(result.stderr, "")
+        self.assertIn("No such option", envelope["message"])
+
+    def test_json_preparse_stops_at_end_of_options_marker(self) -> None:
+        lifecycle_options = base_cli.LifecycleOptions(
+            json=base_cli.LifecycleOption("--json"),
+        )
+        self.assertFalse(_json_requested(["--", "--json"], lifecycle_options))
+        app = base_cli.App(
+            name="json-end-of-options",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json"),
+            ),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["--", "--json"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 2)
+        self.assertEqual(result.stdout, "")
+        self.assertIn("Got unexpected extra argument", result.stderr or result.output)
 
     def test_json_preparse_errors_honor_combined_positive_declaration(self) -> None:
         app = base_cli.App(

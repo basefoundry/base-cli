@@ -185,14 +185,14 @@ def _json_requested(args: list[str], lifecycle_options: LifecycleOptions) -> boo
     positive_declarations, negative_declarations = _lifecycle_flag_declarations(option)
     explicit_value: bool | None = None
     for argument in args:
-        if any(
-            argument == declaration or argument.startswith(f"{declaration}=") for declaration in positive_declarations
-        ):
-            explicit_value = True
-        elif any(
-            argument == declaration or argument.startswith(f"{declaration}=") for declaration in negative_declarations
-        ):
-            explicit_value = False
+        if argument == "--":
+            break
+        explicit_value = _explicit_lifecycle_value(
+            argument,
+            positive_declarations,
+            negative_declarations,
+            explicit_value,
+        )
     if explicit_value is not None:
         return explicit_value
 
@@ -201,6 +201,38 @@ def _json_requested(args: list[str], lifecycle_options: LifecycleOptions) -> boo
         if any(os.environ.get(name, "").lower() in {"1", "true", "yes", "on"} for name in envvars):
             return True
     return option.default is True
+
+
+def _explicit_lifecycle_value(
+    argument: str,
+    positive_declarations: tuple[str, ...],
+    negative_declarations: tuple[str, ...],
+    current: bool | None,
+) -> bool | None:
+    """Apply one raw token using the option grammar needed before Click parses."""
+
+    for declaration in positive_declarations:
+        if argument == declaration or argument.startswith(f"{declaration}="):
+            current = True
+    for declaration in negative_declarations:
+        if argument == declaration or argument.startswith(f"{declaration}="):
+            current = False
+
+    prefix = argument[:1]
+    if prefix not in "-+/" or argument.startswith(f"{prefix}{prefix}"):
+        return current
+
+    positive_short = {declaration for declaration in positive_declarations if len(declaration) == 2}
+    negative_short = {declaration for declaration in negative_declarations if len(declaration) == 2}
+    for character in argument[1:]:
+        if character == "=":
+            break
+        declaration = f"{prefix}{character}"
+        if declaration in positive_short:
+            current = True
+        elif declaration in negative_short:
+            current = False
+    return current
 
 
 def _captured_stdout(output_capture: io.StringIO | None) -> str:
