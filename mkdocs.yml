@@ -41,6 +41,10 @@ nav:
       - API stability: api-stability.md
       - Dependency support: dependency-support.md
       - Migration guide: migrations.md
+      - Click migration: migration-click.md
+      - Typer migration: migration-typer.md
+      - Cement migration: migration-cement.md
+      - argparse migration: migration-argparse.md
       - Output contracts: output-contracts.md
       - JSON contracts: json-contracts.md
       - JSON Schema artifacts: schemas.md

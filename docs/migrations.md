@@ -1,8 +1,48 @@
 # Migration guide
 
-This page collects the format for changes that affect the public `base-cli`
-contract. The compatibility rules and deprecation timeline are defined in
-[`api-stability.md`](api-stability.md).
+This page is the starting point for adopting `base-cli` in an existing Python
+CLI. It collects framework-specific recipes as well as the format for changes
+that affect the public `base-cli` contract. The compatibility rules and
+deprecation timeline are defined in [`api-stability.md`](api-stability.md).
+
+## Choose a migration path
+
+- [Click](migration-click.md) — keep an existing Click command tree and add a
+  shared lifecycle boundary.
+- [Typer](migration-typer.md) — keep typed Typer declarations and attach the
+  generated command to the lifecycle boundary.
+- [Cement](migration-cement.md) — keep Cement while evaluating the boundary,
+  then move command definitions incrementally to Click plus `base-cli`.
+- [argparse](migration-argparse.md) — keep parser behavior stable while
+  replacing application-owned lifecycle code one command at a time.
+
+The [framework choice guide](framework-choice.md) explains the boundary and
+the [adopter readiness guide](adopter-readiness.md) is the production handoff
+checklist. These recipes assume a pinned `base-cli` release and a wheel-first
+smoke test before changing a user's command behavior.
+
+## Common rollout and rollback checklist
+
+1. Inventory command names, options, exit codes, configuration precedence,
+   output consumed by automation, and log/diagnostic locations.
+2. Add `base-cli` to the lock file and preserve the existing parser and
+   callback tests. Start with one low-risk command.
+3. Attach the existing tree (or add a small `App`) and move policy into a
+   consumer-owned `CliProfile`. Mark secrets as sensitive.
+4. Add success, usage-error, and unexpected-error contract fixtures. Keep
+   stdout reserved for command output and diagnostics on stderr.
+5. Run the full platform/dependency matrix, then compare old and new output
+   and retained run metadata in a pilot environment.
+6. Keep the previous wheel, configuration schema, and output contract
+   available for the documented compatibility window. If the pilot fails,
+   restore the previous entry point and wheel, and retain the evidence for a
+   follow-up issue.
+
+`base-cli` owns invocation lifecycle, context, logging, redaction, runtime
+state, cleanup, history hooks, and versioned output contracts. The parser
+(Click, Typer, Cement, or `argparse`) remains responsible for command trees,
+parameters, help, completion, and parser-specific errors. Product callbacks,
+services, configuration policy, and domain schemas remain consumer-owned.
 
 ## Migrating a deprecated API
 
