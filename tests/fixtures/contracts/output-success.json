@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "schema": "base-cli.output",
+  "code": "ok",
+  "type": "success",
+  "message": "Success",
+  "details": {"exit_code": 0, "stdout": "hello\n"},
+  "run_id": "run-success"
+}

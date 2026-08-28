@@ -49,6 +49,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Add golden success, error, inspection, log, NDJSON, and command-protocol
+  fixtures with Python and Node.js validators for cross-language consumers.
 - Publish versioned JSON Schema artifacts for output, error, inspection, log,
   NDJSON, and decoded command-protocol contracts in the package and docs site.
 - Add a framework choice guide, five-minute evaluation path, and clearer

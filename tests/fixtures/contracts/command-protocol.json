@@ -1,0 +1,6 @@
+{
+  "protocol_header": "COMMAND_PROTOCOL_V1",
+  "record_type": "status",
+  "record_count": 1,
+  "records": [{"name": "ready", "ok": true}]
+}
