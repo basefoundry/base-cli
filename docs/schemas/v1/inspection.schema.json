@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basefoundry.github.io/base-cli/schemas/v1/inspection.schema.json",
+  "title": "base-cli inspection envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "command", "status", "data", "error"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "command": {"type": "string", "minLength": 1},
+    "status": {"enum": ["ok", "warn", "error"]},
+    "data": {"type": "object"},
+    "error": {"type": ["object", "null"]}
+  }
+}

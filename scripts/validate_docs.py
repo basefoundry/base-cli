@@ -33,6 +33,7 @@ PUBLIC_DOCS = frozenset(
         "releasing.md",
         "security-review.md",
         "security-threat-model.md",
+        "schemas.md",
         "typer-adapter.md",
         "user-config-typing.md",
     }

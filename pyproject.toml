@@ -101,7 +101,7 @@ where = ["lib/python"]
 version = {file = "VERSION"}
 
 [tool.setuptools.package-data]
-base_cli = ["py.typed"]
+base_cli = ["py.typed", "schemas/v1/*.json"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

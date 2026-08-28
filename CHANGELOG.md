@@ -49,6 +49,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Publish versioned JSON Schema artifacts for output, error, inspection, log,
+  NDJSON, and decoded command-protocol contracts in the package and docs site.
 - Add a framework choice guide, five-minute evaluation path, and clearer
   production-lifecycle positioning for Click and Typer adopters.
 - Add deterministic SPDX SBOMs, artifact checksums, and OIDC-backed GitHub
