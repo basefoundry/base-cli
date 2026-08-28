@@ -7,18 +7,22 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "base-cli"
 dynamic = ["version"]
-description = "A production lifecycle framework for Click and Typer Python CLIs"
+description = "The production lifecycle layer for Click and Typer Python CLIs"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 keywords = [
   "cli",
+  "python-cli",
   "command-line",
+  "command-line-interface",
+  "cli-framework",
   "click",
   "typer",
   "framework",
   "lifecycle",
   "logging",
+  "structured-logging",
   "configuration",
 ]
 authors = [
@@ -39,6 +43,8 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Topic :: System :: Shells",
 ]
 dependencies = [
   "click>=8.1,<9",

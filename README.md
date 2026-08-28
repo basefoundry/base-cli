@@ -9,11 +9,16 @@
 | --- | --- | --- | --- |
 | `0.4.2` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.4.2](https://github.com/basefoundry/base-cli/releases/tag/v0.4.2) |
 
-`base-cli` is a production lifecycle framework for Python CLIs built with
-Click or Typer. It standardizes context, logging, configuration, cleanup, and
-machine-readable contracts while leaving command and product policy in the
-consumer application. The PyPI distribution is `base-cli`; import it in
-Python as `base_cli`.
+`base-cli` is the production lifecycle layer for Click and Typer Python CLIs.
+It standardizes context, logging, configuration, cleanup, and machine-readable
+contracts while leaving command and product policy in the consumer application.
+The PyPI distribution is `base-cli`; import it in Python as `base_cli`.
+
+It is for teams shipping operational CLIs that need the same diagnostics,
+configuration boundary, cleanup behavior, and automation contracts in every
+command. It is not a parser replacement or an application scaffold: Click and
+Typer still own parsing and command definitions, while the consuming project
+owns its domain policy and services.
 
 Install it with:
 

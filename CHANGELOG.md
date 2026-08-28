@@ -54,8 +54,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Add a permissioned-adopter evidence policy and dated compatibility-run
   artifacts without presenting maintained fixtures as customer adoption.
 
-- Improve PyPI description and search keywords to make the framework's
-  lifecycle, logging, configuration, and CLI integration surface discoverable.
+- Align the README, documentation landing page, package metadata, and search
+  keywords around the production lifecycle layer positioning for Click and
+  Typer CLIs.
 
 ## [0.4.2] - 2026-08-08
 
