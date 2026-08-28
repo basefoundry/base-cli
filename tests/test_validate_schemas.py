@@ -7,12 +7,15 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from scripts import validate_schemas
+from scripts import validate_contract_fixtures, validate_schemas
 
 
 class SchemaValidationTests(unittest.TestCase):
     def test_repository_schemas_are_valid_and_in_sync(self) -> None:
         validate_schemas.validate(Path(__file__).resolve().parents[1])
+
+    def test_golden_contract_fixtures_are_valid(self) -> None:
+        validate_contract_fixtures.validate(Path(__file__).resolve().parents[1])
 
     def test_schema_drift_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

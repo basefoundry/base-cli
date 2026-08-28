@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "command": "doctor",
+  "status": "warn",
+  "data": {"checks": 3},
+  "error": null
+}

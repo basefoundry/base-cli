@@ -56,6 +56,12 @@ their own structured `details` records. Secret-looking keys (`token`,
 `password`, `secret`, `api_key`, and `authorization`) and credential-bearing
 URLs are redacted recursively.
 
+Golden payloads for each public contract live in
+[`tests/fixtures/contracts`](https://github.com/basefoundry/base-cli/tree/main/tests/fixtures/contracts).
+CI validates them against the packaged schemas with both a Python validator and
+a dependency-free Node.js reader; consumers can use the same fixtures as
+cross-language conformance tests.
+
 ## Inspection envelopes
 
 Read-only inspection commands can use the stable inspection helpers when their

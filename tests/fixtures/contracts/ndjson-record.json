@@ -1,0 +1,5 @@
+{
+  "schema_version": 1,
+  "schema": "base-cli.record",
+  "record": {"name": "base", "count": 1}
+}

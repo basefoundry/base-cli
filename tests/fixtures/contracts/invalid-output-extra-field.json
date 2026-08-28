@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "schema": "base-cli.output",
+  "code": "ok",
+  "type": "success",
+  "message": "Success",
+  "details": {},
+  "run_id": null,
+  "unexpected": true
+}
