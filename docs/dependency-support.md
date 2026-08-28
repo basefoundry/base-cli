@@ -3,6 +3,8 @@
 This page is the human-readable dependency contract for the current release
 line. The package metadata is authoritative for installation; this matrix
 documents the versions covered by CI and the process for widening a window.
+The generated [compatibility dashboard](compatibility-dashboard.md) combines
+these dependency declarations with the platform and adapter matrices.
 
 ## Core runtime
 

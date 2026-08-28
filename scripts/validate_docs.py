@@ -17,6 +17,7 @@ PUBLIC_DOCS = frozenset(
         "api-reference.md",
         "api-stability.md",
         "cache-ownership-and-layout.md",
+        "compatibility-dashboard.md",
         "consumer-profiles.md",
         "coverage-policy.md",
         "dependency-support.md",

@@ -12,7 +12,15 @@ on:
       - "pyproject.toml"
       - "scripts/validate_docs.py"
       - "scripts/validate_changelog.py"
+      - "scripts/generate_compatibility_dashboard.py"
+      - ".github/workflows/tests.yml"
+      - ".github/workflows/dependency-matrix.yml"
+      - ".github/workflows/compatibility.yml"
       - "scripts/generate_api_reference.py"
+      - "scripts/generate_compatibility_dashboard.py"
+      - ".github/workflows/tests.yml"
+      - ".github/workflows/dependency-matrix.yml"
+      - ".github/workflows/compatibility.yml"
       - "tests/validate.sh"
       - ".github/workflows/docs.yml"
   pull_request:
@@ -56,6 +64,7 @@ jobs:
         run: |
           python scripts/validate_docs.py
           python scripts/validate_changelog.py
+          python scripts/generate_compatibility_dashboard.py --check
 
       - name: Validate generated public API reference
         run: python scripts/generate_api_reference.py --check
