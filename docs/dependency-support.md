@@ -9,7 +9,7 @@ documents the versions covered by CI and the process for widening a window.
 | Dependency | Declared window | CI coverage | Policy |
 | --- | --- | --- | --- |
 | Python | `>=3.10,<4` (CPython 3.10--3.14) | Every OS test job | Drop an end-of-life line only in a documented compatibility release |
-| Click | `>=8.1,<9` | 8.1 and 8.2 lines on Python 3.10 and 3.14 | Review the next major before widening the upper bound |
+| Click | `>=8.1,<8.5` | 8.1, 8.2, 8.3, and 8.4 lines on Python 3.10 and 3.14 | Add a matrix lane and compatibility note before widening the upper bound |
 | YAML extra | `PyYAML>=6.0,<7` | 6.0 line on Python 3.10 and 3.14 | Install `base-cli[yaml]`; keep parser behavior covered by profile tests |
 
 The `base-cli[yaml]` extra is the minimal installation for YAML profiles.
@@ -27,7 +27,9 @@ Optional integrations are intentionally independent of the core window:
 
 ## Updating a window
 
-1. Add the candidate lower or upper line to the dependency matrix.
+1. Add the candidate lower or upper line to the dependency matrix. The
+   current supported Click window is 8.1 through 8.4; versions outside that
+   window are rejected by package metadata until they are evaluated.
 2. Run the full test, type-check, documentation, and installed-wheel gates.
 3. Review release notes and consumer impact, including resolver behavior.
 4. Update `pyproject.toml`, this page, and the API stability contract in one
