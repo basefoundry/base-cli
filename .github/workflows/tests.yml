@@ -69,7 +69,9 @@ jobs:
           python scripts/benchmark_runtime.py --check
           python -m compileall -q examples
       - name: Run tests with coverage threshold
-        run: python -m pytest --cov=base_cli --cov-report=term-missing --cov-fail-under=80
+        run: python -m pytest --cov=base_cli --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
+      - name: Enforce high-risk module coverage floors
+        run: python scripts/validate_coverage.py coverage.json
       - name: Run static security checks
         run: |
           bandit -q -r lib/python/base_cli scripts -lll -iii

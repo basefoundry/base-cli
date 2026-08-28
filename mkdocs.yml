@@ -49,6 +49,7 @@ nav:
       - Typer adapter: typer-adapter.md
       - Optional integrations: integrations.md
   - Operations and security:
+      - Coverage policy: coverage-policy.md
       - Local configuration: local-config.md
       - Cache ownership and layout: cache-ownership-and-layout.md
       - Performance: performance.md
