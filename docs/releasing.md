@@ -35,6 +35,14 @@ runs, GitHub's OIDC-backed `actions/attest` job records both build provenance
 and an SBOM attestation for the exact artifact digests; no PyPI token or other
 long-lived publish secret is used.
 
+For a version tag, the same Package workflow creates a GitHub Release after
+the protected PyPI publication and attestations succeed. The release attaches
+the exact reviewed wheel, sdist, `SHA256SUMS`, and `SBOM.spdx.json` downloaded
+from the build job. GitHub-generated comparison notes are supplemented by the
+dated section in `CHANGELOG.md`; the tagged release is rejected when `VERSION`
+or that section does not match the tag. Rerunning a tag updates an existing
+release's assets with `--clobber` instead of creating a second release.
+
 ## Independent verification
 
 Download the release metadata artifact from the successful Package workflow
@@ -114,9 +122,11 @@ publishing for this repository and workflow before the dispatch can upload.
 1. Update `VERSION` and the changelog in a reviewed pull request.
 2. Merge to `main` and create the matching `v${VERSION}` tag.
 3. Approve the protected `pypi` environment. The workflow verifies the tag,
-   builds and tests the artifact, then publishes the exact artifact to PyPI via
-   trusted publishing.
-4. Verify installation from PyPI:
+   dated changelog section, builds and tests the artifact, then publishes the
+   exact artifact to PyPI via trusted publishing and creates the matching
+   GitHub Release.
+4. Verify installation from PyPI and download the matching GitHub Release
+   assets:
 
    ```bash
    python -m venv /tmp/base-cli-smoke
