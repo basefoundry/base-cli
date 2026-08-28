@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basefoundry.github.io/base-cli/schemas/v1/log.schema.json",
+  "title": "base-cli JSON log record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema", "timestamp", "level", "logger", "message", "run_id"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "schema": {"const": "base-cli.log"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "level": {"type": "string", "minLength": 1},
+    "logger": {"type": "string", "minLength": 1},
+    "message": {"type": "string", "maxLength": 8193},
+    "run_id": {"type": ["string", "null"]},
+    "details": {"type": "object"}
+  }
+}

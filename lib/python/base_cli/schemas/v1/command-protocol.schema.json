@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basefoundry.github.io/base-cli/schemas/v1/command-protocol.schema.json",
+  "title": "base-cli decoded command-protocol payload",
+  "description": "Schema for the decoded representation of COMMAND_PROTOCOL_V1 frames.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_header", "record_type", "record_count", "records"],
+  "properties": {
+    "protocol_header": {"const": "COMMAND_PROTOCOL_V1"},
+    "record_type": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9-]*$"},
+    "record_count": {"type": "integer", "minimum": 0, "maximum": 1000000},
+    "records": {"type": "array", "maxItems": 1000000, "items": {"type": "object"}}
+  }
+}

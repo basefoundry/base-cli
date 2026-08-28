@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://basefoundry.github.io/base-cli/schemas/v1/ndjson.schema.json",
+  "title": "base-cli NDJSON record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schema", "record"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "schema": {"const": "base-cli.record"},
+    "record": {"type": "object"}
+  }
+}

@@ -43,6 +43,7 @@ nav:
       - Migration guide: migrations.md
       - Output contracts: output-contracts.md
       - JSON contracts: json-contracts.md
+      - JSON Schema artifacts: schemas.md
       - Typed user configuration: user-config-typing.md
       - Entry-point extensions: extensions.md
   - Integrations:
