@@ -18,6 +18,8 @@ and versions are tracked in the repo-root `VERSION` file.
   modules without changing the public import surface.
 - Bound the core Click and PyYAML dependency windows, publish the tested
   compatibility matrix, and document the dependency update policy.
+- Validate Click 8.1 through 8.4 on the supported Python floor and ceiling,
+  and reject unvalidated Click 8.5+ versions through package metadata.
 - Move PyYAML behind the optional `base-cli[yaml]` extra and provide an
   actionable installation hint when YAML configuration or output is selected.
 - Add an explicit `App.async_command()` adapter and `run_async()` helper for
