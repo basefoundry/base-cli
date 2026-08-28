@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Add branch-aware coverage reporting with documented floors for lifecycle,
+  filesystem, compatibility, history, and contract modules.
 - Decompose the application implementation behind a compatibility facade into
   focused core, lifecycle-installation, attachment, and invocation-runner
   modules without changing the public import surface.
