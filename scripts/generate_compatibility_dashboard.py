@@ -8,8 +8,6 @@ import re
 import sys
 from pathlib import Path
 
-import tomllib
-
 MATRIX_PATTERN = re.compile(r"(?m)^[ \t]+(?P<key>[a-z-]+):\s*\[(?P<values>[^\]]*)\]")
 QUOTED_VALUE = re.compile(r"['\"]([^'\"]+)['\"]")
 
@@ -54,13 +52,20 @@ def _dependency_window(dependencies: list[str], name: str) -> str:
     raise ValueError(f"pyproject.toml has no dependency window for {name!r}")
 
 
+def _toml_array(text: str, key: str) -> list[str]:
+    """Read the quoted array used by this repository's simple TOML metadata."""
+    match = re.search(rf"(?ms)^{re.escape(key)}\s*=\s*\[(?P<body>.*?)\]", text)
+    if match is None:
+        raise ValueError(f"pyproject.toml has no array for {key!r}")
+    return QUOTED_VALUE.findall(match.group("body"))
+
+
 def generate_dashboard(root: Path) -> str:
     """Return deterministic Markdown generated from repository declarations."""
-    pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
-    dependencies = [str(value) for value in pyproject["dependencies"]]
-    optional = pyproject["optional-dependencies"]
-    typer_dependencies = [str(value) for value in optional["typer"]]
-    yaml_dependencies = [str(value) for value in optional["yaml"]]
+    pyproject_text = (root / "pyproject.toml").read_text(encoding="utf-8")
+    dependencies = _toml_array(pyproject_text, "dependencies")
+    typer_dependencies = _toml_array(pyproject_text, "typer")
+    yaml_dependencies = _toml_array(pyproject_text, "yaml")
 
     tests_workflow = root / ".github/workflows/tests.yml"
     dependency_workflow = root / ".github/workflows/dependency-matrix.yml"
