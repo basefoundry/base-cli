@@ -14,6 +14,7 @@ on:
       - "scripts/validate_examples.py"
       - "scripts/generate_release_metadata.py"
       - "scripts/validate_release_metadata.py"
+      - "scripts/validate_changelog.py"
       - "examples/**"
       - "compatibility/**"
       - "docs/releasing.md"
@@ -79,6 +80,9 @@ jobs:
 
       - name: Validate repository baseline
         run: ./tests/validate.sh
+
+      - name: Validate changelog
+        run: python scripts/validate_changelog.py
 
       - name: Prepare clean artifact destination
         run: |

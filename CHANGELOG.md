@@ -53,10 +53,6 @@ and versions are tracked in the repo-root `VERSION` file.
   stable facade export remains searchable and documented.
 - Add a permissioned-adopter evidence policy and dated compatibility-run
   artifacts without presenting maintained fixtures as customer adoption.
-- Add a permissioned-adopter evidence policy and dated compatibility-run
-  artifacts without presenting maintained fixtures as customer adoption.
-
-### Changed
 
 - Improve PyPI description and search keywords to make the framework's
   lifecycle, logging, configuration, and CLI integration surface discoverable.
@@ -284,6 +280,13 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 - Initialized the repository with the Base-managed repo baseline.
 - Added the guarded package build, artifact validation, and protected
   TestPyPI/PyPI publication workflow.
+
+[Unreleased]: https://github.com/basefoundry/base-cli/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/basefoundry/base-cli/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/basefoundry/base-cli/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/basefoundry/base-cli/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/basefoundry/base-cli/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/basefoundry/base-cli/releases/tag/v0.2.0
 - Exposed `base_cli.__version__` from the repository and installed package
   version contract.
 - Pinned the build backend to metadata compatible with the bundled publication

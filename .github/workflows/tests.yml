@@ -65,6 +65,7 @@ jobs:
           python -m mypy --strict examples/typed_consumer.py
           python -m mypy --strict lib/python/base_cli
           python scripts/validate_docs.py
+          python scripts/validate_changelog.py
           python scripts/benchmark_runtime.py --check
           python -m compileall -q examples
       - name: Run tests with coverage threshold

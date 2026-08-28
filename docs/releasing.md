@@ -63,6 +63,20 @@ the downloaded artifact's digest with `SHA256SUMS`, confirm the SBOM namespace
 contains the expected tag commit, and inspect the attestation's workflow and
 repository identity before installation.
 
+## Changelog and release notes
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+Keep `[Unreleased]` first, use one section per change category, and write
+user-facing bullets rather than internal implementation notes. Every released
+version must include its release date and a reference link at the bottom of the
+file. Move entries from `[Unreleased]` into the dated section when the release
+PR is prepared; do not rewrite an already published section.
+
+The repository validates these rules in CI with
+`python scripts/validate_changelog.py`, including duplicate bullets, duplicate
+categories, missing release links, malformed dates, and accidental internal
+planning text.
+
 ## Documentation site
 
 The Documentation workflow builds this site with `mkdocs build --strict` and
