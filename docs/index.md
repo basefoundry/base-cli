@@ -1,14 +1,14 @@
 # base-cli
 
-`base-cli` is a small, consumer-neutral Python framework for writing
-professional command-line applications. It gives commands a consistent
-lifecycle, context, logging, cleanup, configuration, and test boundary while
-leaving application policy in the consuming project.
+**base-cli is the production lifecycle layer for Click and Typer Python CLIs.**
+It gives commands a consistent lifecycle, context, logging, cleanup,
+configuration, and test boundary while leaving application policy in the
+consuming project.
 
-In one sentence: **base-cli is the production lifecycle layer for a Click or
-Typer CLI**. It keeps parsing and command policy familiar while making the
-operational contract—context, logs, cleanup, configuration, and automation
-output—repeatable across commands.
+It is for teams shipping operational CLIs that need repeatable diagnostics and
+automation contracts across commands. It is not a parser replacement or an
+application scaffold: Click and Typer still own parsing and command
+definitions, while the consuming project owns its domain policy and services.
 
 ## Quick start
 

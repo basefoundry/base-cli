@@ -1,5 +1,5 @@
 site_name: base-cli
-site_description: A small, consumer-neutral Python framework for professional command-line applications.
+site_description: The production lifecycle layer for Click and Typer Python CLIs.
 site_url: https://basefoundry.github.io/base-cli/
 repo_name: basefoundry/base-cli
 repo_url: https://github.com/basefoundry/base-cli
