@@ -54,8 +54,9 @@ class PrivateFileEdgeTests(unittest.TestCase):
             sleep.assert_called_once()
 
     def test_parent_directory_open_is_disabled_on_windows(self) -> None:
+        path = Path("/tmp")
         with mock.patch.object(private_files.os, "name", "nt"):
-            self.assertIsNone(private_files._open_parent_directory(Path("/tmp")))  # pylint: disable=protected-access
+            self.assertIsNone(private_files._open_parent_directory(path))  # pylint: disable=protected-access
 
 
 class ClickCompatibilityEdgeTests(unittest.TestCase):
