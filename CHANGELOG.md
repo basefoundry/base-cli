@@ -49,6 +49,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Added
 
+- Add framework-specific migration guides for Click, Typer, Cement, and
+  `argparse`, with rollout and rollback checklists.
 - Add golden success, error, inspection, log, NDJSON, and command-protocol
   fixtures with Python and Node.js validators for cross-language consumers.
 - Publish versioned JSON Schema artifacts for output, error, inspection, log,
