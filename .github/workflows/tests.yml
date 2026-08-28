@@ -69,6 +69,7 @@ jobs:
           python scripts/validate_schemas.py
           python scripts/validate_contract_fixtures.py
           node scripts/validate_contract_fixtures.mjs
+          python scripts/generate_compatibility_dashboard.py --check
           python scripts/benchmark_runtime.py --check
           python -m compileall -q examples
       - name: Run tests with coverage threshold

@@ -31,6 +31,8 @@ Read the complete documentation at
 
 Compatibility results and the permissioned-adopter policy are documented in
 the [adoption and compatibility evidence guide](https://basefoundry.github.io/base-cli/adoption-evidence/).
+The [compatibility dashboard](https://basefoundry.github.io/base-cli/compatibility-dashboard/)
+shows the declared and CI-tested dependency and platform support boundaries.
 
 ## Quick start
 

@@ -51,6 +51,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Automate GitHub Releases from matching version tags with reviewed
   distributions, checksums, SBOM metadata, and generated comparison notes.
+- Publish a generated dependency and platform compatibility dashboard linked
+  from the README and documentation site.
 - Add framework-specific migration guides for Click, Typer, Cement, and
   `argparse`, with rollout and rollback checklists.
 - Add golden success, error, inspection, log, NDJSON, and command-protocol
