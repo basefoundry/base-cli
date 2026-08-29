@@ -7,7 +7,7 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `0.4.2` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.4.2](https://github.com/basefoundry/base-cli/releases/tag/v0.4.2) |
+| `0.4.3` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.4.3](https://github.com/basefoundry/base-cli/releases/tag/v0.4.3) |
 
 `base-cli` is the production lifecycle layer for Click and Typer Python CLIs.
 It standardizes context, logging, configuration, cleanup, and machine-readable

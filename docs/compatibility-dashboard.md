@@ -17,7 +17,7 @@ red badge means that evidence is pending or needs investigation.
 | Python | `>=3.10,<4` | Python 3.10, Python 3.11, Python 3.12, Python 3.13, Python 3.14 | Supported and tested |
 | Click | `click>=8.1,<8.5` | 8.1, 8.2, 8.3, 8.4 | Supported and tested on Python 3.10 and 3.14 |
 | PyYAML extra | `PyYAML>=6.0,<7` | 6.0 | Supported when `base-cli[yaml]` is installed |
-| Typer extra | `typer>=0.12,<0.28` | 0.25.1, 0.26.0, 0.27.1 | Supported through `attach_typer()` |
+| Typer extra | `typer>=0.12,<0.28` | 0.25.1, 0.26.0, 0.27.1, 0.27.2 | Supported through `attach_typer()` |
 | Platforms | Pure-Python core | macos-latest, ubuntu-latest, windows-latest, Debian 12, Fedora latest, WSL2 | Supported tiers documented below |
 
 ## What the labels mean

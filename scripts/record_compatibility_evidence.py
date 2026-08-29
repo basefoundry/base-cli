@@ -13,7 +13,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = ("atlas_click", "beacon_typer", "cinder_automation")
 PYTHON_VERSIONS = ("3.10", "3.11", "3.12", "3.13", "3.14")
-TYPER_VERSIONS = ("0.25.1", "0.26.0", "0.27.1")
+TYPER_VERSIONS = ("0.25.1", "0.26.0", "0.27.1", "0.27.2")
 
 
 def _revision() -> str:

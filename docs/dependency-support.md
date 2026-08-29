@@ -23,7 +23,7 @@ Optional integrations are intentionally independent of the core window:
 
 | Extra | Declared window | Compatibility evidence |
 | --- | --- | --- |
-| `typer` | `>=0.12,<0.28` | Typer 0.25--0.27 across Python 3.10--3.14 |
+| `typer` | `>=0.12,<0.28` | Typer 0.25.1, 0.26.0, 0.27.1, and 0.27.2 across Python 3.10--3.14 |
 | `rich` | `>=13.7,<15` | Integration tests and graceful-degradation checks |
 | `telemetry` | `>=1.24,<2` | Telemetry integration tests |
 

@@ -60,6 +60,13 @@ class PrivateFileEdgeTests(unittest.TestCase):
 
 
 class ClickCompatibilityEdgeTests(unittest.TestCase):
+    def test_exit_exception_type_supports_core_fallback(self) -> None:
+        fallback = types.SimpleNamespace(
+            exceptions=types.SimpleNamespace(),
+            core=types.SimpleNamespace(Exit=RuntimeError),
+        )
+        self.assertIs(click_compat.exit_exception_type(fallback), RuntimeError)
+
     def test_dialect_falls_back_to_public_click_without_typer(self) -> None:
         with mock.patch.dict("sys.modules", {"typer": None}):
             command = object()
