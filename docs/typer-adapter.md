@@ -74,5 +74,5 @@ Typer is an optional extra and is imported lazily.  Importing `base_cli` and
 using the Click integration never imports or requires Typer.
 
 The compatibility workflow exercises the adapter and a typed consumer against
-Typer 0.25.1, 0.26.0, and 0.27.1 on Python 3.10 through 3.14. Keep this matrix
-green before widening the supported Typer range again.
+Typer 0.25.1, 0.26.0, 0.27.1, and 0.27.2 on Python 3.10 through 3.14. Keep
+this matrix green before widening the supported Typer range again.

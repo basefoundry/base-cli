@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from ._click_compat import exit_exception_type
 from ._private_files import write_private_json
 from ._runtime import refresh_run_bundle_index
 from .context import Context
@@ -128,7 +129,7 @@ def outcome_from_exception(click: Any, exc: BaseException) -> InvocationOutcome:
         if isinstance(exc.__cause__, KeyboardInterrupt):
             return InvocationOutcome("interrupted", "aborted", ExitCode.INTERRUPTED)
         return InvocationOutcome("aborted", "error", ExitCode.FAILURE)
-    if isinstance(exc, click.exceptions.Exit):
+    if isinstance(exc, exit_exception_type(click)):
         exit_code = _click_exception_exit_code(exc)
         if exit_code is None:
             return InvocationOutcome("unexpected_error", "error", ExitCode.FAILURE)

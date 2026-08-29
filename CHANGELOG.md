@@ -11,6 +11,13 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+## [0.4.3] - 2026-08-29
+
+This is a compatible pre-1.0 patch release. It contains lifecycle hardening,
+security fixes, versioned machine-readable contracts, and adoption tooling
+after 0.4.2; it does not introduce a new API or JSON-contract compatibility
+boundary. Existing Click and Typer command trees remain supported.
+
 ### Changed
 
 - Add branch-aware coverage reporting with documented floors for lifecycle,
@@ -39,6 +46,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
+  exception layout and validate that release in the compatibility matrix.
 - Apply the documented count-only 20-bundle retention default to implicit JSON
   mode while preserving explicit retention policies, human-mode safe defaults,
   and the `max_log_files` compatibility path.
@@ -296,7 +305,8 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 - Added the guarded package build, artifact validation, and protected
   TestPyPI/PyPI publication workflow.
 
-[Unreleased]: https://github.com/basefoundry/base-cli/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/basefoundry/base-cli/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/basefoundry/base-cli/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/basefoundry/base-cli/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/basefoundry/base-cli/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/basefoundry/base-cli/compare/v0.3.0...v0.4.0

@@ -36,6 +36,7 @@ from ._app_core import (
     _validate_standard_options,
     _warn_lifecycle_failure,
 )
+from ._click_compat import exit_exception_type
 from ._lifecycle import RunRecorder, outcome_from_exception, outcome_from_exit_code
 from ._lifecycle_install import _resolve_lifecycle_values, _standard_options_from_values
 from ._run import _reject_async_callback, _reject_async_result
@@ -109,7 +110,7 @@ class _AttachedLifecycleResource:
                 # is called from a close hook, that recursive close can unwind
                 # this resource with no exception information, so capture the
                 # terminal outcome before delegating.
-                self.record_exception(self.click.exceptions.Exit(code))
+                self.record_exception(exit_exception_type(self.click)(code))
                 return original_click_exit(code)
 
             self.original_click_exit = original_click_exit

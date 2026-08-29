@@ -125,6 +125,24 @@ def dialect_for_typer(typer: Any) -> Any:
     return dialect if dialect is not None else click
 
 
+def exit_exception_type(click: Any) -> type[BaseException]:
+    """Return the owning dialect's exit exception across Click variants.
+
+    Typer 0.27.2 keeps ``Exit`` on its core module (and maps it to
+    ``typer.exceptions.Exit``) instead of exporting it from
+    ``click.exceptions``. Older Click and Typer releases use the latter.
+    """
+    exceptions = getattr(click, "exceptions", None)
+    candidate = getattr(exceptions, "Exit", None)
+    if isinstance(candidate, type):
+        return candidate
+    core = getattr(click, "core", None)
+    candidate = getattr(core, "Exit", None)
+    if isinstance(candidate, type):
+        return candidate
+    raise AttributeError("Click dialect does not expose an Exit exception type")
+
+
 def mark_command_dialect(command: Any, dialect: Any) -> Any:
     """Remember the owning dialect on a generated command object."""
 
@@ -171,4 +189,4 @@ def is_command(command: Any) -> bool:
     return dialect is not click and isinstance(command, dialect.Command)
 
 
-__all__ = ["dialect_for_command", "dialect_for_typer", "is_command", "mark_command_dialect"]
+__all__ = ["dialect_for_command", "dialect_for_typer", "exit_exception_type", "is_command", "mark_command_dialect"]
