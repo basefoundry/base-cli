@@ -354,9 +354,13 @@ def _show_unexpected_error(state: _InvocationState, exc: Exception) -> None:
 def _normalize_command_result(result: Any) -> int:
     if result is None:
         return ExitCode.SUCCESS
-    if isinstance(result, int):
+    if isinstance(result, bool):
+        raise TypeError("Commands must return None or an int exit code from 0 through 255; bool is not an exit code.")
+    if isinstance(result, int) and 0 <= result <= 255:
         return result
-    raise TypeError(f"Commands must return None or an int exit code; got {type(result).__name__}.")
+    if isinstance(result, int):
+        raise TypeError(f"Commands must return None or an int exit code from 0 through 255; got {result}.")
+    raise TypeError(f"Commands must return None or an int exit code from 0 through 255; got {type(result).__name__}.")
 
 
 def _reject_async_callback(callback: Any) -> None:

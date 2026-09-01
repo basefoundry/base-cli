@@ -11,6 +11,13 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Fixed
+
+- Keep plain consumer configuration mappings opaque so only validated
+  `ConfigSnapshot.framework` values control lifecycle behavior.
+- Preserve streaming human output unless JSON was explicitly requested,
+  including pre-parse option, environment, and default-map detection.
+
 ## [0.4.3] - 2026-08-29
 
 This is a compatible pre-1.0 patch release. It contains lifecycle hardening,
@@ -46,8 +53,8 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Fixed
 
-- Preserve streaming human and NDJSON output for JSON-capable apps; active JSON
-  mode alone uses a bounded 1 MiB memory spool with disk rollover.
+- Enforce the portable `0` through `255` process exit-code contract for command
+  return values, rejecting booleans and out-of-range integers consistently.
 
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
