@@ -1,7 +1,7 @@
 [build-system]
 # Keep the generated core metadata at 2.3 until the pinned publisher action's
 # bundled twine/pkginfo stack accepts Metadata-Version 2.4.
-requires = ["setuptools>=68,<77"]
+requires = ["setuptools==75.1.0", "wheel==0.44.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
