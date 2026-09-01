@@ -113,6 +113,20 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         self.assertFalse(results[0].ok)
         self.assertIn("missing optional dependency", str(results[0].error))
 
+    def test_extension_import_preserves_process_control_exceptions(self) -> None:
+        for exception_type in (KeyboardInterrupt, SystemExit, GeneratorExit):
+            entry_point = _entry_point("control", "control:register")
+            current_type = exception_type
+
+            def fail_load(exc_type: type[BaseException] = current_type) -> object:
+                raise exc_type()
+
+            entry_point.load = fail_load
+            discovery = base_cli.ExtensionDiscovery(entry_points=(entry_point,))
+
+            with self.subTest(exception=exception_type.__name__), self.assertRaises(exception_type):
+                discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "control")
+
     def test_api_version_and_capabilities_are_negotiated_from_entry_point_extras(self) -> None:
         compatible = _entry_point(
             "telemetry",

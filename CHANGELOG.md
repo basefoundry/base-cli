@@ -15,6 +15,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Keep plain consumer configuration mappings opaque so only validated
   `ConfigSnapshot.framework` values control lifecycle behavior.
+- Preserve `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit` across
+  optional Rich, telemetry, and extension integrations while still shielding
+  teardown cleanup from process-control exceptions.
 
 ## [0.4.3] - 2026-08-29
 

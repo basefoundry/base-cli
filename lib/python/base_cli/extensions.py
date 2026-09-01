@@ -237,7 +237,7 @@ class ExtensionDiscovery:
             raise ExtensionCompatibilityError(descriptor, tuple(sorted(self.supported_api_versions)))
         try:
             value = self._load_descriptor(descriptor)
-        except BaseException as exc:  # isolate third-party import failures
+        except Exception as exc:  # isolate ordinary third-party import failures
             raise ExtensionLoadError(descriptor, exc) from exc
         with self._lock:
             self._loaded_cache[key] = value

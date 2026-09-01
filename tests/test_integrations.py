@@ -4,8 +4,10 @@ import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import base_cli
+from base_cli.integrations import start_telemetry
 from base_cli.testing import invoke
 
 
@@ -39,6 +41,25 @@ class _Tracer:
 class _BrokenTracer:
     def start_span(self, *_args: object, **_kwargs: object) -> object:
         raise RuntimeError("exporter unavailable")
+
+
+class _ControlFlowTracer:
+    def __init__(self, exception: BaseException) -> None:
+        self.exception = exception
+
+    def start_span(self, *_args: object, **_kwargs: object) -> object:
+        raise self.exception
+
+
+class _RichImportFailure:
+    def __init__(self, exception_type: type[BaseException], original_import: object) -> None:
+        self.exception_type = exception_type
+        self.original_import = original_import
+
+    def __call__(self, name: str, *args: object, **kwargs: object) -> object:
+        if name.startswith("rich."):
+            raise self.exception_type()
+        return self.original_import(name, *args, **kwargs)  # type: ignore[operator]
 
 
 class IntegrationTests(unittest.TestCase):
@@ -113,3 +134,20 @@ class IntegrationTests(unittest.TestCase):
             result = invoke(app, [], home=Path(tmpdir))
 
         self.assertEqual(result.exit_code, 0, result.output)
+
+    def test_optional_boundaries_propagate_process_control_exceptions(self) -> None:
+        for exception_type in (KeyboardInterrupt, SystemExit, GeneratorExit):
+            with self.subTest(boundary="rich", exception=exception_type.__name__):
+                with mock.patch(
+                    "builtins.__import__",
+                    side_effect=_RichImportFailure(exception_type, __import__),
+                ):
+                    with self.assertRaises(exception_type):
+                        base_cli.try_render_rich_table(io.StringIO(), ("NAME",), (("x",),), None)
+
+            with self.subTest(boundary="telemetry", exception=exception_type.__name__):
+                with self.assertRaises(exception_type):
+                    start_telemetry(
+                        base_cli.TelemetryOptions(tracer=_ControlFlowTracer(exception_type())),
+                        object(),
+                    )
