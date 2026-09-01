@@ -116,16 +116,24 @@ jobs:
           python - <<'PY'
           import gzip
           import os
+          import tarfile
           from pathlib import Path
 
           epoch = int(os.environ["SOURCE_DATE_EPOCH"])
           for directory in (Path("dist-a"), Path("dist-b")):
               for path in directory.glob("*.tar.gz"):
-                  payload = gzip.open(path, "rb").read()
+                  with tarfile.open(path, "r:gz") as source:
+                      members = [(member, source.extractfile(member).read() if member.isfile() else None) for member in source.getmembers()]
                   temporary = path.with_suffix(path.suffix + ".tmp")
                   with temporary.open("wb") as raw:
                       with gzip.GzipFile(filename=path.name, mode="wb", fileobj=raw, mtime=epoch) as compressed:
-                          compressed.write(payload)
+                          with tarfile.open(fileobj=compressed, mode="w|") as target:
+                              for member, payload in sorted(members, key=lambda item: item[0].name):
+                                  member.mtime = epoch
+                                  member.uid = member.gid = 0
+                                  member.uname = member.gname = ""
+                                  member.pax_headers = {}
+                                  target.addfile(member, None if payload is None else __import__("io").BytesIO(payload))
                   temporary.replace(path)
           PY
           (cd dist-a && sha256sum * | sort) > dist-a.SHA256SUMS
