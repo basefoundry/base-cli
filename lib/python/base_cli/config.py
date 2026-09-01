@@ -104,20 +104,22 @@ def _merge_mapping(
     provenance: dict[str, str],
     incoming: Mapping[str, Any],
     source: str,
+    *,
+    prefix: str = "",
 ) -> None:
     for key, value in incoming.items():
         if not isinstance(key, str):
             raise ConfigurationError("Configuration keys must be strings.")
+        path = f"{prefix}.{key}" if prefix else key
         previous = target.get(key)
         if isinstance(previous, Mapping) and isinstance(value, Mapping):
-            _merge_mapping(target[key], provenance, value, source)
-            provenance.update(_leaf_provenance(value, source, key))
+            _merge_mapping(target[key], provenance, value, source, prefix=path)
             continue
-        for path in tuple(provenance):
-            if path == key or path.startswith(f"{key}."):
-                del provenance[path]
+        for existing_path in tuple(provenance):
+            if existing_path == path or existing_path.startswith(f"{path}."):
+                del provenance[existing_path]
         target[key] = dict(value) if isinstance(value, Mapping) else value
-        provenance.update(_leaf_provenance(value, source, key))
+        provenance.update(_leaf_provenance(value, source, path))
 
 
 class BatteriesIncludedConfigLoader:

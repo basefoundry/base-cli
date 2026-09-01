@@ -13,8 +13,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
-- Document the atomic snapshot contract for managed runtime metadata and
-  indexes while preserving locked append-only history semantics.
+- Keep plain consumer configuration mappings opaque so only validated
+  `ConfigSnapshot.framework` values control lifecycle behavior.
+- Make managed metadata and index replacements atomic, with bounded retries
+  for transient Windows file-sharing locks.
 
 ## [0.4.3] - 2026-08-29
 
@@ -50,6 +52,9 @@ boundary. Existing Click and Typer command trees remain supported.
   persisted history.
 
 ### Fixed
+
+- Enforce the portable `0` through `255` process exit-code contract for command
+  return values, rejecting booleans and out-of-range integers consistently.
 
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
