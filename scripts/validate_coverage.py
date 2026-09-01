@@ -27,9 +27,17 @@ def fail(message: str) -> NoReturn:
     raise SystemExit(1)
 
 
+def _normalise_path(value: str) -> str:
+    """Compare coverage paths consistently across Windows and POSIX hosts."""
+
+    return value.replace("\\", "/")
+
+
 def _file_summary(files: dict[str, Any], expected_path: str) -> dict[str, Any]:
+    expected_path = _normalise_path(expected_path)
     for path, payload in files.items():
-        if path == expected_path or path.endswith(expected_path):
+        normalised_path = _normalise_path(path)
+        if normalised_path == expected_path or normalised_path.endswith(expected_path):
             summary = payload.get("summary")
             if isinstance(summary, dict):
                 return summary
