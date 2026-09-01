@@ -9,4 +9,4 @@ python:
   manager: uv
 
 test:
-  command: ./tests/validate.sh
+  command: ./tests/full_validate.sh
