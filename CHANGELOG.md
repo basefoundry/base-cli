@@ -11,6 +11,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Fixed
+
+- Document the atomic snapshot contract for managed runtime metadata and
+  indexes while preserving locked append-only history semantics.
+
 ## [0.4.3] - 2026-08-29
 
 This is a compatible pre-1.0 patch release. It contains lifecycle hardening,
