@@ -1602,7 +1602,7 @@ base_cli.testing
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Installed base-cli distribution version exposed by the public facade.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1617,7 +1617,7 @@ value = base_cli.__version__
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Describe the wire type and nullability of one command-record field.
+**Behavior:** Schema field descriptor for a required boolean command-record value.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1632,7 +1632,7 @@ value = base_cli.BOOLEAN
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Type variable.
+**Behavior:** Consumer-owned application-state type parameter carried by Context.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1647,7 +1647,7 @@ value = base_cli.ApplicationStateT
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Public facade symbol; see the linked contract and source annotations for details.
+**Behavior:** Callable type for canonicalizing command filter names.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1662,7 +1662,7 @@ value = base_cli.CommandFilterNormalizer
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Entry-point group name used to discover command extensions.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1677,7 +1677,7 @@ value = base_cli.COMMAND_ENTRY_POINT_GROUP
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Type variable.
+**Behavior:** Consumer-owned configuration type parameter carried by Context and App.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1692,7 +1692,7 @@ value = base_cli.ConfigT
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Built-in immutable sequence.
+**Behavior:** Supported base-cli extension entry-point groups in discovery order.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1707,7 +1707,7 @@ value = base_cli.ENTRY_POINT_GROUPS
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Extension API version negotiated through entry-point metadata.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1722,7 +1722,7 @@ value = base_cli.EXTENSION_API_VERSION
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Own an isolated set of command record schemas.
+**Behavior:** Process-local registry containing built-in and consumer record schemas.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1737,7 +1737,7 @@ value = base_cli.DEFAULT_SCHEMA_REGISTRY
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Metadata key used to mark lifecycle-owned Click parameters.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1752,7 +1752,7 @@ value = base_cli.LIFECYCLE_META_KEY
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Describe the wire type and nullability of one command-record field.
+**Behavior:** Schema field descriptor for a nullable string command-record value.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1767,7 +1767,7 @@ value = base_cli.NULLABLE_STRING
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Describe the wire type and nullability of one command-record field.
+**Behavior:** Schema field descriptor for a required string command-record value.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1782,7 +1782,7 @@ value = base_cli.STRING
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** int([x]) -> integer int(x, base=10) -> integer
+**Behavior:** Version number for the stable JSON output, error, and log contracts.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1797,7 +1797,7 @@ value = base_cli.JSON_CONTRACT_VERSION
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Schema identifier emitted by machine-readable error envelopes.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1812,7 +1812,7 @@ value = base_cli.JSON_ERROR_SCHEMA
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Schema identifier emitted by structured JSON log records.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1827,7 +1827,7 @@ value = base_cli.JSON_LOG_SCHEMA
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Schema identifier emitted by successful JSON output envelopes.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1842,7 +1842,7 @@ value = base_cli.JSON_OUTPUT_SCHEMA
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** int([x]) -> integer int(x, base=10) -> integer
+**Behavior:** Maximum retained message length for one structured JSON log record.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1857,7 +1857,7 @@ value = base_cli.MAX_JSON_LOG_MESSAGE_LENGTH
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Schema identifier emitted by versioned newline-delimited record output.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1872,7 +1872,7 @@ value = base_cli.NDJSON_SCHEMA
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** int([x]) -> integer int(x, base=10) -> integer
+**Behavior:** Version number for the newline-delimited record contract.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1887,7 +1887,7 @@ value = base_cli.NDJSON_SCHEMA_VERSION
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Built-in immutable sequence.
+**Behavior:** Supported public output format names and their resolution order.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1902,7 +1902,7 @@ value = base_cli.PUBLIC_OUTPUT_FORMATS
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** A Mapping is a generic container for associating key/value pairs.
+**Behavior:** Mapping shape accepted by the versioned command-record serializers.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1917,7 +1917,7 @@ value = base_cli.StructuredRecord
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** dict() -> new empty dictionary dict(mapping) -> new dictionary initialized from a mapping object's     (key, value) pairs dict(iterable) -> new dictionary initialized as if via:     d = {}     for k, v in iterable:         d[k] = v dict(**kwargs) -> new dictionary initialized with the name=value pairs     in the keyword argument list.  For example:  dict(one=1, two=2)
+**Behavior:** Mutable registry mapping consumer record names to FieldSpec definitions.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1932,7 +1932,7 @@ value = base_cli.RECORD_SCHEMAS
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Entry-point group name used to discover optional plugin extensions.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1947,7 +1947,7 @@ value = base_cli.PLUGIN_ENTRY_POINT_GROUP
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** str(object='') -> str str(bytes_or_buffer[, encoding[, errors]]) -> str
+**Behavior:** Entry-point group name used to discover profile extensions.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
@@ -1962,7 +1962,7 @@ value = base_cli.PROFILE_ENTRY_POINT_GROUP
 **Kind:** constant/type  
 **Signature:** (value is not callable)
 
-**Behavior:** Type variable.
+**Behavior:** Consumer-owned service-container type parameter carried by Context.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 

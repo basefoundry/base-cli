@@ -15,6 +15,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Keep plain consumer configuration mappings opaque so only validated
   `ConfigSnapshot.framework` values control lifecycle behavior.
+- Preserve `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit` across
+  optional Rich, telemetry, and extension integrations while still shielding
+  teardown cleanup from process-control exceptions.
 - Make managed metadata and index replacements atomic, with bounded retries
   for transient Windows file-sharing locks.
 
@@ -67,6 +70,9 @@ boundary. Existing Click and Typer command trees remain supported.
   cannot prevent healthy extensions from being discovered.
 
 ### Added
+
+- Click 8.5 compatibility coverage across the dependency matrix and supported
+  OS test lanes; the core dependency window now permits `<8.6`.
 
 - Automate GitHub Releases from matching version tags with reviewed
   distributions, checksums, SBOM metadata, and generated comparison notes.
