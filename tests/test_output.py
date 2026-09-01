@@ -266,6 +266,22 @@ class OutputTest(unittest.TestCase):
         self.assertEqual(rich_renderer.call_args.args[1], ["PROJECT", "PATH"])
         self.assertEqual(rich_renderer.call_args.args[2], [["left  right next", "value"]])
 
+    def test_rich_receives_the_same_bounded_cells_as_builtin_renderer(self) -> None:
+        stream = _Stream(terminal=True)
+        with mock.patch("base_cli.output.try_render_rich_table", return_value=True) as rich_renderer:
+            render_records(
+                ({"name": "abcdefghij", "path": "1234567890"},),
+                requested_format="text",
+                columns=COLUMNS,
+                stream=stream,
+                terminal_width=20,
+                max_cell_width=6,
+                rich=True,
+            )
+
+        self.assertEqual(rich_renderer.call_args.args[1], ["PROJE…", "PATH"])
+        self.assertEqual(rich_renderer.call_args.args[2], [["abcde…", "12345…"]])
+
     def test_delimited_controls_are_replaced_and_remain_parseable(self) -> None:
         for requested_format, delimiter in (("csv", ","), ("tsv", "\t")):
             with self.subTest(requested_format=requested_format):
@@ -374,3 +390,18 @@ class OutputTest(unittest.TestCase):
         self.assertIn("one\t\n", output)
         self.assertIn("two\tready\n", output)
         self.assertIn("ready", output)
+
+    def test_render_document_rejects_missing_or_malformed_record_collections(self) -> None:
+        for document in (
+            {},
+            {"rows": {"name": "not-a-list"}},
+            {"rows": [{"name": "ok"}, "not-a-record"]},
+        ):
+            with self.subTest(document=document):
+                with self.assertRaisesRegex(OutputFormatError, "records_key 'rows'"):
+                    render_document(
+                        document,
+                        requested_format="tsv",
+                        records_key="rows",
+                        stream=_Stream(terminal=False),
+                    )
