@@ -182,7 +182,11 @@ def _sync_directory(parent_fd: int) -> None:
 def _replace_with_retry(source: Path, destination: Path) -> None:
     """Replace a private file, tolerating transient Windows sharing races."""
 
-    attempts = 1 if os.name != "nt" else 10
+    # Antivirus/indexer handles and concurrent writers can hold the destination
+    # briefly on Windows. Use a bounded, linear backoff long enough for those
+    # transient sharing violations without making a persistent permission error
+    # unbounded.
+    attempts = 1 if os.name != "nt" else 50
     for attempt in range(attempts):
         try:
             os.replace(source, destination)
@@ -190,4 +194,4 @@ def _replace_with_retry(source: Path, destination: Path) -> None:
         except PermissionError:
             if attempt == attempts - 1:
                 raise
-            time.sleep(0.001 * (attempt + 1))
+            time.sleep(0.005 * (attempt + 1))
