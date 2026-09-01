@@ -149,6 +149,12 @@ validated into `Context.framework_config` and are excluded from the consumer
 configuration dictionary. All other keys remain consumer-owned and are exposed
 through `Context.config`.
 
+Custom `ConfigLoader` callbacks that return a plain mapping do not opt into
+those lifecycle settings: every mapping key, including names that resemble
+framework keys, remains consumer data. Return a `ConfigSnapshot` to supply
+validated framework settings. This prevents strings such as `"false"` or
+`"debug"` from changing lifecycle behavior through an unvalidated mapping.
+
 ## Safe profile errors
 
 Plain exceptions from profile callbacks are treated as unexpected internal
