@@ -20,3 +20,8 @@ CI writes a branch-aware `coverage.json` report and runs
 the same pull request as the tests that justify it. Platform-specific tests
 must cover both the native path and the safe fallback where the operating
 system provides a different filesystem primitive.
+
+The strict table is the canonical POSIX floor enforced by the Ubuntu quality
+job. Windows compatibility jobs use 50% for `_private_files` and 55% for
+`_runtime`, because their filesystem and process branches differ materially;
+the aggregate 80% gate and all other module floors remain unchanged.

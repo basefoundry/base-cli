@@ -21,6 +21,15 @@ MODULE_FLOORS: dict[str, float] = {
     "lib/python/base_cli/redaction.py": 90.0,
 }
 
+# Windows compatibility runs exercise different filesystem and lifecycle
+# branches than the canonical POSIX suite. Keep a meaningful floor there,
+# while enforcing the strict contract floors in the Ubuntu quality job.
+WINDOWS_MODULE_FLOORS: dict[str, float] = {
+    **MODULE_FLOORS,
+    "lib/python/base_cli/_private_files.py": 50.0,
+    "lib/python/base_cli/_runtime.py": 55.0,
+}
+
 
 def fail(message: str) -> NoReturn:
     print(f"coverage policy failed: {message}", file=sys.stderr)
@@ -44,6 +53,10 @@ def _file_summary(files: dict[str, Any], expected_path: str) -> dict[str, Any]:
     fail(f"coverage report is missing {expected_path}")
 
 
+def _module_floors() -> dict[str, float]:
+    return WINDOWS_MODULE_FLOORS if sys.platform == "win32" else MODULE_FLOORS
+
+
 def validate(report_path: Path) -> None:
     try:
         report = json.loads(report_path.read_text(encoding="utf-8"))
@@ -53,8 +66,9 @@ def validate(report_path: Path) -> None:
     if not isinstance(files, dict):
         fail(f"{report_path} does not contain a coverage 'files' mapping")
 
+    floors = _module_floors()
     failures: list[str] = []
-    for path, floor in MODULE_FLOORS.items():
+    for path, floor in floors.items():
         summary = _file_summary(files, path)
         covered = summary.get("percent_covered")
         if not isinstance(covered, (int, float)):
@@ -64,7 +78,7 @@ def validate(report_path: Path) -> None:
     if failures:
         fail("; ".join(failures))
 
-    for path, floor in MODULE_FLOORS.items():
+    for path, floor in floors.items():
         summary = _file_summary(files, path)
         print(f"{path}: {summary['percent_covered']:.2f}% (floor {floor:.2f}%)")
 
