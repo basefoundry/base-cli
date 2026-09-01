@@ -18,6 +18,13 @@ app = base_cli.App(
 envelope on stdout. Logs remain on stderr. Human mode, including the default
 Click error rendering and command stdout behavior, is unchanged.
 
+Capture is activated only when JSON mode is selected, including an environment
+variable or Click `default_map`. Human and NDJSON invocations write directly to
+the caller's stdout, preserving progress visibility and flush behavior. JSON
+capture uses a 1 MiB in-memory spool and transparently rolls larger output to a
+temporary file; the complete captured text remains available in the v1 envelope
+and the temporary file is removed when the invocation ends.
+
 ## Output and errors
 
 Both envelopes use `schema_version: 1` and stable fields:

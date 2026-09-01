@@ -46,6 +46,9 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Fixed
 
+- Preserve streaming human and NDJSON output for JSON-capable apps; active JSON
+  mode alone uses a bounded 1 MiB memory spool with disk rollover.
+
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
 - Apply the documented count-only 20-bundle retention default to implicit JSON
