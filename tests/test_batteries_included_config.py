@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 import base_cli
-from base_cli.config import BatteriesIncludedConfigLoader, ConfigSnapshot
+from base_cli.config import BatteriesIncludedConfigLoader, ConfigSnapshot, _merge_mapping
 from base_cli.testing import invoke
 
 
@@ -15,6 +15,19 @@ def _write_yaml(path: Path, contents: str) -> None:
 
 
 class BatteriesIncludedConfigTests(unittest.TestCase):
+    def test_nested_merge_provenance_keeps_repeated_leaf_names_scoped(self) -> None:
+        values: dict[str, object] = {}
+        provenance: dict[str, str] = {}
+
+        _merge_mapping(values, provenance, {"host": "top", "db": {"host": "one"}}, "user")
+        _merge_mapping(values, provenance, {"db": {"host": "two", "tls": {"enabled": True}}}, "project")
+
+        self.assertEqual(values, {"host": "top", "db": {"host": "two", "tls": {"enabled": True}}})
+        self.assertEqual(
+            provenance,
+            {"host": "user", "db.host": "project", "db.tls.enabled": "project"},
+        )
+
     def test_layered_loader_merges_in_documented_order_and_records_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
