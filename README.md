@@ -714,6 +714,12 @@ if ctx.project_root is None:
     return base_cli.ExitCode.USAGE_ERROR
 ```
 
+Command callbacks may return `None` or an integer in the portable process exit
+code range `0` through `255` (inclusive). Boolean values, negative integers,
+and values above `255` are rejected before the result is recorded or rendered;
+this keeps direct `run_app()` results, JSON envelopes, history, and the spawned
+process status consistent on POSIX and Windows.
+
 `run_app()` is the process boundary for production entry points. It preserves
 Click's messages and exit codes for usage and application errors, reports an
 explicit abort as `1`, and reports <kbd>Ctrl</kbd>+<kbd>C</kbd> during startup or

@@ -208,6 +208,55 @@ class RunAppTests(unittest.TestCase):
         self.assertIn("Commands must return None or an int exit code", stderr.getvalue())
 
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_run_app_rejects_nonportable_command_exit_codes(self) -> None:
+        for returned in (-1, 256, 300, True):
+            app = base_cli.App(name=f"invalid-return-{returned}", log_to_file=False)
+
+            @app.command()
+            def main(ctx: base_cli.Context, value: object = returned) -> object:
+                del ctx
+                return value
+
+            with self.subTest(returned=returned), tempfile.TemporaryDirectory() as tmpdir:
+                home = Path(tmpdir)
+                stderr = io.StringIO()
+                with (
+                    mock.patch.dict(
+                        os.environ,
+                        {
+                            "HOME": str(home),
+                            "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                        },
+                    ),
+                    redirect_stderr(stderr),
+                ):
+                    status = base_cli.run_app(app, [])
+
+                self.assertEqual(status, 1)
+                self.assertIn("from 0 through 255", stderr.getvalue())
+
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_run_app_accepts_portable_command_exit_code_boundaries(self) -> None:
+        for returned in (0, 1, 2, 130, 255):
+            app = base_cli.App(name=f"valid-return-{returned}", log_to_file=False)
+
+            @app.command()
+            def main(ctx: base_cli.Context, value: int = returned) -> int:
+                del ctx
+                return value
+
+            with self.subTest(returned=returned), tempfile.TemporaryDirectory() as tmpdir:
+                home = Path(tmpdir)
+                with mock.patch.dict(
+                    os.environ,
+                    {
+                        "HOME": str(home),
+                        "BASE_CLI_CACHE_DIR": str(home / ".cache"),
+                    },
+                ):
+                    self.assertEqual(base_cli.run_app(app, []), returned)
+
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_run_app_accepts_click_native_equals_form_long_option_values(self) -> None:
         app = base_cli.App(name="space-options", log_to_file=False)
         seen = {}
