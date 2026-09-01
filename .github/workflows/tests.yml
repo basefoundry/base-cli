@@ -138,4 +138,4 @@ jobs:
           $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
           $path = $env:GITHUB_WORKSPACE.Substring(2).Replace('\', '/')
           $linuxWorkspace = "/mnt/$drive$path"
-          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer,quality]'; bash tests/full_validate.sh"
+          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; apt-get update -qq; apt-get install -y -qq python3-venv python3.14-venv; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer,quality]'; bash tests/full_validate.sh"
