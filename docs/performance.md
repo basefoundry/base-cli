@@ -9,15 +9,24 @@ python scripts/benchmark_runtime.py --check
 ```
 
 It records fresh-process import time and the cost of an isolated production
-invocation through `base_cli.testing.invoke`. The CI quality job checks the
-sample p95 against these budgets:
+invocation through `base_cli.testing.invoke`. The comparison mode measures
+equivalent no-op commands for base-cli, Click, Typer, and (when installed)
+Cyclopts. Install the optional benchmark extra to include Cyclopts:
+
+```bash
+python -m pip install 'base-cli[benchmark]'
+```
+
+The CI quality job checks the base-cli sample p95 against these budgets:
 
 | Measurement | Budget |
 | --- | ---: |
 | Fresh `import base_cli` | 750 ms |
 | Isolated invocation and runtime filesystem setup | 1,500 ms |
 
-The benchmark reports the median, p95, and maximum for seven samples. These
+The benchmark reports the median, p95, and maximum for seven samples. Pass
+`--json` for a stable machine-readable result suitable for archiving or CI
+comparison. These
 budgets are intentionally broad enough for hosted runners while still
 detecting accidental quadratic startup work, unbounded metadata scans, or
 unexpected dependency imports. A performance improvement should preserve the

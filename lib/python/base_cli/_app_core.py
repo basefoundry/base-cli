@@ -1136,18 +1136,13 @@ class App:
         environment = (
             standard.get("environment")
             or (framework_config.environment if framework_config is not None else None)
-            or config.get("environment")
             or "dev"
         )
-        log_level = (
-            framework_config.log_level if framework_config is not None else str(config.get("log_level", "")).lower()
-        )
+        log_level = framework_config.log_level if framework_config is not None else None
         debug = bool(standard.get("debug") or log_level == "debug")
         quiet = bool(standard.get("quiet"))
         keep_temp = bool(
-            standard.get("keep_temp")
-            or (framework_config.keep_temp if framework_config is not None else None)
-            or config.get("keep_temp")
+            standard.get("keep_temp") or (framework_config.keep_temp if framework_config is not None else None)
         )
         _capture_effective_output_options(
             owner_app=self,

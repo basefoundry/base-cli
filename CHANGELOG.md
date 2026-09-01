@@ -11,6 +11,13 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Fixed
+
+- Keep plain consumer configuration mappings opaque so only validated
+  `ConfigSnapshot.framework` values control lifecycle behavior.
+- Require output records to match the declared list-of-mappings contract and
+  apply identical bounded width handling to Rich and plain renderers.
+
 ## [0.4.3] - 2026-08-29
 
 This is a compatible pre-1.0 patch release. It contains lifecycle hardening,
@@ -46,9 +53,8 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Fixed
 
-- Preserve `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit` across Rich,
-  telemetry startup, and extension-loading boundaries; only telemetry teardown
-  retains its explicit primary-outcome shield.
+- Enforce the portable `0` through `255` process exit-code contract for command
+  return values, rejecting booleans and out-of-range integers consistently.
 
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
