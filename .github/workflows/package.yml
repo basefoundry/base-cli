@@ -20,6 +20,8 @@ on:
       - "examples/**"
       - "compatibility/**"
       - "docs/releasing.md"
+      - "requirements/release.in"
+      - "requirements/release.txt"
       - ".github/workflows/package.yml"
   push:
     branches:
@@ -98,10 +100,46 @@ jobs:
           mkdir -p dist
 
       - name: Install build and validation tools
-        run: python -m pip install --upgrade build twine
+        run: python -m pip install --require-hashes --no-deps -r requirements/release.txt
 
       - name: Build sdist and wheel
-        run: python -m build --sdist --wheel --outdir dist
+        env:
+          SOURCE_DATE_EPOCH: ${{ github.event.head_commit.timestamp || '0' }}
+        run: |
+          rm -rf dist-a dist-b "$RUNNER_TEMP/base-cli-build-a" "$RUNNER_TEMP/base-cli-build-b"
+          mkdir -p dist-a dist-b
+          mkdir -p "$RUNNER_TEMP/base-cli-build-a" "$RUNNER_TEMP/base-cli-build-b"
+          git archive "$GITHUB_SHA" | tar -x -C "$RUNNER_TEMP/base-cli-build-a"
+          git archive "$GITHUB_SHA" | tar -x -C "$RUNNER_TEMP/base-cli-build-b"
+          (cd "$RUNNER_TEMP/base-cli-build-a" && python -m build --sdist --wheel --outdir "$GITHUB_WORKSPACE/dist-a")
+          (cd "$RUNNER_TEMP/base-cli-build-b" && python -m build --sdist --wheel --outdir "$GITHUB_WORKSPACE/dist-b")
+          python - <<'PY'
+          import gzip
+          import os
+          import tarfile
+          from pathlib import Path
+
+          epoch = int(os.environ["SOURCE_DATE_EPOCH"])
+          for directory in (Path("dist-a"), Path("dist-b")):
+              for path in directory.glob("*.tar.gz"):
+                  with tarfile.open(path, "r:gz") as source:
+                      members = [(member, source.extractfile(member).read() if member.isfile() else None) for member in source.getmembers()]
+                  temporary = path.with_suffix(path.suffix + ".tmp")
+                  with temporary.open("wb") as raw:
+                      with gzip.GzipFile(filename=path.name, mode="wb", fileobj=raw, mtime=epoch) as compressed:
+                          with tarfile.open(fileobj=compressed, mode="w|") as target:
+                              for member, payload in sorted(members, key=lambda item: item[0].name):
+                                  member.mtime = epoch
+                                  member.uid = member.gid = 0
+                                  member.uname = member.gname = ""
+                                  member.pax_headers = {}
+                                  target.addfile(member, None if payload is None else __import__("io").BytesIO(payload))
+                  temporary.replace(path)
+          PY
+          (cd dist-a && sha256sum * | sort) > dist-a.SHA256SUMS
+          (cd dist-b && sha256sum * | sort) > dist-b.SHA256SUMS
+          diff -u dist-a.SHA256SUMS dist-b.SHA256SUMS
+          cp dist-a/* dist/
 
       - name: Validate artifact contents and metadata
         run: python scripts/validate_package_artifact.py dist

@@ -45,6 +45,26 @@ release's assets with `--clobber` instead of creating a second release.
 
 ## Independent verification
 
+The release job uses the reviewed, hash-locked toolchain in
+`requirements/release.txt`; it does not install mutable latest build or
+publishing packages. The lock includes transitive release-path dependencies,
+and the PEP 517 backend is pinned to the same setuptools and wheel versions in
+`pyproject.toml`. The job builds two clean source archives with the same
+`SOURCE_DATE_EPOCH` and rejects digest drift before publishing the reviewed
+artifacts.
+
+To intentionally refresh the toolchain, edit the four direct requirements in
+`requirements/release.in` and regenerate the lock with:
+
+```bash
+uv pip compile requirements/release.in --python-version 3.13 \
+  --generate-hashes --output-file requirements/release.txt
+```
+
+Review the complete diff, run the package workflow on a pull request, and only
+then merge the update. Runtime dependency windows are deliberately not tied to
+this release-only toolchain.
+
 Download the release metadata artifact from the successful Package workflow
 run (the artifact is named `base-cli-release-metadata-<run-id>`), alongside
 the wheel or sdist you downloaded from PyPI:
