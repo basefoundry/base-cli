@@ -15,7 +15,7 @@ from typing import NoReturn
 PACKAGE_NAME = "base-cli"
 IMPORT_NAME = "base_cli"
 MINIMUM_PYTHON = ">=3.10"
-REQUIRED_DEPENDENCIES = ("click<8.5,>=8.1",)
+REQUIRED_DEPENDENCIES = ("click<8.6,>=8.1",)
 YAML_DEPENDENCY_PREFIX = "PyYAML<7,>=6.0"
 DOCUMENTATION_URL = "Documentation, https://basefoundry.github.io/base-cli/"
 ALLOWED_WHEEL_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", "top_level.txt", "entry_points.txt"})
