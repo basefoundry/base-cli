@@ -317,7 +317,7 @@ class ExplicitConfigValidationTests(unittest.TestCase):
             result = invoke(app, ["--config", "~/explicit-config.yml"], home=home)
 
             self.assertEqual(result.exit_code, 0, _combined_output(result))
-            self.assertEqual(seen, {"environment": "tilde"})
+            self.assertEqual(seen, {"environment": "dev"})
 
 
 if __name__ == "__main__":

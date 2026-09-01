@@ -11,6 +11,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Fixed
+
+- Keep plain consumer configuration mappings opaque so only validated
+  `ConfigSnapshot.framework` values control lifecycle behavior.
+
 ## [0.4.3] - 2026-08-29
 
 This is a compatible pre-1.0 patch release. It contains lifecycle hardening,
