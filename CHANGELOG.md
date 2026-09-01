@@ -20,6 +20,8 @@ and versions are tracked in the repo-root `VERSION` file.
   teardown cleanup from process-control exceptions.
 - Preserve streaming human output unless JSON was explicitly requested,
   including pre-parse option, environment, and default-map detection.
+- Make managed metadata and index replacements atomic, with bounded retries
+  for transient Windows file-sharing locks.
 
 ## [0.4.3] - 2026-08-29
 

@@ -39,7 +39,13 @@ History may enrich a matching record with consumer fields, but the core writes
 the canonical lifecycle fields last. If terminal persistence fails, the
 process keeps its primary result and the framework best-effort removes its
 matching or corrupt record rather than leave history data or `running` state
-looking authoritative. Writes are not yet promised to be atomic.
+looking authoritative. Required JSON snapshots are written to a sibling
+temporary file, flushed, and atomically replaced; readers therefore observe
+either the previous complete document or the new complete document, never a
+truncated JSON file. A failed serialization, permission check, or replacement
+leaves the previous snapshot intact. History is intentionally append-only and
+uses its file lock to serialize complete JSON lines; it is not rewritten as an
+atomic snapshot.
 
 The ownership boundary intentionally excludes parser failures, help and version
 requests, inherited runtime bindings, `log_to_file=False`, and dry-run mode.
