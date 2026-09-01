@@ -67,8 +67,12 @@ command = adapter.attach(name="example")
 
 `adapter.command` exposes the cached Click command returned by the most recent
 `attach()` call. Reuse that object when the application needs to inspect or
-pass the generated command to another integration boundary; calling
-`attach()` again refreshes the cached command.
+pass the generated command to another integration boundary. Repeating
+`attach()` without new lifecycle arguments is idempotent and returns the same
+Click object. A second call with lifecycle arguments after attachment is
+rejected with
+`TypeError`; construct a new adapter when the lifecycle configuration needs to
+change rather than silently mutating an attached command tree.
 
 Typer is an optional extra and is imported lazily.  Importing `base_cli` and
 using the Click integration never imports or requires Typer.
