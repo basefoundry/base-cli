@@ -20,6 +20,8 @@ and versions are tracked in the repo-root `VERSION` file.
   teardown cleanup from process-control exceptions.
 - Preserve streaming human output unless JSON was explicitly requested,
   including pre-parse option, environment, and default-map detection.
+- Require output records to match the declared list-of-mappings contract and
+  apply identical bounded width handling to Rich and plain renderers.
 - Make managed metadata and index replacements atomic, with bounded retries
   for transient Windows file-sharing locks.
 

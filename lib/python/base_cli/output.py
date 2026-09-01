@@ -206,12 +206,19 @@ def render_document(
         target.write(yaml.safe_dump(dict(document), sort_keys=False, allow_unicode=True))
         return resolved
 
-    if records_key:
+    if records_key is not None:
         candidate = document.get(records_key)
-        if isinstance(candidate, list):
-            records = [record for record in candidate if isinstance(record, Mapping)]
-        else:
-            records = [document]
+        if not isinstance(candidate, list):
+            raise OutputFormatError(f"records_key '{records_key}' must identify a list of record mappings.")
+        invalid_index = next(
+            (index for index, record in enumerate(candidate) if not isinstance(record, Mapping)),
+            None,
+        )
+        if invalid_index is not None:
+            raise OutputFormatError(
+                f"records_key '{records_key}' contains a non-mapping record at index {invalid_index}."
+            )
+        records = list(candidate)
     else:
         records = [document]
     selected_columns = columns or _document_columns(records)
@@ -301,28 +308,24 @@ def _write_table(
         raise ValueError("terminal_width must be greater than 0 when set")
     available_width = terminal_width if terminal_width is not None else _terminal_width(stream)
     widths = _fit_table_width(widths, available_width)
+    bounded_headers = [_truncate(header, width) for header, width in zip(headers, widths, strict=False)]
+    bounded_rows = [[_truncate(value, width) for value, width in zip(row, widths, strict=False)] for row in table_rows]
 
     if rich and try_render_rich_table(
         stream,
-        headers,
-        table_rows,
+        bounded_headers,
+        bounded_rows,
         footer,
         terminal_width=terminal_width,
     ):
         return
 
     stream.write(
-        "  ".join(
-            _pad_cell(_truncate(header, width), width) for header, width in zip(headers, widths, strict=False)
-        ).rstrip()
+        "  ".join(_pad_cell(header, width) for header, width in zip(bounded_headers, widths, strict=False)).rstrip()
     )
     stream.write("\n")
-    for row in table_rows:
-        stream.write(
-            "  ".join(
-                _pad_cell(_truncate(value, width), width) for value, width in zip(row, widths, strict=False)
-            ).rstrip()
-        )
+    for row in bounded_rows:
+        stream.write("  ".join(_pad_cell(value, width) for value, width in zip(row, widths, strict=False)).rstrip())
         stream.write("\n")
     if footer:
         stream.write(f"\n{footer}\n")
