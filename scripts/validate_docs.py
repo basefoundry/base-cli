@@ -34,6 +34,7 @@ PUBLIC_DOCS = frozenset(
         "migrations.md",
         "output-contracts.md",
         "performance.md",
+        "testing.md",
         "platform-support.md",
         "releasing.md",
         "security-review.md",

@@ -14,10 +14,10 @@ class CompatibilityDashboardTests(unittest.TestCase):
         dashboard = generate_compatibility_dashboard.generate_dashboard(root)
         for expected in (
             "`>=3.10,<4`",
-            "`click>=8.1,<8.5`",
+            "`click>=8.1,<8.6`",
             "`PyYAML>=6.0,<7`",
             "`typer>=0.12,<0.28`",
-            "8.1, 8.2, 8.3, 8.4",
+            "8.1, 8.2, 8.3, 8.4, 8.5",
             "0.25.1, 0.26.0, 0.27.1",
             "Debian 12",
             "Fedora latest",

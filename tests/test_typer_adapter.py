@@ -109,6 +109,20 @@ class TyperAdapterTests(unittest.TestCase):
         self.assertIs(command, adapter.command)
         self.assertEqual(command.name, "cached-cli")
 
+    def test_repeated_attachment_is_idempotent_and_changed_arguments_are_rejected(self) -> None:
+        cli = self.typer.Typer()
+
+        @cli.command()
+        def status() -> None:
+            self.typer.echo("ready")
+
+        adapter = base_cli.TyperAdapter(cli)
+        first = adapter.attach(name="cached-cli", log_to_file=False)
+        second = adapter.attach()
+        self.assertIs(first, second)
+        with self.assertRaisesRegex(TypeError, "cannot be changed"):
+            adapter.attach(name="other-cli", log_to_file=False)
+
     def test_adapter_uses_owner_dialect_for_version_option(self) -> None:
         cli = self.typer.Typer()
 

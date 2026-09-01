@@ -25,7 +25,7 @@ tests that should be run or extended.
 Run the repository gates appropriate to the change:
 
 ```bash
-./tests/validate.sh
+./tests/full_validate.sh
 python -m pytest
 ruff format --check scripts examples
 ruff check lib/python/base_cli scripts examples tests

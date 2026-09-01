@@ -28,6 +28,7 @@ required_files=(
   docs/user-config-typing.md
   docs/migrations.md
   docs/security-threat-model.md
+  docs/testing.md
   docs/security-review.md
   docs/adopter-readiness.md
   docs/adoption-evidence.md
@@ -44,6 +45,7 @@ required_files=(
   scripts/record_compatibility_evidence.py
   scripts/generate_compatibility_dashboard.py
   scripts/benchmark_runtime.py
+  tests/full_validate.sh
   tests/conftest.py
   compatibility/README.md
   compatibility/consumers/manifest.json
