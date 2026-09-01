@@ -19,3 +19,9 @@ class BenchmarkSummaryTests(unittest.TestCase):
         self.assertEqual(summary["median"], 4.0)
         self.assertAlmostEqual(summary["p95"], 6.7)
         self.assertEqual(summary["maximum"], 7.0)
+
+    def test_framework_comparison_has_stable_public_set(self) -> None:
+        self.assertEqual(
+            benchmark_runtime.FRAMEWORKS,
+            ("base-cli", "click", "typer", "cyclopts"),
+        )
