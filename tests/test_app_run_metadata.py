@@ -429,7 +429,11 @@ class AppRunMetadataTests(unittest.TestCase):
 
         profile = replace(
             base_cli.CliProfile.generic(
-                load_config=lambda _project, _explicit: {"log_level": "debug"},
+                load_config=lambda _project, _explicit: base_cli.ConfigSnapshot(
+                    config={},
+                    framework=base_cli.FrameworkConfig(log_level="debug"),
+                    provenance={},
+                ),
             ),
             resolve_runtime=fail_runtime,
         )
@@ -450,7 +454,11 @@ class AppRunMetadataTests(unittest.TestCase):
 
     def test_config_debug_with_quiet_keeps_traceback_out_of_stderr_and_shows_hint(self) -> None:
         profile = base_cli.CliProfile.generic(
-            load_config=lambda _project, _explicit: {"log_level": "debug"},
+            load_config=lambda _project, _explicit: base_cli.ConfigSnapshot(
+                config={},
+                framework=base_cli.FrameworkConfig(log_level="debug"),
+                provenance={},
+            ),
         )
         app = base_cli.App(name="metadata-config-debug-quiet", profile=profile)
 
@@ -471,6 +479,39 @@ class AppRunMetadataTests(unittest.TestCase):
         self.assertIn("Re-run with --debug for a traceback.", stderr)
         self.assertIn("RuntimeError: quiet private detail", log_text)
         _assert_terminal_metadata(self, metadata, status="error", outcome="unexpected_error", exit_code=1)
+
+    def test_plain_consumer_lifecycle_keys_do_not_change_framework_state(self) -> None:
+        profile = base_cli.CliProfile.generic(
+            load_config=lambda _project, _explicit: {
+                "environment": "production",
+                "log_level": "debug",
+                "keep_temp": "false",
+                "answer": 42,
+            }
+        )
+        app = base_cli.App(name="opaque-config", profile=profile, log_to_file=False)
+        seen: dict[str, object] = {}
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            seen.update(
+                environment=ctx.environment,
+                debug=ctx.debug,
+                keep_temp=ctx.keep_temp,
+                config=ctx.config,
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            status, _stderr = _run(app, Path(tmpdir))
+
+        self.assertEqual(status, 0)
+        self.assertEqual(seen["environment"], "dev")
+        self.assertFalse(seen["debug"])
+        self.assertFalse(seen["keep_temp"])
+        self.assertEqual(
+            seen["config"],
+            {"environment": "production", "log_level": "debug", "keep_temp": "false", "answer": 42},
+        )
 
     def test_traceback_logging_interruption_cannot_replace_primary_exception(self) -> None:
         app = base_cli.App(name="metadata-traceback-interrupt")
