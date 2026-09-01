@@ -51,6 +51,9 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Fixed
 
+- Enforce the portable `0` through `255` process exit-code contract for command
+  return values, rejecting booleans and out-of-range integers consistently.
+
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
 - Apply the documented count-only 20-bundle retention default to implicit JSON
