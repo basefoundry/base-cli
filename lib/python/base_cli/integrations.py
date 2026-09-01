@@ -1,9 +1,11 @@
 """Optional Rich and OpenTelemetry integrations.
 
 The core package deliberately imports no integration dependency. Optional
-libraries are resolved only after a consumer opts in, and every integration
-boundary is best-effort so a missing or broken plugin cannot change command
-completion.
+libraries are resolved only after a consumer opts in, and ordinary integration
+failures are best-effort so a missing or broken plugin cannot change command
+completion. Process-control exceptions always retain their normal meaning;
+only the explicitly documented teardown shield keeps them from replacing the
+primary command outcome.
 """
 
 from __future__ import annotations
@@ -57,7 +59,7 @@ def try_render_rich_table(
         from rich.console import Console
         from rich.table import Table
         from rich.text import Text
-    except BaseException:  # pragma: no cover - depends on optional package
+    except Exception:  # pragma: no cover - depends on optional package
         return False
 
     try:
@@ -88,7 +90,7 @@ def try_render_rich_table(
             console.print()
             console.print(footer)
         return True
-    except BaseException:  # pragma: no cover - depends on optional package
+    except Exception:  # pragma: no cover - depends on optional package
         return False
 
 
@@ -117,7 +119,7 @@ def start_telemetry(options: TelemetryOptions | None, context: Any) -> Telemetry
             return None
         _safe_span_call(span, "add_event", "base_cli.run.started", attributes=attributes)
         return TelemetrySession(span=span, started_monotonic_ns=time.monotonic_ns())
-    except BaseException as exc:  # pragma: no cover - optional package/runtime dependent
+    except Exception as exc:  # pragma: no cover - optional package/runtime dependent
         _debug_integration_failure(context, "OpenTelemetry start failed", exc)
         return None
 
@@ -154,6 +156,9 @@ def finish_telemetry(
         )
         _safe_span_call(session.span, "end")
     except BaseException as exc:  # pragma: no cover - optional exporter dependent
+        # Finishing telemetry is teardown. Preserve the already-determined
+        # command result even if an exporter or logger raises process-control
+        # exceptions while the span is being closed.
         _debug_integration_failure(context, "OpenTelemetry finish failed", exc)
 
 
@@ -173,9 +178,11 @@ def _safe_span_call(span: Any, method: str, *args: Any, **kwargs: Any) -> None:
         callback = getattr(span, method, None)
         if callback is not None:
             callback(*args, **kwargs)
-    except BaseException:
+    except Exception:
         # Exporters and SDK shutdown hooks are outside the command's failure
-        # boundary. A broken exporter must never fail the user command.
+        # boundary. Ordinary exporter failures must never fail the user
+        # command. Process-control exceptions propagate to the caller; the
+        # finish_telemetry teardown shield above retains the primary result.
         pass
 
 

@@ -46,6 +46,10 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Fixed
 
+- Preserve `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit` across Rich,
+  telemetry startup, and extension-loading boundaries; only telemetry teardown
+  retains its explicit primary-outcome shield.
+
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
 - Apply the documented count-only 20-bundle retention default to implicit JSON
