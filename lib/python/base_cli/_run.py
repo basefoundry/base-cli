@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import inspect
-import io
 import os
 import sys
+import tempfile
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import redirect_stdout
-from typing import Any
+from typing import Any, TextIO
 
 from ._app_core import (
     _ASYNC_CALLBACK_ERROR,
@@ -29,6 +29,8 @@ from .exit_codes import ExitCode
 from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import LifecycleOption, LifecycleOptions
 from .redaction import option_aliases_from_decls
+
+_MAX_JSON_CAPTURE_BYTES = 1_048_576
 
 
 def run_app(
@@ -63,22 +65,25 @@ def run_app(
         json_output=_json_requested(args, app.lifecycle_options),
     )
     state_token = _INVOCATION_STATE.set(state)
-    output_capture: io.StringIO | None = None
+    output_capture: TextIO | None = None
     try:
         try:
             display_command = app.profile.display_command()
             invocation_argv = _effective_invocation_argv(app, args, display_command)
             command = app.click_command
             click = dialect_for_command(command)
+            if not state.json_output:
+                state.json_output = _json_requested(
+                    args,
+                    app.lifecycle_options,
+                    default_map=_command_default_map(command),
+                )
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
                 bypass_token = _INVOCATION_MAIN_BYPASS.set(command)
-                # A configured JSON option may be enabled by any Click-supported
-                # source (for example ``default_map`` or a combined short flag),
-                # so raw argv cannot determine capture eligibility.  Buffer the
-                # command whenever JSON mode exists and let the parsed lifecycle
-                # value decide whether to emit an envelope or replay human text.
-                output_capture = io.StringIO() if app.lifecycle_options.json is not None else None
+                # Capture only an active JSON invocation. Human and NDJSON
+                # paths retain the real stdout stream and its flush behavior.
+                output_capture = _new_json_capture() if state.json_output else None
                 try:
                     if output_capture is None:
                         result = command.main(
@@ -172,12 +177,17 @@ def run_app(
             print(f"ERROR: {exc}", file=sys.stderr)
             return ExitCode.FAILURE
     finally:
-        if output_capture is not None and not state.json_output:
-            sys.stdout.write(output_capture.getvalue())
+        if output_capture is not None:
+            output_capture.close()
         _reset_context_var(_INVOCATION_STATE, state_token)
 
 
-def _json_requested(args: list[str], lifecycle_options: LifecycleOptions) -> bool:
+def _json_requested(
+    args: list[str],
+    lifecycle_options: LifecycleOptions,
+    *,
+    default_map: Mapping[str, Any] | None = None,
+) -> bool:
     option = lifecycle_options.json
     if option is None:
         return False
@@ -200,7 +210,36 @@ def _json_requested(args: list[str], lifecycle_options: LifecycleOptions) -> boo
         envvars = (option.envvar,) if isinstance(option.envvar, str) else option.envvar
         if any(os.environ.get(name, "").lower() in {"1", "true", "yes", "on"} for name in envvars):
             return True
+    if default_map is not None:
+        key = option.name or _option_destination(option)
+        value = default_map.get(key)
+        if isinstance(value, bool):
+            return value
     return option.default is True
+
+
+def _option_destination(option: LifecycleOption) -> str:
+    for declaration in option.param_decls:
+        if declaration.startswith("--"):
+            return declaration[2:].split("/", 1)[0].replace("-", "_")
+    return ""
+
+
+def _command_default_map(command: Any) -> Mapping[str, Any] | None:
+    settings = getattr(command, "context_settings", None)
+    if not isinstance(settings, Mapping):
+        return None
+    default_map = settings.get("default_map")
+    return default_map if isinstance(default_map, Mapping) else None
+
+
+def _new_json_capture() -> TextIO:
+    return tempfile.SpooledTemporaryFile(
+        max_size=_MAX_JSON_CAPTURE_BYTES,
+        mode="w+",
+        encoding="utf-8",
+        newline="",
+    )
 
 
 def _explicit_lifecycle_value(
@@ -235,14 +274,20 @@ def _explicit_lifecycle_value(
     return current
 
 
-def _captured_stdout(output_capture: io.StringIO | None) -> str:
-    return "" if output_capture is None else output_capture.getvalue()
+def _captured_stdout(output_capture: TextIO | None) -> str:
+    if output_capture is None:
+        return ""
+    position = output_capture.tell()
+    output_capture.seek(0)
+    value = output_capture.read()
+    output_capture.seek(position)
+    return value
 
 
 def _emit_json_success(
     state: _InvocationState,
     exit_code: int,
-    output_capture: io.StringIO | None,
+    output_capture: TextIO | None,
 ) -> None:
     details = {
         "exit_code": exit_code,
@@ -264,7 +309,7 @@ def _emit_json_error(
     state: _InvocationState,
     outcome: InvocationOutcome,
     message: str,
-    output_capture: io.StringIO | None,
+    output_capture: TextIO | None,
 ) -> None:
     if outcome.exit_code == ExitCode.SUCCESS:
         _emit_json_success(state, outcome.exit_code, output_capture)

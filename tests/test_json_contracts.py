@@ -375,6 +375,21 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 0, result.output)
         self.assertEqual(result.stdout, "hello\n")
 
+    def test_json_capable_human_path_does_not_capture_stdout(self) -> None:
+        app = self._retention_app("human-json-capable")
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            print("progress")
+
+        with tempfile.TemporaryDirectory() as home, mock.patch("base_cli._run._new_json_capture") as new_capture:
+            result = base_cli.testing.invoke(app, [], home=Path(home))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(result.stdout, "progress\n")
+        new_capture.assert_not_called()
+
     def test_implicit_json_retention_is_count_only(self) -> None:
         app = self._retention_app("json-count-only")
 
