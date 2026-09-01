@@ -30,6 +30,7 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Validation: testing.md
   - Getting started:
       - Framework choice: framework-choice.md
       - Adopter readiness: adopter-readiness.md

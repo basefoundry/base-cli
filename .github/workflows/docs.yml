@@ -22,6 +22,8 @@ on:
       - ".github/workflows/dependency-matrix.yml"
       - ".github/workflows/compatibility.yml"
       - "tests/validate.sh"
+      - "tests/full_validate.sh"
+      - "docs/testing.md"
       - ".github/workflows/docs.yml"
   pull_request:
     paths:
@@ -33,6 +35,8 @@ on:
       - "scripts/validate_docs.py"
       - "scripts/generate_api_reference.py"
       - "tests/validate.sh"
+      - "tests/full_validate.sh"
+      - "docs/testing.md"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
