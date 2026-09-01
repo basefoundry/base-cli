@@ -58,6 +58,9 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Added
 
+- Click 8.5 compatibility coverage across the dependency matrix and supported
+  OS test lanes; the core dependency window now permits `<8.6`.
+
 - Automate GitHub Releases from matching version tags with reviewed
   distributions, checksums, SBOM metadata, and generated comparison notes.
 - Publish a generated dependency and platform compatibility dashboard linked
