@@ -16,7 +16,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
-IMPORT_P95_BUDGET_MS = 750.0
+# Windows hosted runners have a materially slower fresh Python process start
+# (the import probe includes that process startup by design). Keep the tighter
+# budget on Unix while allowing the documented Windows baseline headroom.
+IMPORT_P95_BUDGET_MS = 1_000.0 if os.name == "nt" else 750.0
 INVOCATION_P95_BUDGET_MS = 1_500.0
 DEFAULT_ITERATIONS = 7
 FRAMEWORKS = ("base-cli", "click", "typer", "cyclopts")

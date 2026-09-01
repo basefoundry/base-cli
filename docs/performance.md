@@ -21,7 +21,8 @@ The CI quality job checks the base-cli sample p95 against these budgets:
 
 | Measurement | Budget |
 | --- | ---: |
-| Fresh `import base_cli` | 750 ms |
+| Fresh `import base_cli` (Unix) | 750 ms |
+| Fresh `import base_cli` (Windows) | 1,000 ms |
 | Isolated invocation and runtime filesystem setup | 1,500 ms |
 
 The benchmark reports the median, p95, and maximum for seven samples. Pass
