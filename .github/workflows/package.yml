@@ -107,7 +107,9 @@ jobs:
 
       - name: Build sdist and wheel
         env:
-          SOURCE_DATE_EPOCH: ${{ github.event.head_commit.timestamp || '0' }}
+          # Keep the reproducibility input numeric; push-event timestamps are
+          # ISO-8601 strings and are not accepted by wheel/build backends.
+          SOURCE_DATE_EPOCH: '0'
         run: |
           rm -rf dist-a dist-b "$RUNNER_TEMP/base-cli-build-a" "$RUNNER_TEMP/base-cli-build-b"
           mkdir -p dist-a dist-b
@@ -153,7 +155,7 @@ jobs:
       - name: Generate release checksums and SPDX SBOM
         env:
           SOURCE_REVISION: ${{ github.sha }}
-          SOURCE_DATE_EPOCH: ${{ github.event.head_commit.timestamp || '0' }}
+          SOURCE_DATE_EPOCH: '0'
         run: python scripts/generate_release_metadata.py dist
 
       - name: Validate release checksums and SPDX SBOM
