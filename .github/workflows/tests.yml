@@ -29,20 +29,14 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Validate repository baseline
-        run: ./tests/validate.sh
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install test dependencies
-        run: python -m pip install ".[dev,typer]"
-      - name: Run Python tests
-        run: python -m pytest
-      - name: Type-check public contract sample
-        run: python -m mypy --strict examples/typed_consumer.py
-      - name: Type-check library
-        run: python -m mypy --strict lib/python/base_cli
+      - name: Install full validation dependencies
+        run: python -m pip install ".[dev,typer,quality]"
+      - name: Run authoritative validation gate
+        run: ./tests/full_validate.sh
 
   quality:
     name: Quality and security gates
@@ -121,11 +115,11 @@ jobs:
               else
                 dnf install -y python3 python3-pip
               fi
-              ./tests/validate.sh
               python3 -m venv /tmp/base-cli-venv
               /tmp/base-cli-venv/bin/python -m pip install ".[dev,typer]"
-              /tmp/base-cli-venv/bin/python -m pytest
-              /tmp/base-cli-venv/bin/python -c "import base_cli; print(base_cli.__version__)"
+              . /tmp/base-cli-venv/bin/activate
+              python -m pip install ".[quality]"
+              ./tests/full_validate.sh
             '
 
   wsl:
@@ -144,4 +138,4 @@ jobs:
           $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
           $path = $env:GITHUB_WORKSPACE.Substring(2).Replace('\', '/')
           $linuxWorkspace = "/mnt/$drive$path"
-          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/validate.sh; bash tests/validate.sh; python3 --version"
+          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer,quality]'; bash tests/full_validate.sh"
