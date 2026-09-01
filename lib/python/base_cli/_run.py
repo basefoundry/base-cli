@@ -9,7 +9,7 @@ import tempfile
 import traceback
 from collections.abc import Callable, Mapping
 from contextlib import redirect_stdout
-from typing import Any, TextIO
+from typing import Any, TextIO, cast
 
 from ._app_core import (
     _ASYNC_CALLBACK_ERROR,
@@ -234,11 +234,14 @@ def _command_default_map(command: Any) -> Mapping[str, Any] | None:
 
 
 def _new_json_capture() -> TextIO:
-    return tempfile.SpooledTemporaryFile(
-        max_size=_MAX_JSON_CAPTURE_BYTES,
-        mode="w+",
-        encoding="utf-8",
-        newline="",
+    return cast(
+        TextIO,
+        tempfile.SpooledTemporaryFile(
+            max_size=_MAX_JSON_CAPTURE_BYTES,
+            mode="w+",
+            encoding="utf-8",
+            newline="",
+        ),
     )
 
 
