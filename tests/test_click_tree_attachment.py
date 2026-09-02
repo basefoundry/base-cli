@@ -11,6 +11,7 @@ from typing import Any
 from unittest import mock
 
 import base_cli
+from base_cli._runtime import RuntimeDirectoryError
 from base_cli.testing import invoke
 
 
@@ -615,6 +616,55 @@ class ClickTreeAttachmentTests(unittest.TestCase):
         self.assertEqual(callback_calls, [])
         self.assertEqual(len(cleanup_calls), 1)
         self.assertEqual(app.context_create_count, 1)
+        self.assertEqual(app.context_cleanup_count, 1)
+        with self.assertRaisesRegex(RuntimeError, "context is not active"):
+            base_cli.get_current_context()
+
+    def test_factory_configuration_and_runtime_failures_translate_to_click_errors(self) -> None:
+        import click
+
+        cases = (
+            (base_cli.ConfigurationError("invalid application configuration"), click.UsageError),
+            (RuntimeDirectoryError("runtime directory unavailable"), click.ClickException),
+        )
+        for failure, expected_type in cases:
+            with self.subTest(failure=type(failure).__name__):
+
+                @click.command(name=f"factory-{type(failure).__name__.lower()}")
+                def command() -> None:
+                    self.fail("factory failure should prevent callback execution")
+
+                app = _CountingApp(name=command.name or "factory", log_to_file=False)
+                app.attach(command, context_factory=lambda _context, failure=failure: (_ for _ in ()).throw(failure))
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    result = invoke(app, [], home=Path(tmpdir))
+
+                self.assertEqual(result.exit_code, 2 if expected_type is click.UsageError else 1, result.output)
+                self.assertIn(str(failure), result.output)
+                self.assertEqual(app.context_cleanup_count, 1)
+
+    def test_partial_attachment_initialization_finalizes_before_reraising(self) -> None:
+        import click
+
+        class PartialInitializationFailure(BaseException):
+            pass
+
+        @click.command(name="partial-attachment")
+        def command() -> None:
+            self.fail("partial initialization should prevent callback execution")
+
+        app = _CountingApp(name="partial-attachment", log_to_file=False)
+        app.attach(command)
+        failure = PartialInitializationFailure("context activation interrupted")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch(
+                "base_cli._attach.set_current_context",
+                side_effect=failure,
+            ):
+                with self.assertRaises(PartialInitializationFailure) as raised:
+                    invoke(app, [], home=Path(tmpdir), reraise_unexpected=True)
+
+        self.assertIs(raised.exception, failure)
         self.assertEqual(app.context_cleanup_count, 1)
         with self.assertRaisesRegex(RuntimeError, "context is not active"):
             base_cli.get_current_context()
