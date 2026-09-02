@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import io
 import os
 import sys
 import tempfile
@@ -30,7 +31,71 @@ from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import LifecycleOption, LifecycleOptions
 from .redaction import option_aliases_from_decls
 
-_MAX_JSON_CAPTURE_BYTES = 1_048_576
+_MAX_JSON_CAPTURE_BYTES = 8 * 1_048_576
+
+
+class JsonCaptureLimitError(RuntimeError):
+    """Raised when a JSON invocation exceeds its bounded stdout contract."""
+
+
+class _BoundedJsonCapture(io.TextIOBase):
+    """Text stream that bounds UTF-8 output before it reaches the spool."""
+
+    def __init__(self, limit_bytes: int) -> None:
+        super().__init__()
+        self._limit_bytes = limit_bytes
+        self._bytes_written = 0
+        self._stream = cast(
+            TextIO,
+            tempfile.SpooledTemporaryFile(
+                max_size=min(limit_bytes, 1_048_576),
+                mode="w+",
+                encoding="utf-8",
+                newline="",
+            ),
+        )
+
+    @property
+    def encoding(self) -> str:
+        return "utf-8"
+
+    @property
+    def errors(self) -> str:
+        return "strict"
+
+    def write(self, value: str) -> int:
+        encoded_size = len(value.encode("utf-8"))
+        if self._bytes_written + encoded_size > self._limit_bytes:
+            raise JsonCaptureLimitError(
+                f"JSON stdout exceeded the {_format_bytes(self._limit_bytes)} limit; use NDJSON for large record sets."
+            )
+        written = self._stream.write(value)
+        self._bytes_written += encoded_size
+        return written
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+    def read(self, size: int = -1) -> str:
+        return self._stream.read(size)
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        return self._stream.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._stream.tell()
+
+    def close(self) -> None:
+        try:
+            super().close()
+        finally:
+            self._stream.close()
+
+
+def _format_bytes(value: int) -> str:
+    if value % 1_048_576 == 0:
+        return f"{value // 1_048_576} MiB"
+    return f"{value} bytes"
 
 
 def run_app(
@@ -142,6 +207,12 @@ def run_app(
             if exc.code is not None and not isinstance(exc.code, int):
                 print(str(exc.code), file=sys.stderr)
             return system_exit_code(exc)
+        except JsonCaptureLimitError as exc:
+            if state.json_output:
+                outcome = InvocationOutcome("capture_limit", "error", ExitCode.FAILURE)
+                _emit_json_error(state, outcome, str(exc), output_capture)
+                return outcome.exit_code
+            raise
         except Exception as exc:
             if reraise_unexpected:
                 raise
@@ -234,15 +305,7 @@ def _command_default_map(command: Any) -> Mapping[str, Any] | None:
 
 
 def _new_json_capture() -> TextIO:
-    return cast(
-        TextIO,
-        tempfile.SpooledTemporaryFile(
-            max_size=_MAX_JSON_CAPTURE_BYTES,
-            mode="w+",
-            encoding="utf-8",
-            newline="",
-        ),
-    )
+    return cast(TextIO, _BoundedJsonCapture(_MAX_JSON_CAPTURE_BYTES))
 
 
 def _explicit_lifecycle_value(
