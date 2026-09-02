@@ -41,6 +41,9 @@ class JsonCaptureLimitError(RuntimeError):
 class _BoundedJsonCapture(io.TextIOBase):
     """Text stream that bounds UTF-8 output before it reaches the spool."""
 
+    encoding = "utf-8"
+    errors = "strict"
+
     def __init__(self, limit_bytes: int) -> None:
         super().__init__()
         self._limit_bytes = limit_bytes
@@ -55,14 +58,6 @@ class _BoundedJsonCapture(io.TextIOBase):
             ),
         )
 
-    @property
-    def encoding(self) -> str:
-        return "utf-8"
-
-    @property
-    def errors(self) -> str:
-        return "strict"
-
     def write(self, value: str) -> int:
         encoded_size = len(value.encode("utf-8"))
         if self._bytes_written + encoded_size > self._limit_bytes:
@@ -76,8 +71,8 @@ class _BoundedJsonCapture(io.TextIOBase):
     def flush(self) -> None:
         self._stream.flush()
 
-    def read(self, size: int = -1) -> str:
-        return self._stream.read(size)
+    def read(self, size: int | None = -1) -> str:
+        return self._stream.read(-1 if size is None else size)
 
     def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         return self._stream.seek(offset, whence)
