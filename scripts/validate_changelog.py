@@ -175,6 +175,11 @@ def _section_text(lines: list[str], version: str) -> str | None:
         if VERSION_HEADING.fullmatch(lines[index].strip()) is not None:
             end = index
             break
+        # Keep Markdown reference definitions at file scope rather than
+        # treating them as part of the final release section.
+        if REFERENCE_LINK.fullmatch(lines[index].strip()) is not None:
+            end = index
+            break
     return "\n".join(lines[start:end]).rstrip()
 
 
