@@ -16,10 +16,44 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
-# Windows hosted runners have a materially slower fresh Python process start
-# (the import probe includes that process startup by design). Keep the tighter
-# budget on Unix while allowing the documented Windows baseline headroom.
-IMPORT_P95_BUDGET_MS = 1_000.0 if os.name == "nt" else 750.0
+# Fresh-process startup is materially slower on native Windows and on WSL
+# when the checkout is on the Windows-mounted filesystem.  CI can select the
+# platform explicitly with BASE_CLI_BENCHMARK_PLATFORM; the fallback keeps
+# local runs useful without requiring a setting.
+IMPORT_P95_BUDGETS_MS = {
+    "unix": 750.0,
+    "macos": 750.0,
+    "windows": 1_000.0,
+    "wsl": 1_000.0,
+}
+
+
+def _is_wsl() -> bool:
+    try:
+        proc_version = Path("/proc/version").read_text(encoding="utf-8").lower()
+    except OSError:
+        return False
+    return "microsoft" in proc_version or "wsl" in proc_version
+
+
+def _benchmark_platform() -> str:
+    configured = os.environ.get("BASE_CLI_BENCHMARK_PLATFORM", "").strip().lower()
+    if configured:
+        if configured not in IMPORT_P95_BUDGETS_MS:
+            supported = ", ".join(sorted(IMPORT_P95_BUDGETS_MS))
+            raise ValueError(f"BASE_CLI_BENCHMARK_PLATFORM must be one of {supported}; got {configured!r}")
+        return configured
+    if os.name == "nt":
+        return "windows"
+    if sys.platform == "darwin":
+        return "macos"
+    if _is_wsl():
+        return "wsl"
+    return "unix"
+
+
+BENCHMARK_PLATFORM = _benchmark_platform()
+IMPORT_P95_BUDGET_MS = IMPORT_P95_BUDGETS_MS[BENCHMARK_PLATFORM]
 INVOCATION_P95_BUDGET_MS = 1_500.0
 DEFAULT_ITERATIONS = 7
 FRAMEWORKS = ("base-cli", "click", "typer", "cyclopts")
@@ -69,8 +103,19 @@ def main() -> int:
             "invocation_ms": _summary(_measure_invocations(args.iterations, framework)),
         }
     if args.json:
-        print(json.dumps({"iterations": args.iterations, "frameworks": metrics}, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    "iterations": args.iterations,
+                    "platform": BENCHMARK_PLATFORM,
+                    "import_p95_budget_ms": IMPORT_P95_BUDGET_MS,
+                    "frameworks": metrics,
+                },
+                sort_keys=True,
+            )
+        )
     else:
+        print(f"benchmark platform: {BENCHMARK_PLATFORM} (import p95 budget {IMPORT_P95_BUDGET_MS:.0f} ms)")
         for framework, result in metrics.items():
             if result.get("status") == "unavailable":
                 print(f"{framework}: unavailable (install it to include this comparison)")
