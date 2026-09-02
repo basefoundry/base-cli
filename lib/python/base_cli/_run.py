@@ -312,7 +312,10 @@ def _remaining_context_args(context: Any) -> list[str]:
     """Return unparsed group/command arguments without Click deprecation warnings."""
 
     values = getattr(context, "__dict__", {})
-    protected = values.get("_protected_args", ()) if isinstance(values, Mapping) else ()
+    if isinstance(values, Mapping):
+        protected = values.get("_protected_args", values.get("protected_args", ()))
+    else:
+        protected = ()
     args = getattr(context, "args", ())
     return [*protected, *args]
 

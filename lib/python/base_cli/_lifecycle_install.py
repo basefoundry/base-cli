@@ -450,7 +450,10 @@ def _nested_default_map_value(click_context: Any, key: str) -> Any:
     if not isinstance(default_map, Mapping):
         return None
     context_values = getattr(click_context, "__dict__", {})
-    protected = context_values.get("_protected_args", ()) if isinstance(context_values, Mapping) else ()
+    if isinstance(context_values, Mapping):
+        protected = context_values.get("_protected_args", context_values.get("protected_args", ()))
+    else:
+        protected = ()
     remaining = [*protected, *getattr(click_context, "args", ())]
     while remaining:
         command_name = remaining[0]
