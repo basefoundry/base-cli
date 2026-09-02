@@ -12,6 +12,9 @@ from typing import Any
 
 PRIVATE_FILE_MODE = 0o600
 PRIVATE_DIRECTORY_MODE = 0o700
+_WINDOWS_REPLACE_RETRY_DEADLINE_SECONDS = 1.0
+_WINDOWS_REPLACE_INITIAL_DELAY_SECONDS = 0.005
+_WINDOWS_RETRYABLE_WINERRORS = frozenset({32, 33})  # sharing and lock violations
 
 
 def restrict_file(path: Path) -> None:
@@ -182,16 +185,25 @@ def _sync_directory(parent_fd: int) -> None:
 def _replace_with_retry(source: Path, destination: Path) -> None:
     """Replace a private file, tolerating transient Windows sharing races."""
 
+    if os.name != "nt":
+        os.replace(source, destination)
+        return
+
     # Antivirus/indexer handles and concurrent writers can hold the destination
-    # briefly on Windows. Use a bounded, linear backoff long enough for those
-    # transient sharing violations without making a persistent permission error
-    # unbounded.
-    attempts = 1 if os.name != "nt" else 50
-    for attempt in range(attempts):
+    # briefly on Windows. Retry only documented sharing/lock violations and
+    # bound the total delay so permanent ACL/path failures remain actionable.
+    deadline = time.monotonic() + _WINDOWS_REPLACE_RETRY_DEADLINE_SECONDS
+    attempt = 0
+    while True:
         try:
             os.replace(source, destination)
             return
-        except PermissionError:
-            if attempt == attempts - 1:
+        except PermissionError as exc:
+            if getattr(exc, "winerror", None) not in _WINDOWS_RETRYABLE_WINERRORS:
                 raise
-            time.sleep(0.005 * (attempt + 1))
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise
+            delay = min(_WINDOWS_REPLACE_INITIAL_DELAY_SECONDS * (attempt + 1), remaining)
+            time.sleep(delay)
+            attempt += 1

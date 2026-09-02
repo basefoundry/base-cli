@@ -66,3 +66,9 @@ provided by the Windows mount and are outside the Linux filesystem contract.
 WSL2 support does not imply that the generic package translates paths between
 Linux and Windows or that a consumer's native Windows commands are available
 inside the distribution.
+
+On native Windows, private metadata replacement retries only sharing-violation
+and lock-violation errors (`winerror` 32 and 33). Access-denied and other
+permanent permission/path errors fail immediately. Transient retries are
+bounded by a one-second elapsed deadline; the destination remains untouched if
+that deadline is exhausted.
