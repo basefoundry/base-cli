@@ -49,8 +49,8 @@ that need a frozen API should pin a minor release (for example, `~=0.4.0`).
 
 The core package requires Python `>=3.10` and currently tests CPython 3.10
 through 3.14 on Linux, macOS, and Windows. The core runtime dependency is
-Click `>=8.1,<8.5`; the compatibility suite covers the 8.1, 8.2, 8.3, and
-8.4 lines on Python 3.10 and 3.14. YAML configuration and YAML output are provided by the
+Click `>=8.1,<8.6`; the compatibility suite covers the 8.1, 8.2, 8.3, 8.4,
+and 8.5 lines on Python 3.10 and 3.14. YAML configuration and YAML output are provided by the
 optional `base-cli[yaml]` extra, which supplies PyYAML `>=6.0,<7`. Other
 optional integrations are independently versioned and constrained in `pyproject.toml`: Typer
 `>=0.12,<0.28`, Rich `>=13.7,<15`, and OpenTelemetry API `>=1.24,<2`. The
