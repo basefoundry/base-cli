@@ -118,7 +118,7 @@ base_cli.TyperAdapter(...)
 **Kind:** class  
 **Signature:** `BatteriesIncludedConfigLoader(cli_name: 'str | None' = None, *, user_config_dir: 'Path | None' = None, user_config_name: 'str' = 'config.yaml', project_config_name: 'str' = '.base-cli.yaml', environment_dir_name: 'str' = 'environments') -> 'None'`
 
-**Behavior:** Load conventional user, project, environment, and explicit layers. When `user_config_dir` is omitted, the optional `cli_name` is normalized and used to namespace the platform-default user configuration directory. Provide an explicit `user_config_dir` to retain consumer-owned path policy. At least one of these two arguments is required.
+**Behavior:** Load conventional user, project, environment, and explicit layers.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
