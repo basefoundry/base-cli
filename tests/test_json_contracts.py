@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
-from base_cli._run import _json_requested
+from base_cli._run import JsonCaptureLimitError, _BoundedJsonCapture, _json_requested
 from base_cli.json_contracts import MAX_JSON_LOG_MESSAGE_LENGTH
 
 
@@ -431,6 +431,40 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(result.stdout, "")
         self.assertIn("No such option", result.stderr or result.output)
+
+    def test_json_capture_rejects_overflow_without_partial_writes(self) -> None:
+        capture = _BoundedJsonCapture(4)
+        try:
+            self.assertEqual(capture.write("éé"), 2)
+            with self.assertRaises(JsonCaptureLimitError):
+                capture.write("x")
+            capture.seek(0)
+            self.assertEqual(capture.read(), "éé")
+        finally:
+            capture.close()
+
+    def test_json_capture_overflow_is_one_machine_readable_error(self) -> None:
+        app = base_cli.App(
+            name="json-capture-limit",
+            log_to_file=False,
+            lifecycle_options=self._lifecycle_options(),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            print("x" * 17, end="")
+
+        with tempfile.TemporaryDirectory() as home:
+            with mock.patch("base_cli._run._MAX_JSON_CAPTURE_BYTES", 16):
+                result = base_cli.testing.invoke(app, ["--json"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 1)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["schema"], "base-cli.error")
+        self.assertEqual(envelope["code"], "capture_limit")
+        self.assertEqual(envelope["details"]["stdout"], "")
+        self.assertIn("16 bytes", envelope["message"])
 
     def test_json_mode_captures_default_map_values(self) -> None:
         app = base_cli.App(

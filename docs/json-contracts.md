@@ -21,9 +21,14 @@ Click error rendering and command stdout behavior, is unchanged.
 Capture is activated only when JSON mode is selected, including an environment
 variable or Click `default_map`. Human and NDJSON invocations write directly to
 the caller's stdout, preserving progress visibility and flush behavior. JSON
-capture uses a 1 MiB in-memory spool and transparently rolls larger output to a
-temporary file; the complete captured text remains available in the v1 envelope
-and the temporary file is removed when the invocation ends.
+capture allows at most 8 MiB of UTF-8 command stdout. It keeps the first 1 MiB
+in memory and rolls the remainder to a temporary file, so both temporary-disk
+use and finalization memory remain bounded. The temporary file is removed when
+the invocation ends.
+
+If a command exceeds the limit, base-cli emits one `base-cli.error` envelope
+with `code: "capture_limit"` and exit code `1`; it never silently truncates
+the captured text. Use the NDJSON contract for larger record sets.
 
 ## Output and errors
 
@@ -43,7 +48,7 @@ Both envelopes use `schema_version: 1` and stable fields:
 
 Failures use `schema: "base-cli.error"`, `type: "error"`, and a deterministic
 `code` derived from the lifecycle outcome (`usage_error`, `click_error`,
-`aborted`, `interrupted`, `unexpected_error`, and so on). `details` always
+`capture_limit`, `aborted`, `interrupted`, `unexpected_error`, and so on). `details` always
 contains the numeric `exit_code` and captured command stdout. A command's
 human output is represented as a JSON string, so it cannot introduce prose or
 ANSI escapes as a second stdout record.
