@@ -16,6 +16,7 @@ from ._app_core import (
     _INVOCATION_ARGV,
     _INVOCATION_MAIN_BYPASS,
     _INVOCATION_STATE,
+    _LIFECYCLE_CAPTURE_META_KEY,
     DISPLAY_COMMAND_ENV,
     App,
     _InvocationState,
@@ -77,6 +78,8 @@ def run_app(
                     args,
                     app.lifecycle_options,
                     default_map=_command_default_map(command),
+                    command=command,
+                    prog_name=display_command or app.name,
                 )
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
@@ -187,6 +190,8 @@ def _json_requested(
     lifecycle_options: LifecycleOptions,
     *,
     default_map: Mapping[str, Any] | None = None,
+    command: Any | None = None,
+    prog_name: str | None = None,
 ) -> bool:
     option = lifecycle_options.json
     if option is None:
@@ -206,6 +211,16 @@ def _json_requested(
     if explicit_value is not None:
         return explicit_value
 
+    # Once the command object is available, let Click resolve the option. Its
+    # parser knows about auto_envvar_prefix, nested default maps, callable
+    # defaults, and the complete boolean environment grammar (including `t`
+    # and `y`). This is used only for the pre-invocation capture decision; the
+    # real command is still parsed and invoked exactly once below.
+    if command is not None:
+        click_value = _click_lifecycle_value(command, args, option, prog_name)
+        if click_value is not None:
+            return click_value
+
     if option.envvar is not None:
         envvars = (option.envvar,) if isinstance(option.envvar, str) else option.envvar
         if any(os.environ.get(name, "").lower() in {"1", "true", "yes", "on"} for name in envvars):
@@ -216,6 +231,93 @@ def _json_requested(
         if isinstance(value, bool):
             return value
     return option.default is True
+
+
+def _click_lifecycle_value(
+    command: Any,
+    args: list[str],
+    option: LifecycleOption,
+    prog_name: str | None,
+) -> bool | None:
+    """Resolve a lifecycle flag with the owning Click command parser."""
+
+    contexts: list[Any] = []
+    current_command = command
+    current_args = list(args)
+    current_context: Any | None = None
+    try:
+        current_context = command.make_context(
+            prog_name,
+            current_args,
+            resilient_parsing=True,
+        )
+        contexts.append(current_context)
+        while current_args:
+            resolve_command = getattr(current_command, "resolve_command", None)
+            if not callable(resolve_command):
+                break
+            command_name, next_command, remaining = resolve_command(
+                current_context,
+                _remaining_context_args(current_context),
+            )
+            if command_name is None or next_command is None:
+                break
+            next_context = next_command.make_context(
+                command_name,
+                remaining,
+                parent=current_context,
+                resilient_parsing=True,
+            )
+            contexts.append(next_context)
+            current_command = next_command
+            current_context = next_context
+            current_args = _remaining_context_args(current_context)
+
+        destination = option.name or _option_destination(option)
+        for context in reversed(contexts):
+            params = getattr(context, "params", {})
+            value = params.get(destination) if isinstance(params, Mapping) else None
+            if isinstance(value, bool):
+                return value
+            context_default_map = getattr(context, "default_map", None)
+            if isinstance(context_default_map, Mapping):
+                mapped_value = context_default_map.get(destination)
+                if isinstance(mapped_value, bool):
+                    return mapped_value
+            meta = getattr(context, "meta", {})
+            captures = meta.get(_LIFECYCLE_CAPTURE_META_KEY) if isinstance(meta, Mapping) else None
+            if isinstance(captures, Mapping):
+                for captured in captures.values():
+                    if not isinstance(captured, Mapping):
+                        continue
+                    raw = captured.get("json")
+                    raw_value = getattr(raw, "value", None)
+                    if isinstance(raw_value, bool):
+                        return raw_value
+    except (Exception, SystemExit):
+        # Invalid command lines still need the lightweight explicit-token
+        # detector above so Click can render its normal machine error. A
+        # resilient parse may not be able to resolve a leaf command; in that
+        # case retain the existing fallback behavior.
+        return None
+    finally:
+        for context in reversed(contexts):
+            close = getattr(context, "close", None)
+            if callable(close):
+                close()
+    return None
+
+
+def _remaining_context_args(context: Any) -> list[str]:
+    """Return unparsed group/command arguments without Click deprecation warnings."""
+
+    values = getattr(context, "__dict__", {})
+    if isinstance(values, Mapping):
+        protected = values.get("_protected_args", values.get("protected_args", ()))
+    else:
+        protected = ()
+    args = getattr(context, "args", ())
+    return [*protected, *args]
 
 
 def _option_destination(option: LifecycleOption) -> str:

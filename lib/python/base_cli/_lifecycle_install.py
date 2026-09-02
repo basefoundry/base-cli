@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -443,6 +443,30 @@ def _prefer_lifecycle_value(
     return current
 
 
+def _nested_default_map_value(click_context: Any, key: str) -> Any:
+    """Read a command's nested default-map value before child invocation."""
+
+    default_map = getattr(click_context, "default_map", None)
+    if not isinstance(default_map, Mapping):
+        return None
+    context_values = getattr(click_context, "__dict__", {})
+    if isinstance(context_values, Mapping):
+        protected = context_values.get("_protected_args", context_values.get("protected_args", ()))
+    else:
+        protected = ()
+    remaining = [*protected, *getattr(click_context, "args", ())]
+    while remaining:
+        command_name = remaining[0]
+        if not isinstance(command_name, str) or command_name.startswith(("-", "+", "/")):
+            break
+        nested = default_map.get(command_name)
+        if not isinstance(nested, Mapping):
+            break
+        default_map = nested
+        remaining = remaining[1:]
+    return default_map.get(key)
+
+
 def _normalize_lifecycle_values(
     click: Any,
     raw: dict[str, _RawLifecycleValue],
@@ -521,6 +545,7 @@ def _resolve_lifecycle_values(
     depth = _context_depth(click_context)
 
     for key, binding in bindings.items():
+        candidate: _RawLifecycleValue | None
         if binding.adopted:
             candidate = _RawLifecycleValue(
                 value=getattr(click_context, "params", {}).get(binding.parameter_name),
@@ -529,6 +554,15 @@ def _resolve_lifecycle_values(
             )
         else:
             candidate = context_captures.get(key)
+        mapped_value = _nested_default_map_value(click_context, binding.parameter_name)
+        if isinstance(mapped_value, bool):
+            default_map_source = getattr(getattr(click, "core", click), "ParameterSource", None)
+            source = getattr(default_map_source, "DEFAULT_MAP", None)
+            if source is not None:
+                candidate = _prefer_lifecycle_value(
+                    candidate,
+                    _RawLifecycleValue(value=mapped_value, source=source, depth=depth + 1),
+                )
         selected = _prefer_lifecycle_value(raw.get(key), candidate)
         if selected is not None:
             raw[key] = selected

@@ -215,6 +215,99 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(envelope["type"], "success")
         self.assertEqual(envelope["details"]["stdout"], "hello from env\n")
 
+    def test_json_click_parser_handles_boolean_envvar_spellings(self) -> None:
+        app = base_cli.App(
+            name="json-envvar-spellings",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json", envvar="BASE_JSON_MODE"),
+            ),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            print("hello from env")
+
+        for value in ("t", "y"):
+            with self.subTest(value=value), tempfile.TemporaryDirectory() as home:
+                with mock.patch.dict(os.environ, {"BASE_JSON_MODE": value}, clear=False):
+                    result = base_cli.testing.invoke(app, [], home=Path(home))
+                self.assertEqual(result.exit_code, 0, result.output)
+                envelope = json.loads(result.stdout)
+                self.assertEqual(envelope["details"]["stdout"], "hello from env\n")
+
+    def test_json_click_parser_handles_auto_envvar_prefix(self) -> None:
+        app = base_cli.App(
+            name="json-auto-envvar",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json"),
+            ),
+        )
+
+        @app.command(context_settings={"auto_envvar_prefix": "TOOL"})
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            print("hello from auto env")
+
+        with tempfile.TemporaryDirectory() as home:
+            with mock.patch.dict(os.environ, {"TOOL_JSON": "1"}, clear=False):
+                result = base_cli.testing.invoke(app, [], home=Path(home))
+        self.assertEqual(result.exit_code, 0, result.output)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["details"]["stdout"], "hello from auto env\n")
+
+    def test_json_click_parser_handles_callable_defaults(self) -> None:
+        app = base_cli.App(
+            name="json-callable-default",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json", default=lambda: True),
+            ),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            print("hello from default")
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, [], home=Path(home))
+        self.assertEqual(result.exit_code, 0, result.output)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["details"]["stdout"], "hello from default\n")
+
+    def test_json_click_parser_handles_nested_default_map(self) -> None:
+        import click
+
+        app = base_cli.App(
+            name="json-nested-default-map",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json"),
+            ),
+        )
+
+        @click.group(
+            name="json-nested-default-map",
+            context_settings={"default_map": {"status": {"json": True}}},
+        )
+        def command() -> None:
+            pass
+
+        @command.command()
+        def status() -> None:
+            print("hello from leaf")
+
+        app.attach(command)
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(command, ["status"], home=Path(home))
+        self.assertEqual(result.exit_code, 0, result.output)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["details"]["stdout"], "hello from leaf\n")
+
     def test_json_mode_captures_combined_short_flags(self) -> None:
         app = base_cli.App(
             name="json-combined-short",
