@@ -24,6 +24,14 @@ and versions are tracked in the repo-root `VERSION` file.
   apply identical bounded width handling to Rich and plain renderers.
 - Make managed metadata and index replacements atomic, with bounded retries
   for transient Windows file-sharing locks.
+- Select platform-aware cache roots (`XDG_CACHE_HOME`, macOS Caches, and
+  Windows `LOCALAPPDATA`) and normalize home-relative paths across separators.
+- Add README health and support badges for CI, downstream consumers, PyPI, and
+  supported Python versions.
+- Enforce the portable `0` through `255` process exit-code contract for command
+  return values, rejecting booleans and out-of-range integers consistently.
+- Add Click 8.5 compatibility coverage across the dependency matrix and
+  supported OS test lanes; the core dependency window now permits `<8.6`.
 
 ## [0.4.3] - 2026-08-29
 
@@ -60,9 +68,6 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Fixed
 
-- Enforce the portable `0` through `255` process exit-code contract for command
-  return values, rejecting booleans and out-of-range integers consistently.
-
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
 - Apply the documented count-only 20-bundle retention default to implicit JSON
@@ -74,9 +79,6 @@ boundary. Existing Click and Typer command trees remain supported.
   cannot prevent healthy extensions from being discovered.
 
 ### Added
-
-- Click 8.5 compatibility coverage across the dependency matrix and supported
-  OS test lanes; the core dependency window now permits `<8.6`.
 
 - Automate GitHub Releases from matching version tags with reviewed
   distributions, checksums, SBOM metadata, and generated comparison notes.
@@ -229,7 +231,6 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 
 ### Changed
 
-- Add README health and support badges for CI, downstream consumers, PyPI, and supported Python versions.
 - Normalize command returns, Click errors, aborts, interrupts, `SystemExit`, and
   unexpected exceptions through one core outcome model and clean `run_app()`
   process boundary.
@@ -289,8 +290,6 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 
 ### Changed
 
-- Select platform-aware cache roots (`XDG_CACHE_HOME`, macOS Caches, and
-  Windows `LOCALAPPDATA`) and normalize home-relative paths across separators.
 - Make `base_cli.App()` use the consumer-neutral profile by default.
 - Move manifest discovery, implicit configuration, owner-aware runtime layout,
   and history persistence out of the generic package. Consumers now provide
@@ -324,6 +323,10 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 - Initialized the repository with the Base-managed repo baseline.
 - Added the guarded package build, artifact validation, and protected
   TestPyPI/PyPI publication workflow.
+- Exposed `base_cli.__version__` from the repository and installed package
+  version contract.
+- Pinned the build backend to metadata compatible with the bundled publication
+  action and made license-file validation portable across setuptools versions.
 
 [Unreleased]: https://github.com/basefoundry/base-cli/compare/v0.4.3...HEAD
 [0.4.3]: https://github.com/basefoundry/base-cli/compare/v0.4.2...v0.4.3
@@ -332,7 +335,3 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 [0.4.0]: https://github.com/basefoundry/base-cli/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/basefoundry/base-cli/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/basefoundry/base-cli/releases/tag/v0.2.0
-- Exposed `base_cli.__version__` from the repository and installed package
-  version contract.
-- Pinned the build backend to metadata compatible with the bundled publication
-  action and made license-file validation portable across setuptools versions.

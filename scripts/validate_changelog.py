@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -21,7 +22,7 @@ INTERNAL_MARKERS = (
 )
 
 
-def validate_changelog(path: Path) -> list[str]:
+def validate_changelog(path: Path, *, verify_tags: bool | None = None) -> list[str]:
     """Return human-readable violations found in ``path``."""
     lines = path.read_text(encoding="utf-8").splitlines()
     errors: list[str] = []
@@ -112,7 +113,74 @@ def validate_changelog(path: Path) -> list[str]:
         if version not in versions:
             errors.append(f"release link [{version}] has no matching version section")
 
+    if verify_tags is None:
+        verify_tags = (path.parent / ".git").exists()
+    if verify_tags:
+        errors.extend(_validate_published_sections(path, lines, versions))
+
     return errors
+
+
+def _validate_published_sections(
+    path: Path,
+    lines: list[str],
+    versions: list[str],
+) -> list[str]:
+    """Ensure every released section remains identical to its version tag."""
+
+    errors: list[str] = []
+    for version in versions:
+        if version == "Unreleased":
+            continue
+        tag = f"v{version}"
+        try:
+            completed = subprocess.run(
+                ["git", "-C", str(path.parent), "show", f"{tag}:CHANGELOG.md"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as exc:
+            detail = getattr(exc, "stderr", None) or str(exc)
+            errors.append(
+                f"cannot verify [{version}] against tag {tag}: {detail.strip()}; "
+                "fetch the release tags before validating"
+            )
+            continue
+        tagged_lines = completed.stdout.splitlines()
+        current_section = _section_text(lines, version)
+        tagged_section = _section_text(tagged_lines, version)
+        if current_section is None:
+            continue
+        if tagged_section is None:
+            errors.append(f"tag {tag} has no [{version}] changelog section")
+        elif current_section != tagged_section:
+            errors.append(f"published changelog section [{version}] differs from tag {tag}")
+    return errors
+
+
+def _section_text(lines: list[str], version: str) -> str | None:
+    """Return one complete version section without trailing blank lines."""
+
+    start: int | None = None
+    for index, line in enumerate(lines):
+        match = VERSION_HEADING.fullmatch(line.strip())
+        if match is not None and match.group("version") == version:
+            start = index
+            break
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if VERSION_HEADING.fullmatch(lines[index].strip()) is not None:
+            end = index
+            break
+        # Keep Markdown reference definitions at file scope rather than
+        # treating them as part of the final release section.
+        if REFERENCE_LINK.fullmatch(lines[index].strip()) is not None:
+            end = index
+            break
+    return "\n".join(lines[start:end]).rstrip()
 
 
 def main() -> None:
