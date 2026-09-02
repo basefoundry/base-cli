@@ -89,6 +89,24 @@ jobs:
               return 0
             fi
 
+            # Project V2 operations consume the shared GraphQL quota, while
+            # the REST rate-limit endpoint remains available for discovering
+            # the actual reset time. Avoid a misleading fixed 60-second retry
+            # when the quota will not recover within this workflow attempt.
+            reset_epoch="$(gh api rate_limit --jq '.resources.graphql.reset' 2>/dev/null || true)"
+            if [[ "$reset_epoch" =~ ^[0-9]+$ ]]; then
+              now="$(date +%s)"
+              delay=$(( reset_epoch - now + 5 ))
+              if (( delay < 5 )); then
+                delay=5
+              fi
+              if (( delay > 300 )); then
+                delay=300
+              fi
+              printf '%s\n' "$delay"
+              return 0
+            fi
+
             printf '60\n'
           }
 
@@ -161,7 +179,10 @@ jobs:
             return "$status"
           }
 
-          issue_json="$(project_intake_gh "view issue" gh issue view "$issue_number" --repo "$GITHUB_REPOSITORY" --json state,url)"
+          # Issue state and URL are REST fields. Using `gh issue view --json`
+          # here needlessly consumes the same GraphQL quota required for the
+          # Project V2 mutations below.
+          issue_json="$(project_intake_gh "read issue" gh api "repos/$GITHUB_REPOSITORY/issues/$issue_number" --jq '{state: (.state | ascii_upcase), url: .html_url}')"
           issue_state="$(jq -r '.state' <<<"$issue_json")"
           issue_url="$(jq -r '.url' <<<"$issue_json")"
 
