@@ -25,3 +25,9 @@ class BenchmarkSummaryTests(unittest.TestCase):
             benchmark_runtime.FRAMEWORKS,
             ("base-cli", "click", "typer", "cyclopts"),
         )
+
+    def test_platform_profiles_have_explicit_import_budgets(self) -> None:
+        self.assertEqual(benchmark_runtime.IMPORT_P95_BUDGETS_MS["unix"], 750.0)
+        self.assertEqual(benchmark_runtime.IMPORT_P95_BUDGETS_MS["macos"], 750.0)
+        self.assertEqual(benchmark_runtime.IMPORT_P95_BUDGETS_MS["windows"], 1_000.0)
+        self.assertEqual(benchmark_runtime.IMPORT_P95_BUDGETS_MS["wsl"], 1_000.0)

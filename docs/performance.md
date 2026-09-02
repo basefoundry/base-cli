@@ -17,12 +17,17 @@ Cyclopts. Install the optional benchmark extra to include Cyclopts:
 python -m pip install 'base-cli[benchmark]'
 ```
 
-The CI quality job checks the base-cli sample p95 against these budgets:
+The CI quality job checks the base-cli sample p95 against these budgets. The
+benchmark records the selected platform profile in both text and JSON output;
+set `BASE_CLI_BENCHMARK_PLATFORM` when a runner's filesystem or virtualization
+boundary is not represented by the host operating system. Supported profiles
+are `unix`, `macos`, `windows`, and `wsl`.
 
 | Measurement | Budget |
 | --- | ---: |
-| Fresh `import base_cli` (Unix) | 750 ms |
-| Fresh `import base_cli` (Windows) | 1,000 ms |
+| Fresh `import base_cli` (native Unix/macOS) | 750 ms |
+| Fresh `import base_cli` (native Windows) | 1,000 ms |
+| Fresh `import base_cli` (WSL2 on a Windows-mounted checkout) | 1,000 ms |
 | Isolated invocation and runtime filesystem setup | 1,500 ms |
 
 The benchmark reports the median, p95, and maximum for seven samples. Pass
