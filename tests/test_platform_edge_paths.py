@@ -40,18 +40,66 @@ class PrivateFileEdgeTests(unittest.TestCase):
             source = Path(tmpdir) / "source"
             destination = Path(tmpdir) / "destination"
             source.write_text("payload", encoding="utf-8")
+            transient = PermissionError("busy")
+            transient.winerror = 32
             with (
                 mock.patch.object(private_files.os, "name", "nt"),
                 mock.patch.object(
                     private_files.os,
                     "replace",
-                    side_effect=[PermissionError("busy"), lambda src, dst: Path(dst).write_text(Path(src).read_text())],
+                    side_effect=[transient, lambda src, dst: Path(dst).write_text(Path(src).read_text())],
                 ) as replace,
                 mock.patch.object(private_files.time, "sleep") as sleep,
             ):
                 private_files._replace_with_retry(source, destination)  # pylint: disable=protected-access
             self.assertEqual(replace.call_count, 2)
             sleep.assert_called_once()
+
+    def test_windows_replace_fails_immediately_for_access_denied(self) -> None:
+        source = Path("source")
+        destination = Path("destination")
+        denied = PermissionError("access denied")
+        denied.winerror = 5
+        with (
+            mock.patch.object(private_files.os, "name", "nt"),
+            mock.patch.object(private_files.os, "replace", side_effect=denied),
+            mock.patch.object(private_files.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(PermissionError) as raised:
+                private_files._replace_with_retry(source, destination)  # pylint: disable=protected-access
+        self.assertIs(raised.exception, denied)
+        sleep.assert_not_called()
+
+    def test_windows_replace_retries_compatibility_access_denied_for_owned_temp(self) -> None:
+        source = Path(".destination.owned.tmp")
+        destination = Path("destination")
+        transient = PermissionError("destination in use")
+        transient.winerror = 5
+        with (
+            mock.patch.object(private_files.os, "name", "nt"),
+            mock.patch.object(private_files.os, "replace", side_effect=[transient, None]) as replace,
+            mock.patch.object(private_files.time, "sleep") as sleep,
+        ):
+            private_files._replace_with_retry(source, destination)  # pylint: disable=protected-access
+        self.assertEqual(replace.call_count, 2)
+        sleep.assert_called_once()
+
+    def test_windows_replace_respects_elapsed_retry_deadline(self) -> None:
+        source = Path("source")
+        destination = Path("destination")
+        transient = PermissionError("busy")
+        transient.winerror = 33
+        clock = iter((0.0, 0.1, 1.0))
+        with (
+            mock.patch.object(private_files.os, "name", "nt"),
+            mock.patch.object(private_files.os, "replace", side_effect=transient),
+            mock.patch.object(private_files.time, "monotonic", side_effect=lambda: next(clock)),
+            mock.patch.object(private_files.time, "sleep") as sleep,
+        ):
+            with self.assertRaises(PermissionError) as raised:
+                private_files._replace_with_retry(source, destination)  # pylint: disable=protected-access
+        self.assertIs(raised.exception, transient)
+        self.assertEqual(sleep.call_count, 1)
 
     def test_parent_directory_open_is_disabled_on_windows(self) -> None:
         path = Path("/tmp")
