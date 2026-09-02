@@ -67,8 +67,10 @@ WSL2 support does not imply that the generic package translates paths between
 Linux and Windows or that a consumer's native Windows commands are available
 inside the distribution.
 
-On native Windows, private metadata replacement retries only sharing-violation
-and lock-violation errors (`winerror` 32 and 33). Access-denied and other
-permanent permission/path errors fail immediately. Transient retries are
-bounded by a one-second elapsed deadline; the destination remains untouched if
-that deadline is exhausted.
+On native Windows, private metadata replacement retries sharing-violation and
+lock-violation errors (`winerror` 32 and 33). A Windows access-denied response
+is retried only when the source follows base-cli's own temporary-file naming
+contract, which covers an in-use destination reported as `winerror` 5; other
+access-denied and permanent permission/path errors fail immediately. Transient
+retries are bounded by a one-second elapsed deadline; the destination remains
+untouched if that deadline is exhausted.

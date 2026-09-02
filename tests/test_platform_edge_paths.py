@@ -70,6 +70,20 @@ class PrivateFileEdgeTests(unittest.TestCase):
         self.assertIs(raised.exception, denied)
         sleep.assert_not_called()
 
+    def test_windows_replace_retries_compatibility_access_denied_for_owned_temp(self) -> None:
+        source = Path(".destination.owned.tmp")
+        destination = Path("destination")
+        transient = PermissionError("destination in use")
+        transient.winerror = 5
+        with (
+            mock.patch.object(private_files.os, "name", "nt"),
+            mock.patch.object(private_files.os, "replace", side_effect=[transient, None]) as replace,
+            mock.patch.object(private_files.time, "sleep") as sleep,
+        ):
+            private_files._replace_with_retry(source, destination)  # pylint: disable=protected-access
+        self.assertEqual(replace.call_count, 2)
+        sleep.assert_called_once()
+
     def test_windows_replace_respects_elapsed_retry_deadline(self) -> None:
         transient = PermissionError("busy")
         transient.winerror = 33

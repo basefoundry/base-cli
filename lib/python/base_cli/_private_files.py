@@ -199,7 +199,17 @@ def _replace_with_retry(source: Path, destination: Path) -> None:
             os.replace(source, destination)
             return
         except PermissionError as exc:
-            if getattr(exc, "winerror", None) not in _WINDOWS_RETRYABLE_WINERRORS:
+            winerror = getattr(exc, "winerror", None)
+            retryable = winerror in _WINDOWS_RETRYABLE_WINERRORS
+            # Windows can report an in-use destination as WinError 5 when the
+            # competing process has opened it without sharing. Restrict this
+            # compatibility case to the temporary-file naming contract owned
+            # by this helper; arbitrary access-denied operations still fail
+            # immediately.
+            retryable = retryable or (
+                winerror == 5 and source.name.startswith(f".{destination.name}.") and source.name.endswith(".tmp")
+            )
+            if not retryable:
                 raise
             remaining = deadline - time.monotonic()
             if remaining <= 0:
