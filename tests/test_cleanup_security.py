@@ -10,7 +10,12 @@ from unittest import mock
 
 import base_cli
 import base_cli._cleanup as cleanup_module
-from base_cli._cleanup import UnsafeCleanupPathError, _is_root_like, remove_owned_temp_directory
+from base_cli._cleanup import (
+    UnsafeCleanupPathError,
+    _is_root_like,
+    _validated_cleanup_paths,
+    remove_owned_temp_directory,
+)
 
 
 class CleanupSecurityTests(unittest.TestCase):
@@ -462,6 +467,32 @@ class CleanupSecurityTests(unittest.TestCase):
             self.assertTrue(marker.is_file())
             self.assertIn("mounted temp directories", stream.getvalue())
             self.assertEqual(context.log.handlers, [])
+
+    def test_validation_rejects_traversal_outside_root_and_invalid_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "run"
+            cases = (
+                (root / "tmp" / ".." / "run-123", root, "run-123", "path traversal"),
+                (Path(tmpdir) / "other" / "run-123", root, "run-123", "outside the run root"),
+                (root / "tmp" / "run-123", root, "../run-123", "ownership marker"),
+            )
+            for target, run_root, run_id, message in cases:
+                with self.subTest(target=target, run_id=run_id):
+                    with self.assertRaisesRegex(UnsafeCleanupPathError, message):
+                        _validated_cleanup_paths(target, run_root, run_id, (1, 2))
+
+    def test_validation_rejects_resolved_path_mismatch(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "run"
+            target = root / "tmp" / "cleanup-security" / "run-123"
+            target.mkdir(parents=True)
+            with mock.patch.object(
+                cleanup_module,
+                "_strict_relative_path",
+                side_effect=(Path("tmp/cleanup-security/run-123"), Path("elsewhere/run-123")),
+            ):
+                with self.assertRaisesRegex(UnsafeCleanupPathError, "does not match"):
+                    _validated_cleanup_paths(target, root, "run-123", (target.stat().st_dev, target.stat().st_ino))
 
     def test_platform_without_safe_directory_handles_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
