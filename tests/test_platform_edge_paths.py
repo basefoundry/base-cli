@@ -85,6 +85,8 @@ class PrivateFileEdgeTests(unittest.TestCase):
         sleep.assert_called_once()
 
     def test_windows_replace_respects_elapsed_retry_deadline(self) -> None:
+        source = Path("source")
+        destination = Path("destination")
         transient = PermissionError("busy")
         transient.winerror = 33
         clock = iter((0.0, 0.1, 1.0))
@@ -95,7 +97,7 @@ class PrivateFileEdgeTests(unittest.TestCase):
             mock.patch.object(private_files.time, "sleep") as sleep,
         ):
             with self.assertRaises(PermissionError) as raised:
-                private_files._replace_with_retry(Path("source"), Path("destination"))  # pylint: disable=protected-access
+                private_files._replace_with_retry(source, destination)  # pylint: disable=protected-access
         self.assertIs(raised.exception, transient)
         self.assertEqual(sleep.call_count, 1)
 
