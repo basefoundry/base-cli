@@ -37,7 +37,7 @@ bandit -q -r lib/python/base_cli scripts -lll -iii
 audit_requirements="$(mktemp)"
 trap 'rm -f "$audit_requirements"' EXIT
 python -m pip freeze \
-  | sed -E '/^base-cli([[:space:]=@]|$)/d' \
+  | sed -E '/(^-e .*#egg=base[_-]cli|^base[_-]cli([[:space:]=@]|$))/Id' \
   > "$audit_requirements"
 pip-audit --strict -r "$audit_requirements"
 
