@@ -639,8 +639,8 @@ class ClickTreeAttachmentTests(unittest.TestCase):
                 with tempfile.TemporaryDirectory() as tmpdir:
                     result = invoke(app, [], home=Path(tmpdir))
 
-                self.assertEqual(result.exit_code, 2 if expected_type is click.UsageError else 1, result.output)
-                self.assertIn(str(failure), result.output)
+                self.assertEqual(result.exit_code, 2 if expected_type is click.UsageError else 1, _all_output(result))
+                self.assertIn(str(failure), _all_output(result))
                 self.assertEqual(app.context_cleanup_count, 1)
 
     def test_partial_attachment_initialization_finalizes_before_reraising(self) -> None:
