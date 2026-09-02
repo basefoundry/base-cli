@@ -542,6 +542,7 @@ def _resolve_lifecycle_values(
     depth = _context_depth(click_context)
 
     for key, binding in bindings.items():
+        candidate: _RawLifecycleValue | None
         if binding.adopted:
             candidate = _RawLifecycleValue(
                 value=getattr(click_context, "params", {}).get(binding.parameter_name),
