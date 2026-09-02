@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import mock
 
+import base_cli._private_files as private_files
 from base_cli import RetentionPolicy
 from base_cli._private_files import write_private_json
 from base_cli._runtime import prune_run_bundles
@@ -147,6 +148,18 @@ class RunBundleRetentionTests(unittest.TestCase):
             destination.symlink_to(victim)
             with self.assertRaises(OSError):
                 write_private_json(destination, {"status": "error"})
+            self.assertEqual(victim.read_text(encoding="utf-8"), "unchanged")
+
+    def test_atomic_json_write_refuses_symlink_destination_without_directory_handles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            victim = root / "victim.json"
+            victim.write_text("unchanged", encoding="utf-8")
+            destination = root / "run.json"
+            destination.symlink_to(victim)
+            with mock.patch.object(private_files, "_open_parent_directory", return_value=None):
+                with self.assertRaisesRegex(OSError, "refusing to replace symlink"):
+                    write_private_json(destination, {"status": "error"})
             self.assertEqual(victim.read_text(encoding="utf-8"), "unchanged")
 
     def test_concurrent_metadata_writers_leave_one_valid_snapshot(self) -> None:
