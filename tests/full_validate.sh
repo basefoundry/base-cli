@@ -3,7 +3,7 @@
 # Authoritative local validation entry point for the Base manifest.
 set -euo pipefail
 
-required_commands=(python ruff mypy)
+required_commands=(python ruff mypy bandit pip-audit)
 for command in "${required_commands[@]}"; do
   command -v "$command" >/dev/null 2>&1 || {
     printf 'Missing validation tool: %s. Install the dev and quality extras first.\n' "$command" >&2
@@ -29,8 +29,27 @@ python scripts/benchmark_runtime.py --check
 python -m compileall -q examples
 python scripts/validate_coverage.py coverage.json
 
-if command -v bandit >/dev/null 2>&1; then
-  bandit -q -r lib/python/base_cli scripts -lll -iii
+bandit -q -r lib/python/base_cli scripts -lll -iii
+
+# Audit the resolved third-party environment without asking pip-audit to
+# resolve the unpublished editable checkout itself.  `sed` keeps this safe
+# under `set -o pipefail` even when the environment contains no other package.
+audit_requirements="$(mktemp)"
+trap 'rm -f "$audit_requirements"' EXIT
+python -m pip freeze \
+  | sed -E '/^base-cli([[:space:]=@]|$)/d' \
+  > "$audit_requirements"
+pip-audit --strict -r "$audit_requirements"
+
+validation_result="${BASE_CLI_VALIDATION_RESULT:-${TMPDIR:-/tmp}/base-cli-validation-result.json}"
+if command -v node >/dev/null 2>&1; then
+  printf '%s\n' '{"status":"full","skipped":[]}' > "$validation_result"
+  printf 'Validation result: full (%s)\n' "$validation_result"
+else
+  printf '%s\n' '{"status":"partial","skipped":["node contract validator"]}' > "$validation_result"
+  printf 'Validation result: partial; Node.js contract validation was skipped (%s).\n' "$validation_result"
+  printf 'This result is non-authoritative; install Node.js for the full gate.\n'
+  exit 2
 fi
 
 printf 'Full base-cli validation passed.\n'

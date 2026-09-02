@@ -111,9 +111,9 @@ jobs:
               set -eu
               if [ "$DISTRO_FAMILY" = debian ]; then
                 apt-get update
-                DEBIAN_FRONTEND=noninteractive apt-get install -y bash python3 python3-pip python3-venv
+                DEBIAN_FRONTEND=noninteractive apt-get install -y bash nodejs npm python3 python3-pip python3-venv
               else
-                dnf install -y python3 python3-pip
+                dnf install -y nodejs npm python3 python3-pip
               fi
               python3 -m venv /tmp/base-cli-venv
               /tmp/base-cli-venv/bin/python -m pip install ".[dev,typer]"
@@ -138,4 +138,4 @@ jobs:
           $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
           $path = $env:GITHUB_WORKSPACE.Substring(2).Replace('\', '/')
           $linuxWorkspace = "/mnt/$drive$path"
-          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; apt-get update -qq; apt-get install -y -qq python3-venv python3.14-venv; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer,quality]'; export BASE_CLI_BENCHMARK_PLATFORM=wsl; bash tests/full_validate.sh"
+          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; apt-get update -qq; apt-get install -y -qq nodejs npm python3-venv python3.14-venv; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer,quality]'; export BASE_CLI_BENCHMARK_PLATFORM=wsl; bash tests/full_validate.sh"
