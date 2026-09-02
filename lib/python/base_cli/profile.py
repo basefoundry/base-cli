@@ -217,7 +217,6 @@ class CliProfile:
         root = (config_root or default_config_root()).expanduser()
         selected_user_dir = user_config_dir.expanduser() if user_config_dir is not None else root / normalized_name
         loader = BatteriesIncludedConfigLoader(
-            normalized_name,
             user_config_dir=selected_user_dir,
             user_config_name=user_config_name,
             project_config_name=project_config_name,

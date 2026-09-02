@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import base_cli
 from base_cli.config import BatteriesIncludedConfigLoader, ConfigSnapshot, _merge_mapping
@@ -117,10 +118,7 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
     def test_missing_optional_layers_are_empty_but_explicit_paths_are_strict(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            loader = BatteriesIncludedConfigLoader(
-                "tool",
-                user_config_dir=root / "missing-user",
-            )
+            loader = BatteriesIncludedConfigLoader(user_config_dir=root / "missing-user")
             snapshot = loader.load(None, None)
             self.assertEqual(snapshot.config, {})
             self.assertEqual(snapshot.framework.environment, "dev")
@@ -130,12 +128,11 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
     def test_environment_and_layer_names_cannot_escape_config_roots(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            loader = BatteriesIncludedConfigLoader("tool", user_config_dir=root / "user")
+            loader = BatteriesIncludedConfigLoader(user_config_dir=root / "user")
             with self.assertRaisesRegex(base_cli.ConfigurationError, "environment"):
                 loader.load(None, None, environment="../secret")
             with self.assertRaisesRegex(ValueError, "project_config_name"):
                 BatteriesIncludedConfigLoader(
-                    "tool",
                     user_config_dir=root / "user",
                     project_config_name="../project.yaml",
                 )
@@ -145,13 +142,29 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
             root = Path(tmpdir)
             explicit = root / "config.yaml"
             _write_yaml(explicit, "environment: prod\nlog_level: verbose\n")
-            loader = BatteriesIncludedConfigLoader("tool", user_config_dir=root / "user")
+            loader = BatteriesIncludedConfigLoader(user_config_dir=root / "user")
             with self.assertRaisesRegex(base_cli.ConfigurationError, "log_level"):
                 loader.load(None, explicit)
 
             _write_yaml(explicit, "environment: prod\nkeep_temp: maybe\n")
             with self.assertRaisesRegex(base_cli.ConfigurationError, "keep_temp"):
                 loader.load(None, explicit)
+
+    def test_cli_identity_namespaces_default_config_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            with patch.dict("os.environ", {"BASE_CLI_CONFIG_DIR": str(root)}, clear=False):
+                alpha = BatteriesIncludedConfigLoader("Alpha Tool")
+                beta = BatteriesIncludedConfigLoader("beta")
+
+        self.assertEqual(alpha.cli_name, "Alpha-Tool")
+        self.assertEqual(alpha.user_config_dir, root / "Alpha-Tool")
+        self.assertEqual(beta.user_config_dir, root / "beta")
+        self.assertNotEqual(alpha.user_config_dir, beta.user_config_dir)
+
+    def test_loader_requires_identity_or_explicit_config_directory(self) -> None:
+        with self.assertRaisesRegex(ValueError, "either cli_name or user_config_dir"):
+            BatteriesIncludedConfigLoader()
 
     def test_batteries_included_profile_discovers_project_config_upward(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

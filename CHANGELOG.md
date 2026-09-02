@@ -13,6 +13,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by
+  using it to derive an isolated default configuration directory when no
+  explicit directory is supplied.
 - Keep plain consumer configuration mappings opaque so only validated
   `ConfigSnapshot.framework` values control lifecycle behavior.
 - Preserve `KeyboardInterrupt`, `SystemExit`, and `GeneratorExit` across

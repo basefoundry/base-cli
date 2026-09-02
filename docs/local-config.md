@@ -22,3 +22,10 @@ records the winning source for each key in `Context.config_provenance`. Its
 reserved lifecycle keys are validated separately as `Context.framework_config`;
 consumer-owned keys remain in `Context.config`. `CliProfile.generic()` remains
 the convention-free default.
+
+For direct use, `BatteriesIncludedConfigLoader` accepts an optional `cli_name`.
+When no `user_config_dir` is supplied, that identity selects an isolated
+directory below the platform's default config root (for example,
+`~/.config/tool` on Linux). Consumers with an existing configuration-root
+policy should pass `user_config_dir` explicitly; the identity is then metadata
+only.
