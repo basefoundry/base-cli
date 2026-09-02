@@ -10,6 +10,7 @@ from typing import Any, Final
 
 from ._dependencies import require_yaml
 from .errors import ConfigurationError
+from .paths import default_config_root, normalize_cli_name
 
 __all__ = [
     "BatteriesIncludedConfigLoader",
@@ -123,13 +124,18 @@ def _merge_mapping(
 
 
 class BatteriesIncludedConfigLoader:
-    """Load conventional user, project, environment, and explicit layers."""
+    """Load conventional user, project, environment, and explicit layers.
+
+    ``cli_name`` is an optional identity used to derive the platform-default
+    user configuration directory when ``user_config_dir`` is omitted. Pass an
+    explicit directory when the consumer owns its configuration-root policy.
+    """
 
     def __init__(
         self,
-        cli_name: str,
+        cli_name: str | None = None,
         *,
-        user_config_dir: Path,
+        user_config_dir: Path | None = None,
         user_config_name: str = "config.yaml",
         project_config_name: str = ".base-cli.yaml",
         environment_dir_name: str = "environments",
@@ -140,7 +146,17 @@ class BatteriesIncludedConfigLoader:
             raise ValueError("project_config_name must be a simple filename")
         if _SAFE_NAME.fullmatch(environment_dir_name) is None:
             raise ValueError("environment_dir_name must be a simple directory name")
-        self.cli_name = cli_name
+        if cli_name is not None:
+            normalized_name = normalize_cli_name(cli_name)
+            if not normalized_name:
+                raise ValueError("cli_name must contain a non-empty command name")
+        else:
+            normalized_name = None
+        if user_config_dir is None:
+            if normalized_name is None:
+                raise ValueError("either cli_name or user_config_dir must be provided")
+            user_config_dir = default_config_root() / normalized_name
+        self.cli_name = normalized_name
         self.user_config_dir = user_config_dir.expanduser()
         self.user_config_name = user_config_name
         self.project_config_name = project_config_name

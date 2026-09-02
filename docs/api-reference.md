@@ -116,7 +116,7 @@ base_cli.TyperAdapter(...)
 
 ### `BatteriesIncludedConfigLoader`
 **Kind:** class  
-**Signature:** `BatteriesIncludedConfigLoader(cli_name: 'str', *, user_config_dir: 'Path', user_config_name: 'str' = 'config.yaml', project_config_name: 'str' = '.base-cli.yaml', environment_dir_name: 'str' = 'environments') -> 'None'`
+**Signature:** `BatteriesIncludedConfigLoader(cli_name: 'str | None' = None, *, user_config_dir: 'Path | None' = None, user_config_name: 'str' = 'config.yaml', project_config_name: 'str' = '.base-cli.yaml', environment_dir_name: 'str' = 'environments') -> 'None'`
 
 **Behavior:** Load conventional user, project, environment, and explicit layers.
 
