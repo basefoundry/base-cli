@@ -24,6 +24,10 @@ and versions are tracked in the repo-root `VERSION` file.
   apply identical bounded width handling to Rich and plain renderers.
 - Make managed metadata and index replacements atomic, with bounded retries
   for transient Windows file-sharing locks.
+- Enforce the portable `0` through `255` process exit-code contract for command
+  return values, rejecting booleans and out-of-range integers consistently.
+- Add Click 8.5 compatibility coverage across the dependency matrix and
+  supported OS test lanes; the core dependency window now permits `<8.6`.
 
 ## [0.4.3] - 2026-08-29
 
@@ -60,9 +64,6 @@ boundary. Existing Click and Typer command trees remain supported.
 
 ### Fixed
 
-- Enforce the portable `0` through `255` process exit-code contract for command
-  return values, rejecting booleans and out-of-range integers consistently.
-
 - Keep the Typer adapter compatible with Typer 0.27.2's vendored exit
   exception layout and validate that release in the compatibility matrix.
 - Apply the documented count-only 20-bundle retention default to implicit JSON
@@ -74,9 +75,6 @@ boundary. Existing Click and Typer command trees remain supported.
   cannot prevent healthy extensions from being discovered.
 
 ### Added
-
-- Click 8.5 compatibility coverage across the dependency matrix and supported
-  OS test lanes; the core dependency window now permits `<8.6`.
 
 - Automate GitHub Releases from matching version tags with reviewed
   distributions, checksums, SBOM metadata, and generated comparison notes.
