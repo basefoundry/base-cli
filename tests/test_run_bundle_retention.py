@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import sys
 import tempfile
@@ -143,6 +144,7 @@ class RunBundleRetentionTests(unittest.TestCase):
                     str(ready),
                     str(release),
                 ],
+                env={key: value for key, value in os.environ.items() if not key.startswith(("COV_CORE_", "COVERAGE_"))},
                 stdin=subprocess.DEVNULL,
             )
             try:

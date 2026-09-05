@@ -161,8 +161,7 @@ def acquire_run_lease(run_root: Path) -> Any:
         raise
     except OSError as exc:
         raise RuntimeDirectoryError(
-            f"Unable to establish run liveness for '{run_root}': {exc}. "
-            "Check permissions on the runtime directory."
+            f"Unable to establish run liveness for '{run_root}': {exc}. Check permissions on the runtime directory."
         ) from exc
 
 
