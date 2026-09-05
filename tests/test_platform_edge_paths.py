@@ -10,6 +10,7 @@ from unittest import mock
 import base_cli._click_compat as click_compat
 import base_cli._private_files as private_files
 import base_cli._runtime as runtime
+from base_cli import RetentionPolicy
 from base_cli import history
 from base_cli._attach import (
     _click_command_has_pending_children,
@@ -139,6 +140,40 @@ class ClickCompatibilityEdgeTests(unittest.TestCase):
 
 
 class RuntimeEdgeTests(unittest.TestCase):
+    def test_retention_scan_and_apply_are_portable_without_recursive_sizes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            for index in range(3):
+                bundle = root / f"run-{index}"
+                bundle.mkdir()
+                (bundle / "run.json").write_text(
+                    '{"run_id": "run-%d", "status": "ok", '
+                    '"started_at": "2020-01-01T00:00:00Z", "preserve": false}' % index,
+                    encoding="utf-8",
+                )
+            with mock.patch.object(runtime, "_bundle_size", side_effect=AssertionError("unexpected size walk")):
+                bundles = runtime._discover_run_bundles(  # pylint: disable=protected-access
+                    root,
+                    protected=set(),
+                    max_age_seconds=None,
+                    now=1_600_000_000,
+                    measure_sizes=False,
+                    size_budget=0,
+                )
+            self.assertTrue(all(not bundle["size_known"] for bundle in bundles))
+            with mock.patch.object(runtime, "_remove_run_bundle") as remove:
+                runtime._apply_bundle_retention(  # pylint: disable=protected-access
+                    root,
+                    bundles,
+                    policy=RetentionPolicy(max_bundles=1),
+                    protected=set(),
+                    logger=mock.Mock(),
+                    now=1_600_000_000,
+                    reserved_active_bundles=0,
+                )
+            self.assertEqual(remove.call_count, 2)
+
     def test_owned_runtime_directory_collision_is_not_claimed(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "runs" / "run"
