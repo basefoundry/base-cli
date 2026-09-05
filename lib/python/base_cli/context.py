@@ -71,6 +71,7 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
     json_output: bool = False
     rich: bool = False
     _run_metadata_path: Path | None = field(default=None, init=False, repr=False, compare=False)
+    _run_lease: object | None = field(default=None, init=False, repr=False, compare=False)
     _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
     _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)
     _owned_temp_descriptor: int | None = field(default=None, init=False, repr=False, compare=False)
@@ -129,6 +130,15 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
             except OSError as exc:
                 self._warn_cleanup_failure("Temp directory handle close failed: %s", exc)
 
+    def _close_run_lease(self) -> None:
+        lease = self._run_lease
+        self._run_lease = None
+        if lease is None:
+            return
+        from ._runtime import close_run_lease
+
+        close_run_lease(lease)
+
     def cleanup(self) -> None:
         self._cleanup_resources(preserve_temp_ownership=False)
 
@@ -162,6 +172,7 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
                     self.log.handlers.remove(handler)
                 except BaseException:  # pylint: disable=broad-exception-caught
                     pass
+        self._close_run_lease()
 
 
 def set_current_context(

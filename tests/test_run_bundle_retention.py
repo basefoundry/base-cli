@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -11,7 +14,7 @@ from unittest import mock
 import base_cli._private_files as private_files
 from base_cli import RetentionPolicy
 from base_cli._private_files import write_private_json
-from base_cli._runtime import prune_run_bundles
+from base_cli._runtime import acquire_run_lease, close_run_lease, prune_run_bundles
 
 
 def _bundle(
@@ -83,6 +86,7 @@ class RunBundleRetentionTests(unittest.TestCase):
             root = Path(tmpdir) / "runs"
             root.mkdir()
             stale = _bundle(root, "stale", status="running", started_at="2020-01-01T00:00:00Z")
+            (stale / ".base-cli-run-lease").write_bytes(b"0")
 
             prune_run_bundles(
                 root,
@@ -93,6 +97,73 @@ class RunBundleRetentionTests(unittest.TestCase):
             )
 
             self.assertFalse(stale.exists())
+
+    def test_live_running_bundle_lease_survives_age_recovery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            live = _bundle(root, "live", status="running", started_at="2020-01-01T00:00:00Z")
+            lease = acquire_run_lease(live)
+            try:
+                prune_run_bundles(
+                    root,
+                    policy=RetentionPolicy(max_age_seconds=60),
+                    logger=logging.getLogger(__name__),
+                    now=1_600_000_000,
+                )
+            finally:
+                close_run_lease(lease)
+
+            self.assertTrue(live.exists())
+
+    def test_live_running_bundle_lease_survives_from_another_process(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            live = _bundle(root, "live", status="running", started_at="2020-01-01T00:00:00Z")
+            ready = live / "ready"
+            release = live / "release"
+            child = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    "\n".join(
+                        (
+                            "import sys, time",
+                            "from pathlib import Path",
+                            "from base_cli._runtime import acquire_run_lease, close_run_lease",
+                            "run_root, ready_path, release_path = map(Path, sys.argv[1:])",
+                            "lease = acquire_run_lease(run_root)",
+                            "ready_path.touch()",
+                            "while not release_path.exists(): time.sleep(0.01)",
+                            "close_run_lease(lease)",
+                        )
+                    ),
+                    str(live),
+                    str(ready),
+                    str(release),
+                ],
+                stdin=subprocess.DEVNULL,
+            )
+            try:
+                deadline = time.monotonic() + 5
+                while not ready.exists() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(ready.exists(), "lease holder did not start")
+                prune_run_bundles(
+                    root,
+                    policy=RetentionPolicy(max_age_seconds=60),
+                    logger=logging.getLogger(__name__),
+                    now=1_600_000_000,
+                )
+                self.assertTrue(live.exists())
+            finally:
+                release.touch()
+                try:
+                    child.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    child.wait(timeout=5)
 
     def test_aborted_bundle_is_indexed_as_terminal(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -33,6 +33,7 @@ from .runtime import RetentionPolicy, RuntimeLayout
 _LOG_INDEX_NAME = ".base-cli-log-index.json"
 _RUN_INDEX_NAME = ".base-cli-run-index.json"
 _RUN_LOCK_NAME = ".base-cli-run-index.lock"
+_RUN_LEASE_NAME = ".base-cli-run-lease"
 
 
 class RuntimeDirectoryError(RuntimeError):
@@ -124,6 +125,110 @@ def create_owned_runtime_directory(
         raise
     finally:
         os.close(parent_fd)
+
+
+def acquire_run_lease(run_root: Path) -> Any:
+    """Hold an advisory lease for a live invocation bundle.
+
+    The lease is an open, locked file whose lock is released automatically by
+    the operating system if the process exits. Retention can therefore tell a
+    confirmed crashed run from one that is merely old. A missing, unreadable,
+    or unsupported lease is intentionally treated as unknown by the reader.
+    """
+
+    if _fcntl is None and _msvcrt is None:
+        raise RuntimeDirectoryError("Unable to establish run liveness: this platform has no file-lock API.")
+    lease_path = Path(run_root) / _RUN_LEASE_NAME
+    try:
+        if lease_path.is_symlink():
+            raise OSError(f"refusing to use symlinked run lease '{lease_path}'")
+        flags = os.O_RDWR | os.O_CREAT
+        if hasattr(os, "O_CLOEXEC"):
+            flags |= os.O_CLOEXEC
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(lease_path, flags, 0o600)
+        stream = os.fdopen(fd, "r+b", buffering=0)
+        if lease_path.is_symlink():
+            stream.close()
+            raise OSError(f"refusing to use symlinked run lease '{lease_path}'")
+        _ensure_lease_byte(stream)
+        if not _try_lock_lease_stream(stream):
+            stream.close()
+            raise OSError(f"run lease is already held for '{run_root}'")
+        return stream
+    except RuntimeDirectoryError:
+        raise
+    except OSError as exc:
+        raise RuntimeDirectoryError(
+            f"Unable to establish run liveness for '{run_root}': {exc}. "
+            "Check permissions on the runtime directory."
+        ) from exc
+
+
+def _run_lease_state(run_root: Path) -> str:
+    """Return ``active``, ``inactive``, or ``unknown`` for a run lease."""
+
+    lease_path = Path(run_root) / _RUN_LEASE_NAME
+    try:
+        if lease_path.is_symlink() or not lease_path.is_file():
+            return "unknown"
+        with lease_path.open("r+b", buffering=0) as stream:
+            _ensure_lease_byte(stream)
+            if not _try_lock_lease_stream(stream):
+                return "active"
+            _unlock_lease_stream(stream)
+            return "inactive"
+    except OSError:
+        return "unknown"
+
+
+def close_run_lease(stream: Any) -> None:
+    """Release and close an invocation lease held by :func:`acquire_run_lease`."""
+
+    try:
+        _unlock_lease_stream(stream)
+    except OSError:
+        pass
+    try:
+        stream.close()
+    except OSError:
+        pass
+
+
+def _ensure_lease_byte(stream: Any) -> None:
+    stream.seek(0, os.SEEK_END)
+    if stream.tell() == 0:
+        stream.write(b"0")
+        stream.flush()
+    stream.seek(0)
+
+
+def _try_lock_lease_stream(stream: Any) -> bool:
+    fd = stream.fileno()
+    if _fcntl is not None:
+        try:
+            _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+        except (BlockingIOError, OSError):
+            return False
+        return True
+    if _msvcrt is not None:  # pragma: no cover - Windows
+        try:
+            stream.seek(0)
+            _msvcrt.locking(fd, _msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return False
+        return True
+    return False
+
+
+def _unlock_lease_stream(stream: Any) -> None:
+    fd = stream.fileno()
+    if _fcntl is not None:
+        _fcntl.flock(fd, _fcntl.LOCK_UN)
+    elif _msvcrt is not None:  # pragma: no cover - Windows
+        stream.seek(0)
+        _msvcrt.locking(fd, _msvcrt.LK_UNLCK, 1)
 
 
 def _supports_secure_owned_directory_creation() -> bool:
@@ -382,9 +487,13 @@ def _discover_run_bundles(
                 continue
         age = max(0.0, now - started_at)
         running = status == "running"
-        stale_running = running and max_age_seconds is not None and age >= max_age_seconds
-        if running and not stale_running:
-            continue
+        if running:
+            # A running record is removable only when the lease proves that
+            # its owner has exited. Missing or unreadable leases fail closed.
+            if _run_lease_state(child) != "inactive":
+                continue
+            if max_age_seconds is None or age < max_age_seconds:
+                continue
         if status not in {"running", "ok", "aborted", "error"}:
             continue
         resolved = _safe_resolved_path(child)
