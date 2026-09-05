@@ -38,6 +38,27 @@ detecting accidental quadratic startup work, unbounded metadata scans, or
 unexpected dependency imports. A performance improvement should preserve the
 same lifecycle and persistence assertions covered by the adversarial tests.
 
+## Retention recovery work bounds
+
+Run-bundle recovery is intentionally incremental. Discovery reads direct-child
+metadata and does not recursively size bundles unless a `max_total_bytes`
+decision requires it. The following deterministic bounds apply to each
+foreground pass (protected bundles and unreadable entries are retained):
+
+| Fixture | Metadata entries considered | Recursive size walks | Bundle removals | Index entries written |
+| --- | ---: | ---: | ---: | ---: |
+| 20 bundles | 20 | 0 for count/age policies; up to 20 for byte policy | up to 20 | up to 20 |
+| 2,000 bundles | 2,000 | up to 512 for byte policy | up to 256 | up to 512 |
+| 10,000 bundles | 10,000 | up to 512 for byte policy | up to 256 | up to 512 |
+
+When a bound prevents a complete reconciliation, base-cli leaves the
+unprocessed bundles intact, writes a partial index with `complete: false`, and
+emits a warning describing the remaining policy debt. A later invocation
+continues from the filesystem; the index is an observation aid, never an
+authorization to delete a path. The retention regression suite covers count,
+age, byte limits, deep trees, corrupt metadata/index files, unreadable files,
+concurrent invocations, and live-run lease protection.
+
 The regression suite uses deterministic Hypothesis examples (`derandomize`
 enabled), fixed multiprocessing workloads, and explicit seed values in every
 worker payload. Property cases cover redaction and command-protocol framing;

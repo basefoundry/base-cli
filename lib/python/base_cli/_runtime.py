@@ -33,6 +33,14 @@ from .runtime import RetentionPolicy, RuntimeLayout
 _LOG_INDEX_NAME = ".base-cli-log-index.json"
 _RUN_INDEX_NAME = ".base-cli-run-index.json"
 _RUN_LOCK_NAME = ".base-cli-run-index.lock"
+
+# Retention is maintenance on the foreground command path.  Keep recovery
+# work deterministic even when a cache accumulated after a policy was
+# disabled or a machine was offline for a long time.  Unknown work is left in
+# place and reported as policy debt rather than silently weakening safety.
+_RETENTION_SIZE_MEASUREMENT_BUDGET = 512
+_RETENTION_REMOVAL_BUDGET = 256
+_RETENTION_INDEX_ENTRY_BUDGET = 512
 _RUN_LEASE_NAME = ".base-cli-run-lease"
 
 
@@ -402,14 +410,20 @@ def prune_run_bundles(
         protected.add(_safe_resolved_path(current_run_root))
     clock = time.time() if now is None else now
 
+    # Filesystem discovery and recursive size accounting are deliberately
+    # outside the lock.  The destructive phase revalidates each candidate
+    # under the lock so another invocation can never turn a live bundle into a
+    # deletion candidate while discovery is in progress.
+    bundles = _discover_run_bundles(
+        runs_root,
+        protected=protected,
+        max_age_seconds=effective.max_age_seconds,
+        now=clock,
+        measure_sizes=effective.max_total_bytes is not None,
+        size_budget=_RETENTION_SIZE_MEASUREMENT_BUDGET,
+    )
     try:
         with _retention_lock(runs_root):
-            bundles = _discover_run_bundles(
-                runs_root,
-                protected=protected,
-                max_age_seconds=effective.max_age_seconds,
-                now=clock,
-            )
             _apply_bundle_retention(
                 runs_root,
                 bundles,
@@ -445,13 +459,15 @@ def refresh_run_bundle_index(
     if not runs_root.exists() or runs_root.is_symlink():
         return
     try:
+        bundles = _discover_run_bundles(
+            runs_root,
+            protected=set(),
+            max_age_seconds=None,
+            now=time.time(),
+            measure_sizes=False,
+            size_budget=0,
+        )
         with _retention_lock(runs_root):
-            bundles = _discover_run_bundles(
-                runs_root,
-                protected=set(),
-                max_age_seconds=None,
-                now=time.time(),
-            )
             _write_run_index(runs_root, bundles, log)
     except (OSError, RuntimeError) as exc:
         log.debug("Could not refresh run bundle index under '%s': %s", runs_root, exc)
@@ -463,8 +479,11 @@ def _discover_run_bundles(
     protected: set[Path],
     max_age_seconds: float | None,
     now: float,
+    measure_sizes: bool,
+    size_budget: int,
 ) -> list[dict[str, Any]]:
     bundles: list[dict[str, Any]] = []
+    measured_sizes = 0
     try:
         children = sorted(runs_root.iterdir(), key=lambda path: path.name)
     except OSError:
@@ -497,10 +516,18 @@ def _discover_run_bundles(
         if status not in {"running", "ok", "aborted", "error"}:
             continue
         resolved = _safe_resolved_path(child)
-        try:
-            size = _bundle_size(child)
-        except OSError:
-            continue
+        size = 0
+        size_known = False
+        if measure_sizes and measured_sizes < size_budget:
+            try:
+                size = _bundle_size(child)
+                size_known = True
+                measured_sizes += 1
+            except OSError:
+                # A file that disappears or becomes unreadable remains a
+                # retention candidate for count/age policy, but its byte
+                # contribution is unknown and must be reported below.
+                pass
         retention_metadata = metadata.get("retention")
         preserve = bool(metadata.get("preserve")) or (
             isinstance(retention_metadata, dict) and retention_metadata.get("preserve") is True
@@ -514,6 +541,7 @@ def _discover_run_bundles(
                 "started_at": started_at,
                 "age": age,
                 "size": size,
+                "size_known": size_known,
                 "preserve": preserve,
                 "protected": resolved in protected,
             }
@@ -532,7 +560,6 @@ def _apply_bundle_retention(
     now: float,
     reserved_active_bundles: int,
 ) -> None:
-    del now  # retained for a stable extension point in policy implementations
     removable = [
         bundle
         for bundle in bundles
@@ -541,9 +568,23 @@ def _apply_bundle_retention(
         and _safe_resolved_path(bundle["path"]) not in protected
     ]
     removable.sort(key=lambda bundle: (float(bundle["started_at"]), str(bundle["path"])))
+    removals = 0
+    budget_exhausted = False
 
     def remove(bundle: dict[str, Any]) -> bool:
+        nonlocal removals, budget_exhausted
+        if removals >= _RETENTION_REMOVAL_BUDGET:
+            budget_exhausted = True
+            return False
         path = Path(bundle["path"])
+        if not _bundle_is_still_removable(path, policy=policy, now=now):
+            # The discovery snapshot may be stale because another pruner (or
+            # the owning invocation) changed this bundle while we waited for
+            # the lock. Do not publish a deleted or newly-live path in the
+            # reconciled index.
+            bundles.remove(bundle)
+            removable.remove(bundle)
+            return False
         try:
             _remove_run_bundle(runs_root, path)
         except OSError as exc:
@@ -552,23 +593,86 @@ def _apply_bundle_retention(
             return False
         bundles.remove(bundle)
         removable.remove(bundle)
+        removals += 1
         return True
 
     if policy.max_age_seconds is not None:
         for bundle in list(removable):
             if float(bundle["age"]) >= policy.max_age_seconds:
+                if removals >= _RETENTION_REMOVAL_BUDGET:
+                    budget_exhausted = True
+                    break
                 remove(bundle)
 
     if policy.max_bundles is not None:
         while len(bundles) + reserved_active_bundles > policy.max_bundles and removable:
+            if removals >= _RETENTION_REMOVAL_BUDGET:
+                budget_exhausted = True
+                break
             remove(removable[0])
 
     if policy.max_total_bytes is not None:
-        total = sum(int(bundle["size"]) for bundle in bundles)
-        while total > policy.max_total_bytes and removable:
-            candidate = removable[0]
+        unknown_sizes = sum(1 for bundle in bundles if not bool(bundle.get("size_known", False)))
+        total = sum(int(bundle["size"]) for bundle in bundles if bool(bundle.get("size_known", False)))
+        byte_removable = [bundle for bundle in removable if bool(bundle.get("size_known", False))]
+        while total > policy.max_total_bytes and byte_removable:
+            if removals >= _RETENTION_REMOVAL_BUDGET:
+                budget_exhausted = True
+                break
+            candidate = byte_removable[0]
             if remove(candidate):
                 total -= int(candidate["size"])
+            byte_removable = [bundle for bundle in removable if bool(bundle.get("size_known", False))]
+        if unknown_sizes:
+            logger.warning(
+                "Run bundle byte retention deferred for %d bundle(s); "
+                "only %d size walk(s) are performed per foreground pass.",
+                unknown_sizes,
+                _RETENTION_SIZE_MEASUREMENT_BUDGET,
+            )
+    policy_debt = budget_exhausted
+    if policy.max_age_seconds is not None:
+        policy_debt = policy_debt or any(float(bundle["age"]) >= policy.max_age_seconds for bundle in removable)
+    if policy.max_bundles is not None:
+        policy_debt = policy_debt or len(bundles) + reserved_active_bundles > policy.max_bundles and bool(removable)
+    if policy.max_total_bytes is not None:
+        policy_debt = policy_debt or unknown_sizes > 0 or total > policy.max_total_bytes and bool(byte_removable)
+    if policy_debt:
+        logger.warning(
+            "Run bundle retention pass removed %d bundle(s); policy debt remains and will be "
+            "reconciled by a later foreground pass.",
+            removals,
+        )
+
+
+def _bundle_is_still_removable(path: Path, *, policy: RetentionPolicy, now: float) -> bool:
+    """Revalidate metadata and liveness immediately before destructive work."""
+
+    metadata = _read_bundle_metadata(path)
+    if metadata is None:
+        return False
+    status = str(metadata.get("status", ""))
+    if status == "running":
+        if _run_lease_state(path) != "inactive":
+            return False
+        if policy.max_age_seconds is None:
+            return False
+        started_at = _timestamp_to_epoch(metadata.get("started_at"))
+        if started_at is None:
+            try:
+                started_at = path.stat().st_mtime
+            except OSError:
+                return False
+        if max(0.0, now - started_at) < policy.max_age_seconds:
+            return False
+    elif status not in {"ok", "aborted", "error"}:
+        return False
+    retention_metadata = metadata.get("retention")
+    return not (
+        bool(metadata.get("preserve"))
+        or isinstance(retention_metadata, dict)
+        and retention_metadata.get("preserve") is True
+    )
 
 
 def _write_run_index(
@@ -589,13 +693,20 @@ def _write_run_index(
                     "run_id": current_run_root.name,
                     "status": "running",
                     "started_at": time.time() if now is None else now,
-                    "size": _bundle_size(current_run_root),
+                    "size": 0,
+                    "size_known": False,
                     "preserve": False,
                 }
             )
+    indexed.sort(key=lambda bundle: (float(bundle.get("started_at", 0)), str(bundle["path"])))
+    omitted_bundles = max(0, len(indexed) - _RETENTION_INDEX_ENTRY_BUDGET)
+    if omitted_bundles:
+        indexed = indexed[-_RETENTION_INDEX_ENTRY_BUDGET:]
     index_path = runs_root / _RUN_INDEX_NAME
     payload = {
         "version": 1,
+        "complete": omitted_bundles == 0,
+        "omitted_bundles": omitted_bundles,
         "bundles": [
             {
                 "path": str(bundle["path"]),
@@ -603,6 +714,7 @@ def _write_run_index(
                 "status": bundle["status"],
                 "started_at": bundle["started_at"],
                 "size": bundle["size"],
+                "size_known": bool(bundle.get("size_known", False)),
                 "preserve": bool(bundle["preserve"]),
             }
             for bundle in indexed

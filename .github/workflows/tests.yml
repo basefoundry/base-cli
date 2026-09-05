@@ -46,6 +46,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -99,6 +102,9 @@ jobs:
             family: fedora
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Run distribution validation in Docker
         env:
           DISTRO_IMAGE: ${{ matrix.image }}
@@ -113,10 +119,11 @@ jobs:
               set -eu
               if [ "$DISTRO_FAMILY" = debian ]; then
                 apt-get update
-                DEBIAN_FRONTEND=noninteractive apt-get install -y bash nodejs npm python3 python3-pip python3-venv
+                DEBIAN_FRONTEND=noninteractive apt-get install -y bash git nodejs npm python3 python3-pip python3-venv
               else
-                dnf install -y nodejs npm python3 python3-pip
+                dnf install -y git nodejs npm python3 python3-pip
               fi
+              git config --global --add safe.directory /workspace
               python3 -m venv /tmp/base-cli-venv
               /tmp/base-cli-venv/bin/python -m pip install ".[dev,typer]"
               . /tmp/base-cli-venv/bin/activate
@@ -130,6 +137,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: Validate repository baseline inside WSL
         shell: pwsh
         run: |

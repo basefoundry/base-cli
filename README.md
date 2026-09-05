@@ -888,6 +888,15 @@ diagnosis. The metadata and retention index are written with same-filesystem
 temporary files, flush/sync, and atomic replacement, and concurrent pruners
 serialize through a sidecar lock.
 
+Recovery work is bounded on the foreground command path. Count- and age-only
+policies inspect metadata without recursively sizing bundle contents. A byte
+policy performs at most 512 recursive size walks and removes at most 256
+bundles per pass; any remaining policy debt is retained safely and reported as
+a warning for a later invocation. The diagnostic index records at most 512
+entries and sets `complete: false` plus `omitted_bundles` when a cache is
+larger, so a stale, corrupt, or missing index is always reconciled from the
+filesystem rather than trusted for deletion.
+
 The policy is skipped for `ctx.dry_run`, `log_to_file=False`, and explicit
 `--log-file` paths so no-durable-write modes and caller-selected log locations
 stay under caller control. The original `max_log_files=<count>` option remains
