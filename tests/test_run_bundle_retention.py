@@ -13,6 +13,7 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli._private_files as private_files
+import base_cli._runtime as runtime
 from base_cli import RetentionPolicy
 from base_cli._private_files import write_private_json
 from base_cli._runtime import acquire_run_lease, close_run_lease, prune_run_bundles
@@ -43,6 +44,68 @@ def _bundle(
 
 
 class RunBundleRetentionTests(unittest.TestCase):
+    def test_count_retention_does_not_walk_bundle_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            _bundle(root, "old")
+            _bundle(root, "new")
+            with mock.patch.object(runtime, "_bundle_size", side_effect=AssertionError("unexpected size walk")):
+                prune_run_bundles(
+                    root,
+                    policy=RetentionPolicy(max_bundles=1),
+                    logger=logging.getLogger(__name__),
+                )
+
+            self.assertEqual(
+                len([path for path in root.iterdir() if path.is_dir() and not path.name.startswith(".")]),
+                1,
+            )
+
+    def test_retention_removal_work_is_bounded_and_reports_policy_debt(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            for index in range(300):
+                _bundle(root, f"run-{index:03d}")
+            logger = mock.Mock()
+
+            prune_run_bundles(root, policy=RetentionPolicy(max_bundles=1), logger=logger)
+
+            remaining = [path for path in root.iterdir() if path.is_dir() and not path.name.startswith(".")]
+            self.assertEqual(len(remaining), 44)
+            self.assertTrue(any("policy debt remains" in str(call) for call in logger.warning.call_args_list))
+
+    def test_byte_retention_bounds_recursive_size_work(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            for index in range(520):
+                _bundle(root, f"run-{index:03d}")
+            logger = mock.Mock()
+            with mock.patch.object(runtime, "_bundle_size", wraps=runtime._bundle_size) as bundle_size:
+                prune_run_bundles(
+                    root,
+                    policy=RetentionPolicy(max_total_bytes=1),
+                    logger=logger,
+                )
+
+            self.assertLessEqual(bundle_size.call_count, 512)
+            self.assertTrue(any("size walk(s)" in str(call) for call in logger.warning.call_args_list))
+
+    def test_corrupt_index_is_reconciled_without_trusting_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            _bundle(root, "old")
+            (root / ".base-cli-run-index.json").write_text("not json", encoding="utf-8")
+
+            prune_run_bundles(root, policy=RetentionPolicy(max_bundles=1), logger=logging.getLogger(__name__))
+
+            payload = json.loads((root / ".base-cli-run-index.json").read_text(encoding="utf-8"))
+            self.assertTrue(payload["complete"])
+            self.assertEqual(payload["omitted_bundles"], 0)
+
     def test_count_removes_complete_bundles_as_units(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir) / "runs"

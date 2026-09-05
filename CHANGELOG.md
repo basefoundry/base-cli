@@ -31,6 +31,8 @@ and versions are tracked in the repo-root `VERSION` file.
   for transient Windows file-sharing locks.
 - Protect live run bundles with cross-platform process leases and fail closed
   when liveness is missing or cannot be established during retention recovery.
+- Bound foreground run-cache recovery work, avoid unnecessary recursive size
+  walks, and report remaining retention policy debt for incremental passes.
 - Select platform-aware cache roots (`XDG_CACHE_HOME`, macOS Caches, and
   Windows `LOCALAPPDATA`) and normalize home-relative paths across separators.
 - Add README health and support badges for CI, downstream consumers, PyPI, and
