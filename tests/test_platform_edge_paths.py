@@ -10,8 +10,7 @@ from unittest import mock
 import base_cli._click_compat as click_compat
 import base_cli._private_files as private_files
 import base_cli._runtime as runtime
-from base_cli import RetentionPolicy
-from base_cli import history
+from base_cli import RetentionPolicy, history
 from base_cli._attach import (
     _click_command_has_pending_children,
     _normalize_attached_option_declaration,
@@ -148,8 +147,8 @@ class RuntimeEdgeTests(unittest.TestCase):
                 bundle = root / f"run-{index}"
                 bundle.mkdir()
                 (bundle / "run.json").write_text(
-                    '{"run_id": "run-%d", "status": "ok", '
-                    '"started_at": "2020-01-01T00:00:00Z", "preserve": false}' % index,
+                    f'{{"run_id": "run-{index}", "status": "ok", '
+                    '"started_at": "2020-01-01T00:00:00Z", "preserve": false}',
                     encoding="utf-8",
                 )
             with mock.patch.object(runtime, "_bundle_size", side_effect=AssertionError("unexpected size walk")):
