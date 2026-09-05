@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import hashlib
 import os
 import re
 import sys
@@ -102,6 +103,26 @@ def normalize_cli_name(name: str) -> str:
     if "." in stem:
         stem = stem.rsplit(".", 1)[0]
     return stem.replace(" ", "-")
+
+
+def normalize_explicit_cli_name(name: str) -> str:
+    """Validate and preserve an application identity supplied by a consumer."""
+
+    if not isinstance(name, str):
+        raise TypeError("CLI name must be a string or None")
+    if not name.strip():
+        raise ValueError("CLI name must contain a non-empty identity")
+    return name
+
+
+def runtime_namespace_component(value: str, fallback: str = "application") -> str:
+    """Return a readable, filesystem-safe, collision-resistant component."""
+
+    readable = runtime_slug(value, fallback=fallback)
+    if readable == value:
+        return readable
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+    return f"{readable}--{digest}"
 
 
 def runtime_slug(value: str, fallback: str = "unnamed") -> str:

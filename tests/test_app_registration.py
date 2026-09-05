@@ -63,6 +63,19 @@ class AppRegistrationTests(unittest.TestCase):
         self.assertIn("Usage: professional-tool [OPTIONS]", _all_output(usage_result))
         self.assertNotIn("Usage: implementation", _all_output(usage_result))
 
+    def test_explicit_dotted_identity_remains_lossless(self) -> None:
+        app = base_cli.App(name="ops.prod", log_to_file=False)
+
+        @app.command()
+        def implementation(ctx: base_cli.Context) -> None:
+            self.assertEqual(ctx.cli_name, "ops.prod")
+
+        self.assertEqual(app.name, "ops.prod")
+        self.assertEqual(app.click_command.name, "ops.prod")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(app, [], home=Path(tmpdir))
+        self.assertEqual(result.exit_code, 0, _all_output(result))
+
     def test_single_command_rejects_a_name_conflicting_with_app_identity(self) -> None:
         app = base_cli.App(name="authoritative-name")
 
@@ -139,12 +152,12 @@ class AppRegistrationTests(unittest.TestCase):
 
         app.name = "renamed tool"
 
-        self.assertEqual(app.name, "renamed-tool")
-        self.assertEqual(app.click_command.name, "renamed-tool")
+        self.assertEqual(app.name, "renamed tool")
+        self.assertEqual(app.click_command.name, "renamed tool")
         with tempfile.TemporaryDirectory() as tmpdir:
             result = invoke(app, ["--help"], home=Path(tmpdir))
         self.assertEqual(result.exit_code, 0, result.output)
-        self.assertIn("Usage: renamed-tool [OPTIONS]", result.output)
+        self.assertIn("Usage: renamed tool [OPTIONS]", result.output)
         self.assertNotIn("Usage: original-name", result.output)
 
     def test_app_name_rejects_a_rename_conflicting_with_registered_explicit_name(self) -> None:

@@ -307,8 +307,10 @@ app = base_cli.App(name="workspace-tools", version="0.1.0")
 ```
 
 `App.name` is the canonical Click command and program name. It controls usage,
-help, version output, runtime identity, and the default invocation label. Do not
-pass a conflicting name to `@app.command(...)`; change `App(name=...)` instead.
+help, version output, runtime identity, and the default invocation label. An
+explicit identity is preserved exactly (including dots and punctuation), while
+empty or whitespace-only identities are rejected. Do not pass a conflicting
+name to `@app.command(...)`; change `App(name=...)` instead.
 
 Register the command function explicitly:
 

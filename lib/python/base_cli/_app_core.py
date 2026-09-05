@@ -45,6 +45,7 @@ from .logging import configure_logger, log_invocation
 from .paths import (
     current_working_dir,
     normalize_cli_name,
+    normalize_explicit_cli_name,
 )
 from .profile import CliProfile
 from .redaction import (
@@ -499,7 +500,7 @@ class App:
             self.retention = None
         self._registration_lock = RLock()
         self._registration_state = _REGISTRATION_OPEN
-        self._name = normalize_cli_name(name or sys.argv[0])
+        self._name = normalize_explicit_cli_name(name) if name is not None else normalize_cli_name(sys.argv[0])
         self.version = version
         self.help = help
         self.log_to_file = log_to_file
@@ -542,7 +543,7 @@ class App:
             self._lifecycle_options = value
 
     def _set_name(self, value: str) -> None:
-        normalized = normalize_cli_name(value)
+        normalized = normalize_explicit_cli_name(value)
         with self._registration_lock:
             self._ensure_registration_open()
             explicit_name = _explicit_command_name(
@@ -552,7 +553,7 @@ class App:
             if (
                 self._command_func is not None
                 and explicit_name is not None
-                and normalize_cli_name(explicit_name) != normalized
+                and normalize_explicit_cli_name(explicit_name) != normalized
             ):
                 raise RuntimeError(
                     f"App '{self.name}' cannot be renamed to '{normalized}' because "
@@ -578,7 +579,7 @@ class App:
         command_kwargs: dict[str, Any],
     ) -> None:
         explicit_name = _explicit_command_name(command_args, command_kwargs)
-        if explicit_name is not None and normalize_cli_name(explicit_name) != self.name:
+        if explicit_name is not None and normalize_explicit_cli_name(explicit_name) != self.name:
             raise RuntimeError(
                 f"App '{self.name}' is the authoritative command name; "
                 f"the registered command cannot use '{explicit_name}'."

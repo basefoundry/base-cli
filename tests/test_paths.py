@@ -4,7 +4,12 @@ import unittest
 from pathlib import Path
 
 from base_cli.history import compact_home_text
-from base_cli.paths import default_cache_root, default_config_root
+from base_cli.paths import (
+    default_cache_root,
+    default_config_root,
+    normalize_explicit_cli_name,
+    runtime_namespace_component,
+)
 
 
 class DefaultCacheRootTests(unittest.TestCase):
@@ -128,3 +133,24 @@ class HomePathCompactionTests(unittest.TestCase):
         value = r"C:\Users\Bob\project"
 
         self.assertEqual(compact_home_text(value, home=r"C:\Users\Alice"), value)
+
+
+class CliIdentityPathTests(unittest.TestCase):
+    def test_explicit_identity_is_preserved_and_whitespace_only_is_rejected(self) -> None:
+        self.assertEqual(normalize_explicit_cli_name("ops.prod"), "ops.prod")
+        self.assertEqual(normalize_explicit_cli_name("ops+prod"), "ops+prod")
+        with self.assertRaisesRegex(ValueError, "non-empty"):
+            normalize_explicit_cli_name("   ")
+
+    def test_unsafe_identity_components_are_readable_and_collision_resistant(self) -> None:
+        first = runtime_namespace_component("ops+prod")
+        second = runtime_namespace_component("ops@prod")
+        self.assertNotEqual(first, second)
+        self.assertTrue(first.startswith("ops-prod--"))
+        self.assertTrue(second.startswith("ops-prod--"))
+        self.assertEqual(runtime_namespace_component("ops.prod"), "ops.prod")
+
+    def test_path_like_identity_cannot_escape_runtime_owner(self) -> None:
+        component = runtime_namespace_component("../../outside")
+        self.assertNotIn("/", component)
+        self.assertTrue(component.startswith("outside--"))
