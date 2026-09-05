@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Preserve explicit application identities losslessly while using
+  collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by
   using it to derive an isolated default configuration directory when no
   explicit directory is supplied.

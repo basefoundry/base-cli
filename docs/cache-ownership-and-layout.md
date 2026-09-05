@@ -3,6 +3,11 @@
 Runtime state is rooted at the cache root supplied to `CliProfile.generic()` or
 the platform cache directory. The generic profile places each application in a
 sanitized application namespace and does not impose a product-wide cache name.
+The explicit application identity remains lossless in Click, context, logs,
+metadata, and history. Filesystem components use a readable slug plus a stable
+digest when normalization would change the identity, so punctuation, spaces,
+Unicode, and path-like names cannot escape the owner root or collide with
+another identity.
 
 When no explicit cache root is supplied, the generic profile follows these
 platform conventions:
@@ -18,6 +23,9 @@ characteristics.
 
 Consumer profiles may choose a different cache root or owner-aware layout when
 their application needs stronger isolation between projects or checkouts.
+Changing from an older normalized namespace does not delete or merge the old
+directory; consumers that need migration should provide an explicit profile
+resolver and copy data under their own policy.
 
 Each invocation has a private run bundle containing:
 

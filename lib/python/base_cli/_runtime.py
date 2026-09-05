@@ -27,7 +27,7 @@ from ._private_files import (
     restrict_file,
     write_private_json,
 )
-from .paths import runtime_run_directory_name, runtime_slug
+from .paths import runtime_namespace_component, runtime_run_directory_name
 from .runtime import RetentionPolicy, RuntimeLayout
 
 _LOG_INDEX_NAME = ".base-cli-log-index.json"
@@ -50,6 +50,7 @@ def runtime_layout(
     project_name: str | None = None,
     inherited_run_root: Path | None = None,
 ) -> RuntimeLayout:
+    cli_component = runtime_namespace_component(cli_name, fallback="application")
     owner_root = runtime_namespace_root(cache_root, namespace or cli_name)
     run_root = inherited_run_root or owner_root / "runs" / runtime_run_directory_name(run_id, cli_name, project_name)
     state_dir = owner_root
@@ -61,8 +62,8 @@ def runtime_layout(
         run_root=run_root,
         state_dir=state_dir,
         log_dir=log_dir,
-        cache_dir=owner_root / "cache" / "components" / cli_name,
-        temp_dir=run_root / "tmp" / cli_name / run_id,
+        cache_dir=owner_root / "cache" / "components" / cli_component,
+        temp_dir=run_root / "tmp" / cli_component / run_id,
     )
 
 
@@ -312,7 +313,7 @@ def _owned_directory_collision_error(path: Path) -> str:
 
 def runtime_namespace_root(cache_root: Path, namespace: str) -> Path:
     """Return an application-owned runtime namespace without product assumptions."""
-    return cache_root / runtime_slug(namespace, fallback="application")
+    return cache_root / runtime_namespace_component(namespace, fallback="application")
 
 
 def prune_log_files(

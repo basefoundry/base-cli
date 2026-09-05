@@ -57,6 +57,15 @@ def test_runtime_layout_places_inherited_base_children_in_the_shared_logs_dir() 
     assert layout.temp_dir == parent / "tmp" / "base_projects" / "child"
 
 
+def test_runtime_layout_isolates_distinct_unsafe_cli_names() -> None:
+    runtime = importlib.import_module("base_cli._runtime")
+    first = runtime.runtime_layout(Path("/tmp/base-cache"), "ops+prod", "run-1")
+    second = runtime.runtime_layout(Path("/tmp/base-cache"), "ops@prod", "run-1")
+    assert first.owner_root != second.owner_root
+    assert first.cache_dir.is_relative_to(first.owner_root)
+    assert first.temp_dir.is_relative_to(first.run_root)
+
+
 def test_runtime_directory_helpers_are_split_from_app_module() -> None:
     app_source = Path(app.__file__).read_text(encoding="utf-8")
 
