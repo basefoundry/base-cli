@@ -120,6 +120,7 @@ jobs:
               else
                 dnf install -y git nodejs npm python3 python3-pip
               fi
+              git config --global --add safe.directory /workspace
               python3 -m venv /tmp/base-cli-venv
               /tmp/base-cli-venv/bin/python -m pip install ".[dev,typer]"
               . /tmp/base-cli-venv/bin/activate
