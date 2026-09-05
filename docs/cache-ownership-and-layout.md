@@ -23,7 +23,8 @@ Each invocation has a private run bundle containing:
 
 - `run.json` for lifecycle metadata;
 - `logs/` for diagnostic logs; and
-- `tmp/` for temporary command data.
+- `tmp/` for temporary command data; and
+- an internal `.base-cli-run-lease` held open while the invocation is live.
 
 The core lifecycle, rather than an optional history adapter, owns `run.json`.
 Once command context construction succeeds, the file is written with
@@ -46,6 +47,12 @@ truncated JSON file. A failed serialization, permission check, or replacement
 leaves the previous snapshot intact. History is intentionally append-only and
 uses its file lock to serialize complete JSON lines; it is not rewritten as an
 atomic snapshot.
+
+Retention uses the run lease to distinguish a live process from a crashed one.
+An age-bound recovery pass may remove a `running` bundle only after acquiring
+its lease, which proves no process still holds it. A missing or unreadable
+lease is unknown and is retained; this fail-closed rule protects bundles
+created by old versions and bundles on filesystems without reliable locking.
 
 The ownership boundary intentionally excludes parser failures, help and version
 requests, inherited runtime bindings, `log_to_file=False`, and dry-run mode.

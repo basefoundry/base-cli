@@ -24,6 +24,7 @@ from ._lifecycle import (
 from ._private_files import write_private_json
 from ._runtime import (
     RuntimeDirectoryError,
+    acquire_run_lease,
     create_owned_runtime_directory,
     create_runtime_directory,
     prune_log_files,
@@ -1207,6 +1208,7 @@ class App:
         try:
             if owns_run_metadata:
                 create_runtime_directory(layout.run_root, cache_root)
+                context._run_lease = acquire_run_lease(layout.run_root)
             if dry_run or not self.log_to_file:
                 if log_file is not None:
                     create_runtime_directory(log_file.parent, cache_root)
@@ -1316,6 +1318,7 @@ def _rollback_context_creation(
         context._cleanup_owned_temp_dir()
     except BaseException:  # pylint: disable=broad-exception-caught
         pass
+    context._close_run_lease()
 
 
 def get_command_app(command_func: Any) -> App:

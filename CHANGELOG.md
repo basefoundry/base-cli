@@ -27,6 +27,8 @@ and versions are tracked in the repo-root `VERSION` file.
   apply identical bounded width handling to Rich and plain renderers.
 - Make managed metadata and index replacements atomic, with bounded retries
   for transient Windows file-sharing locks.
+- Protect live run bundles with cross-platform process leases and fail closed
+  when liveness is missing or cannot be established during retention recovery.
 - Select platform-aware cache roots (`XDG_CACHE_HOME`, macOS Caches, and
   Windows `LOCALAPPDATA`) and normalize home-relative paths across separators.
 - Add README health and support badges for CI, downstream consumers, PyPI, and

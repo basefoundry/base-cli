@@ -876,11 +876,15 @@ app = base_cli.App(
 
 Retention runs during startup after the current run's default log file is
 resolved. The active invocation, inherited parent bundle, and bundles marked
-`preserve` (including `--keep-temp`) are never removed. A stale `running`
-bundle is eligible for crash recovery only when an age bound is configured;
-without one it is retained for diagnosis. The metadata and retention index are
-written with same-filesystem temporary files, flush/sync, and atomic
-replacement, and concurrent pruners serialize through a sidecar lock.
+`preserve` (including `--keep-temp`) are never removed. Each lifecycle-owned
+running bundle also holds an advisory `.base-cli-run-lease` for its lifetime;
+retention never removes a bundle whose lease is active. A stale `running`
+bundle is eligible for crash recovery only when an age bound is configured and
+its lease can be acquired, proving that the original process has exited.
+Missing, unreadable, or unsupported leases fail closed and remain retained for
+diagnosis. The metadata and retention index are written with same-filesystem
+temporary files, flush/sync, and atomic replacement, and concurrent pruners
+serialize through a sidecar lock.
 
 The policy is skipped for `ctx.dry_run`, `log_to_file=False`, and explicit
 `--log-file` paths so no-durable-write modes and caller-selected log locations
