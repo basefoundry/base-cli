@@ -29,16 +29,20 @@ redaction, protocol framing, persistence, concurrency, retention, and signal
 cleanup.
 
 The publish job downloads that same reviewed artifact; it does not rebuild
-during publication. The build also emits a deterministic `SHA256SUMS` file and
-an SPDX 2.3 `SBOM.spdx.json` release artifact. On tag and protected dispatch
+during publication. The build also emits a deterministic `SHA256SUMS` file, an
+SPDX 2.3 `SBOM.spdx.json` release artifact, and a
+`RELEASE-BOM-ROW.json` component record for the ecosystem compatibility BOM.
+The row binds the exact base-cli version, full source commit, API contract,
+supported platforms, and passing release evidence. On tag and protected dispatch
 runs, GitHub's OIDC-backed `actions/attest` job records both build provenance
 and an SBOM attestation for the exact artifact digests; no PyPI token or other
 long-lived publish secret is used.
 
 For a version tag, the same Package workflow creates a GitHub Release after
 the protected PyPI publication and attestations succeed. The release attaches
-the exact reviewed wheel, sdist, `SHA256SUMS`, and `SBOM.spdx.json` downloaded
-from the build job. GitHub-generated comparison notes are supplemented by the
+the exact reviewed wheel, sdist, `SHA256SUMS`, `SBOM.spdx.json`, and
+`RELEASE-BOM-ROW.json` downloaded from the build job. GitHub-generated
+comparison notes are supplemented by the
 dated section in `CHANGELOG.md`; the tagged release is rejected when `VERSION`
 or that section does not match the tag. Rerunning a tag updates an existing
 release's assets with `--clobber` instead of creating a second release.

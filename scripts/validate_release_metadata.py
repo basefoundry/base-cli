@@ -7,11 +7,14 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 SBOM_NAME = "SBOM.spdx.json"
 CHECKSUMS_NAME = "SHA256SUMS"
+BOM_ROW_NAME = "RELEASE-BOM-ROW.json"
+SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def _sha256(path: Path) -> str:
@@ -62,6 +65,25 @@ def main() -> None:
     packages = sbom.get("packages")
     if not isinstance(packages, list) or not any(package.get("name") == "base-cli" for package in packages):
         _fail("SBOM does not describe base-cli")
+    bom_path = args.dist / BOM_ROW_NAME
+    try:
+        bom_row: dict[str, Any] = json.loads(bom_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        _fail(f"invalid {BOM_ROW_NAME}: {exc}")
+    version = str(sbom.get("name", "")).removeprefix("base-cli-")
+    if bom_row.get("repository") != "basefoundry/base-cli":
+        _fail(f"{BOM_ROW_NAME} repository must be basefoundry/base-cli")
+    if bom_row.get("version") != version or bom_row.get("tag") != f"v{version}":
+        _fail(f"{BOM_ROW_NAME} version/tag does not match the release")
+    commit = bom_row.get("commit")
+    if not isinstance(commit, str) or not SHA_RE.fullmatch(commit):
+        _fail(f"{BOM_ROW_NAME} commit must be a lowercase full 40-character SHA")
+    if expected_revision and commit != expected_revision:
+        _fail(f"{BOM_ROW_NAME} commit is not bound to SOURCE_REVISION")
+    if bom_row.get("source_mode") != "release" or bom_row.get("required") is not True:
+        _fail(f"{BOM_ROW_NAME} must declare a required release source")
+    if bom_row.get("result") != "passed" or not bom_row.get("evidence"):
+        _fail(f"{BOM_ROW_NAME} must declare a passing result with evidence")
     print(f"Validated {len(artifacts)} artifact hashes and SPDX SBOM {sbom_path}.")
 
 
