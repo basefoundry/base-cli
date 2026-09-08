@@ -182,6 +182,7 @@ jobs:
           path: |
             dist/SBOM.spdx.json
             dist/SHA256SUMS
+            dist/RELEASE-BOM-ROW.json
           if-no-files-found: error
           retention-days: 90
 
@@ -329,7 +330,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="$GITHUB_REF_NAME"
-          assets=(dist/*.whl dist/*.tar.gz dist/SHA256SUMS dist/SBOM.spdx.json)
+          assets=(dist/*.whl dist/*.tar.gz dist/SHA256SUMS dist/SBOM.spdx.json dist/RELEASE-BOM-ROW.json)
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$tag" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
           else

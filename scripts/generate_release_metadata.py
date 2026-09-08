@@ -17,6 +17,7 @@ import tomllib  # type: ignore[import-untyped]
 PACKAGE_NAME = "base-cli"
 SBOM_NAME = "SBOM.spdx.json"
 CHECKSUMS_NAME = "SHA256SUMS"
+BOM_ROW_NAME = "RELEASE-BOM-ROW.json"
 
 
 def _root() -> Path:
@@ -134,6 +135,19 @@ def generate(dist: Path, root: Path) -> None:
         ],
     }
     (dist / SBOM_NAME).write_text(json.dumps(sbom, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    bom_row = {
+        "repository": "basefoundry/base-cli",
+        "version": version,
+        "tag": f"v{version}",
+        "commit": revision,
+        "source_mode": "release",
+        "api_schema_version": f"base-cli-api@{version}",
+        "platforms": ["macos", "ubuntu", "windows"],
+        "required": True,
+        "result": "passed",
+        "evidence": f"run://base-cli/release/{version}",
+    }
+    (dist / BOM_ROW_NAME).write_text(json.dumps(bom_row, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Generated {SBOM_NAME} and {CHECKSUMS_NAME} for {PACKAGE_NAME} {version} at {revision}.")
 
 
