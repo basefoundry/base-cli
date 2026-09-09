@@ -325,18 +325,18 @@ jobs:
           name: base-cli-release-metadata-${{ github.run_id }}
           path: dist
 
-      - name: Create or update GitHub Release
+      - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="$GITHUB_REF_NAME"
           assets=(dist/*.whl dist/*.tar.gz dist/SHA256SUMS dist/SBOM.spdx.json dist/RELEASE-BOM-ROW.json)
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$tag" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$tag" "${assets[@]}" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$tag" \
-              --generate-notes \
-              --notes "Published distributions and release metadata for $tag. See CHANGELOG.md for the reviewed release notes."
+            echo "Published release $tag already exists; refusing to replace immutable release assets." >&2
+            exit 1
           fi
+          gh release create "$tag" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$tag" \
+            --generate-notes \
+            --notes "Published distributions and release metadata for $tag. See CHANGELOG.md for the reviewed release notes."
