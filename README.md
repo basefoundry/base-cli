@@ -33,6 +33,8 @@ Compatibility results and the permissioned-adopter policy are documented in
 the [adoption and compatibility evidence guide](https://basefoundry.github.io/base-cli/adoption-evidence/).
 The [compatibility dashboard](https://basefoundry.github.io/base-cli/compatibility-dashboard/)
 shows the declared and CI-tested dependency and platform support boundaries.
+The shared Base ecosystem boundary is maintained in the [Base ecosystem
+platform, license, and release policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 
 ## Quick start
 
@@ -67,8 +69,10 @@ Release builds, TestPyPI rehearsals, and protected PyPI publication are
 documented in [`docs/releasing.md`](https://basefoundry.github.io/base-cli/releasing/). The package exposes
 `base_cli.__version__`, which matches the distribution version.
 
-The package is distributed under the Apache License 2.0. Base itself remains
-licensed separately under AGPL-3.0-or-later.
+The package is distributed under the Apache License 2.0. Base is licensed under
+Apache-2.0 starting with v1.9.0; earlier Base releases retain the license stated
+in their release documentation. The two projects remain independently licensed
+and independently released.
 
 `base_cli` is designed to be embedded by applications rather than to define
 an application's project model. Base is one consumer of the library, not part

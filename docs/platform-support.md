@@ -19,6 +19,11 @@ Native Windows support applies to the generic Python package. It does not make
 Base or `basectl` natively Windows-compatible; those consumers have their own
 Unix-tooling and shell boundaries. The package does not provide package-manager
 integration, shell startup management, or WSL/Windows path translation.
+The coordinated Base release matrix is intentionally narrower: Base records
+Ubuntu 24.04 and macOS 14 combinations in its release BOM. See the [Base
+ecosystem platform, license, and release
+policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md)
+for the cross-repository boundary.
 
 Recursive invocation-temp content erasure requires descriptor-relative,
 no-follow directory operations. Linux, macOS, and WSL2 provide those

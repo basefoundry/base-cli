@@ -8,3 +8,11 @@ def test_package_workflow_uses_numeric_reproducibility_epoch() -> None:
 
     assert "github.event.head_commit.timestamp" not in workflow
     assert workflow.count("SOURCE_DATE_EPOCH: '0'") == 2
+
+
+def test_package_workflow_does_not_replace_published_release_assets() -> None:
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
+
+    assert "Create GitHub Release" in workflow
+    assert "refusing to replace immutable release assets" in workflow
+    assert "--clobber" not in workflow

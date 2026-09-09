@@ -4,6 +4,11 @@ The `base-cli` distribution is built and published from the standalone
 `basefoundry/base-cli` repository. The package name on PyPI is `base-cli`; the
 Python import name is `base_cli`.
 
+`base-cli` releases are independent of Base releases. The shared provider,
+platform, license, and release-artifact rules are summarized in the [Base
+ecosystem platform, license, and release
+policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
+
 ## Version and tag contract
 
 `VERSION` is the release version source of truth. The build backend reads it for
@@ -44,8 +49,9 @@ the exact reviewed wheel, sdist, `SHA256SUMS`, `SBOM.spdx.json`, and
 `RELEASE-BOM-ROW.json` downloaded from the build job. GitHub-generated
 comparison notes are supplemented by the
 dated section in `CHANGELOG.md`; the tagged release is rejected when `VERSION`
-or that section does not match the tag. Rerunning a tag updates an existing
-release's assets with `--clobber` instead of creating a second release.
+or that section does not match the tag. Published tags and release assets are
+immutable. A rerun that finds an existing GitHub Release fails closed;
+corrections require a new patch version.
 
 ## Independent verification
 
