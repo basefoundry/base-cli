@@ -50,6 +50,7 @@ nav:
       - argparse migration: migration-argparse.md
       - Output contracts: output-contracts.md
       - JSON contracts: json-contracts.md
+      - Strict JSON consumer: strict-json-consumer.md
       - JSON Schema artifacts: schemas.md
       - Typed user configuration: user-config-typing.md
       - Entry-point extensions: extensions.md
