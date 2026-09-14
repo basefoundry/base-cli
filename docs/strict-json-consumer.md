@@ -63,8 +63,8 @@ Consumers should distinguish two failures:
   payload or record stream and report the producer's exit status;
 - valid JSON with an invalid shape: parsing succeeds, but schema validation
   must reject it. The repository's
-  [`scripts/validate_contract_fixtures.mjs`](../scripts/validate_contract_fixtures.mjs)
-  checks both the valid fixtures and the intentionally invalid
+  repository-owned `scripts/validate_contract_fixtures.mjs` checks both the
+  valid fixtures and the intentionally invalid
   `tests/fixtures/contracts/invalid-output-extra-field.json` fixture.
 
 Run the repository-owned cross-language contract check with:
