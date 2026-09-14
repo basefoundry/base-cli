@@ -75,6 +75,8 @@ application.
   cancellation rules.
 - Review the [JSON contracts](json-contracts.md) and [output contracts](output-contracts.md)
   before building automation around command output.
+- Use the [strict JSON consumer guide](strict-json-consumer.md) to validate
+  envelope and NDJSON records with a cross-language parser.
 
 ## Design principles
 
