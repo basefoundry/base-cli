@@ -74,6 +74,98 @@ CI validates them against the packaged schemas with both a Python validator and
 a dependency-free Node.js reader; consumers can use the same fixtures as
 cross-language conformance tests.
 
+
+## Strict JSON consumer validation with Node
+
+Base-cli's JSON output is intended to be consumed by strict parsers such as Node's `JSON.parse`.
+The following Node script validates that a base-cli JSON envelope (success or error) is valid JSON and conforms to the expected schema:
+
+```javascript
+const fs = require('fs');
+
+// Read the JSON output from a file (or stdin)
+const jsonOutput = fs.readFileSync(0, 'utf8');
+
+try {
+  const parsed = JSON.parse(jsonOutput);
+  // Validate the envelope structure
+  if (parsed.schema_version !== 1) {
+    throw new Error('Unsupported schema_version');
+  }
+  if (!['base-cli.output', 'base-cli.error'].includes(parsed.schema)) {
+    throw new Error('Unexpected schema');
+  }
+  if (typeof parsed.code !== 'string') {
+    throw new Error('Missing or invalid code');
+  }
+  console.log('Valid base-cli JSON envelope');
+} catch (err) {
+  console.error('Invalid base-cli JSON envelope:', err.message);
+  process.exit(1);
+}
+```
+
+For NDJSON output (e.g., from `--format ndjson`), each line is a separate JSON object.
+Validate each line individually:
+
+```javascript
+const fs = require('fs');
+const readline = require('readline');
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  crlfDelay: Infinity,
+});
+
+rl.on('line', (line) => {
+  try {
+    const parsed = JSON.parse(line);
+    if (parsed.schema_version !== 1) {
+      throw new Error('Unsupported schema_version');
+    }
+    if (parsed.schema !== 'base-cli.record') {
+      throw new Error('Unexpected schema for NDJSON record');
+    }
+    // Optionally validate the record shape
+  } catch (err) {
+    console.error('Invalid NDJSON line:', err.message);
+    process.exit(1);
+  }
+});
+```
+
+### Failure shape
+
+When base-cli emits an error envelope (e.g., due to invalid usage or an internal error), the JSON will have:
+- `schema: "base-cli.error"`
+- `type: "error"`
+- `code`: a string indicating the error type (e.g., `usage_error`, `unexpected_error`)
+- `details`: an object containing `exit_code` and the captured stdout (if any)
+
+Example error envelope for a missing required argument:
+
+```json
+{
+  "schema_version": 1,
+  "schema": "base-cli.error",
+  "code": "usage_error",
+  "type": "error",
+  "message": "Missing argument 'NAME'...",
+  "details": {
+    "exit_code": 2,
+    "stdout": ""
+  },
+  "run_id": null
+}
+```
+
+### Contract fixtures and validator
+
+Golden payloads for each public contract live in
+[`tests/fixtures/contracts`](https://github.com/basefoundry/base-cli/tree/main/tests/fixtures/contracts).
+The CI validates them against the packaged schemas with both a Python validator and a dependency-free Node.js reader.
+Consumers can use the same fixtures as cross-language conformance tests.
+
 ## Inspection envelopes
 
 Read-only inspection commands can use the stable inspection helpers when their
