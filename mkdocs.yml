@@ -43,6 +43,7 @@ nav:
       - Public API reference: api-reference.md
       - API stability: api-stability.md
       - Dependency support: dependency-support.md
+      - Optional output dependencies: optional-output-dependencies.md
       - Migration guide: migrations.md
       - Click migration: migration-click.md
       - Typer migration: migration-typer.md
