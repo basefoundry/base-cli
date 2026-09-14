@@ -77,6 +77,8 @@ application.
   before building automation around command output.
 - Use the [strict JSON consumer guide](strict-json-consumer.md) to validate
   envelope and NDJSON records with a cross-language parser.
+- Use the [optional output dependency guide](optional-output-dependencies.md)
+  to map YAML and other integrations to their explicit extras and fallbacks.
 
 ## Design principles
 
