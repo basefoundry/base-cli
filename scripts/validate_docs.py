@@ -19,6 +19,7 @@ PUBLIC_DOCS = frozenset(
         "cache-ownership-and-layout.md",
         "compatibility-dashboard.md",
         "consumer-profiles.md",
+        "consumer-quickstart.md",
         "coverage-policy.md",
         "dependency-support.md",
         "extensions.md",

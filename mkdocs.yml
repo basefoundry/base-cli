@@ -33,6 +33,7 @@ nav:
   - Validation: testing.md
   - Getting started:
       - Framework choice: framework-choice.md
+      - Consumer quickstart: consumer-quickstart.md
       - Adopter readiness: adopter-readiness.md
       - Adoption evidence: adoption-evidence.md
       - Compatibility dashboard: compatibility-dashboard.md
