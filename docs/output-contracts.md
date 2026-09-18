@@ -4,6 +4,9 @@
 and `ndjson` formats. Install `base-cli[yaml]` before selecting `yaml`; the
 other formats are available from the core package. The requested `text` format is presentation-aware: it renders
 a table on a TTY and tab-delimited rows when stdout is redirected or piped.
+When an output format or its optional dependency is invalid, `run_app()` reports
+an actionable usage error (exit code `2`); JSON mode uses the stable
+`output_format_error` envelope code.
 
 Delimited output is intentionally automation-friendly:
 
