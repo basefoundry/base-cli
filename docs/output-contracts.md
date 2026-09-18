@@ -37,3 +37,12 @@ For an optional polished human table, pass `rich=True` to `render_records()`.
 Rich is consulted only for interactive `text`; all redirected and structured
 formats retain the rules above and fall back to the built-in renderer if Rich
 is unavailable or fails.
+
+## Optional output-format dependencies
+
+Some output formats require additional dependencies. Install the corresponding extra to use them.
+
+| Format | Extra | Install command | If missing |
+|--------|-------|-----------------|------------|
+| YAML   | yaml  | `pip install base-cli[yaml]` | `ImportError: No module named 'yaml'` |
+| Rich text (when `rich=True` is used in `render_records()`) | rich | `pip install base-cli[rich]` | Falls back to the built-in text renderer (no error, but output lacks Rich styling) |
