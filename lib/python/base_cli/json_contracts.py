@@ -95,6 +95,7 @@ def dumps_envelope(envelope: Mapping[str, Any]) -> str:
             redact_json_value(dict(envelope)),
             ensure_ascii=False,
             separators=(",", ":"),
+            allow_nan=False,
         )
         + "\n"
     )
@@ -140,7 +141,7 @@ class JsonLogFormatter(logging.Formatter):
             payload["details"] = {
                 "exception_type": record.exc_info[0].__name__,
             }
-        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
 def _timestamp(value: float) -> str:

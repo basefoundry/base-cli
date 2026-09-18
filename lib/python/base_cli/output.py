@@ -62,7 +62,10 @@ class NdjsonWriter:
             "schema": self.schema,
             "record": dict(record),
         }
-        self.stream.write(json.dumps(payload, separators=(",", ":")))
+        # Serialize the complete record before touching the sink: with strict
+        # JSON, a nested NaN/Infinity must not leave a partial NDJSON line.
+        encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False)
+        self.stream.write(encoded)
         self.stream.write("\n")
         self.stream.flush()
 
@@ -149,7 +152,7 @@ def render_records(
 
     record_list = [dict(record) for record in records]
     if resolved == "json":
-        target.write(json.dumps(record_list, separators=(",", ":")))
+        target.write(json.dumps(record_list, separators=(",", ":"), allow_nan=False))
         target.write("\n")
         return resolved
 
@@ -195,7 +198,7 @@ def render_document(
     if resolved == "text":
         return resolved
     if resolved == "json":
-        target.write(json.dumps(dict(document), indent=2))
+        target.write(json.dumps(dict(document), indent=2, allow_nan=False))
         target.write("\n")
         return resolved
     if resolved == "yaml":
@@ -249,7 +252,7 @@ def _cell_value(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (Mapping, list, tuple)):
-        return json.dumps(value, separators=(",", ":"))
+        return json.dumps(value, separators=(",", ":"), allow_nan=False)
     return str(value)
 
 
