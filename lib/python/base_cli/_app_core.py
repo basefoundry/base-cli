@@ -6,7 +6,7 @@ import logging
 import stat
 import sys
 import time
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Awaitable, Callable, Iterable, Mapping
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 from datetime import datetime
@@ -274,6 +274,41 @@ def _reset_context_var(variable: ContextVar[Any], token: Any) -> None:
 
 def _default_log_file(layout: Any, configured_log_file: Path | None) -> Path:
     return configured_log_file or layout.log_dir / "primary.log"
+
+
+def _parameter_source_was_supplied(source: Any) -> bool:
+    """Return whether Click resolved an option from an explicit input source."""
+
+    return getattr(source, "name", None) in {"COMMANDLINE", "PROMPT", "ENVIRONMENT", "DEFAULT_MAP"}
+
+
+def _configured_stream_level(
+    configured: str | None,
+    *,
+    debug: bool,
+    quiet: bool,
+    debug_source: Any,
+    quiet_source: Any,
+) -> str | None:
+    """Merge explicit flag modifiers with the configured user-stream level."""
+
+    level = configured
+    if _parameter_source_was_supplied(debug_source):
+        if debug:
+            level = "debug"
+        elif level == "debug":
+            level = "info"
+    if _parameter_source_was_supplied(quiet_source) and quiet:
+        rank = {
+            "debug": logging.DEBUG,
+            "info": logging.INFO,
+            "warning": logging.WARNING,
+            "error": logging.ERROR,
+            "critical": logging.CRITICAL,
+        }
+        if level is None or rank.get(level, logging.INFO) < logging.WARNING:
+            level = "warning"
+    return level
 
 
 def _warn_lifecycle_failure(context: Context[Any, Any, Any], message: str, exc: BaseException) -> None:
@@ -1015,6 +1050,7 @@ class App:
                     context = self._create_context(
                         standard,
                         dry_run=resolution.values.dry_run,
+                        option_sources={key: value.source for key, value in resolution.raw.items()},
                     )
                 except ConfigurationError as exc:
                     raise click.UsageError(str(exc)) from exc
@@ -1110,6 +1146,7 @@ class App:
         self,
         standard: dict[str, Any],
         dry_run: bool = False,
+        option_sources: Mapping[str, Any] | None = None,
     ) -> Context[dict[str, Any], Any, Any]:
         project = self.profile.discover_project(current_working_dir())
         manifest_path = project.manifest if project is not None else None
@@ -1141,10 +1178,28 @@ class App:
             or "dev"
         )
         log_level = framework_config.log_level if framework_config is not None else None
-        debug = bool(standard.get("debug") or log_level == "debug")
+        sources = option_sources or {}
+        debug_source = sources.get("debug")
+        quiet_source = sources.get("quiet")
+        keep_temp_source = sources.get("keep_temp")
+        debug = (
+            bool(standard.get("debug"))
+            if _parameter_source_was_supplied(debug_source) or log_level is None
+            else log_level == "debug"
+        )
         quiet = bool(standard.get("quiet"))
-        keep_temp = bool(
-            standard.get("keep_temp") or (framework_config.keep_temp if framework_config is not None else None)
+        if framework_config is None or _parameter_source_was_supplied(keep_temp_source):
+            keep_temp = bool(standard.get("keep_temp"))
+        elif "keep_temp" in config_provenance or framework_config.keep_temp:
+            keep_temp = framework_config.keep_temp
+        else:
+            keep_temp = bool(standard.get("keep_temp"))
+        stream_log_level = _configured_stream_level(
+            log_level,
+            debug=debug,
+            quiet=quiet,
+            debug_source=debug_source,
+            quiet_source=quiet_source,
         )
         _capture_effective_output_options(
             owner_app=self,
@@ -1235,6 +1290,7 @@ class App:
                     quiet=quiet,
                     json_logs=context.json_output,
                     run_id=context.run_id,
+                    log_level=stream_log_level,
                 )
             except OSError as exc:
                 target = f"persistent log file '{log_file}'" if log_file is not None else "stderr logging"

@@ -58,11 +58,13 @@ class _AttachedLifecycleResource:
         attachment: _ClickAttachment[Any],
         click_context: Any,
         lifecycle_values: LifecycleValues,
+        lifecycle_sources: dict[str, Any],
     ) -> None:
         self.click = click
         self.attachment = attachment
         self.click_context = click_context
         self.lifecycle_values = lifecycle_values
+        self.lifecycle_sources = lifecycle_sources
         self.standard = _standard_options_from_values(lifecycle_values)
         self.started_at = utc_now()
         self.started_monotonic_ns = time.monotonic_ns()
@@ -82,6 +84,7 @@ class _AttachedLifecycleResource:
                 context = self.attachment.app._create_context(  # pylint: disable=protected-access
                     self.standard,
                     dry_run=self.lifecycle_values.dry_run,
+                    option_sources=self.lifecycle_sources,
                 )
             except ConfigurationError as exc:
                 raise self.click.UsageError(str(exc)) from exc
@@ -434,6 +437,7 @@ def _instrument_attached_click_command(click: Any, command: Any) -> None:
                     attachment,
                     click_context,
                     resolution.values,
+                    {key: value.source for key, value in resolution.raw.items()},
                 )
                 _with_attached_lifecycle_resource(click_context, resource)
                 if not _click_command_has_pending_children(click_context, command):
