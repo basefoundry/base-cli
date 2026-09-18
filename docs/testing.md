@@ -7,11 +7,11 @@ documentation/schema/contract validation, benchmark budgets, and security.
 Bandit and pip-audit are required; a missing tool is an error rather than a
 skipped check.
 
-Run it from a clean checkout after installing the development and quality
-extras:
+Run it from a clean checkout after installing the development, quality, and
+benchmark extras (the latter installs every declared framework comparator):
 
 ```bash
-python -m pip install '.[dev,typer,quality]'
+python -m pip install '.[dev,typer,quality,benchmark]'
 ./tests/full_validate.sh
 ```
 
@@ -30,15 +30,17 @@ validation gate. Individual gates can be selected for focused local work:
 ```
 
 The Tests workflow runs the runtime suite across the OS/Python matrix and on
-the supported Linux distributions/WSL. Its single quality job runs the
-platform-independent coverage, typing, style, contract, benchmark, and
-security gates once, with each group visible as a named Actions step. The
-workflow validates feature branches through pull requests rather than
-launching a second full run on every feature-branch push; direct pushes to
-`main` and version tags remain validated. The
-Package workflow focuses on release-boundary checks: building and validating
-the wheel/sdist, checksums/SBOM, and clean installed-wheel smoke tests. It
-does not repeat the source test, typing, lint, documentation, benchmark, or
+the supported Linux distributions/WSL. Its quality job runs platform-
+independent coverage, typing, style, contract, and security gates once, with
+each group visible as a named Actions step. A separate comparative benchmark
+matrix measures Click, Typer, Cyclopts, and base-cli on Unix, macOS, Windows,
+and WSL; each job publishes an Actions summary and retains its versioned JSON
+report as a dated artifact. The workflow validates feature branches through
+pull requests rather than launching a second full run on every feature-branch
+push; direct pushes to `main` and version tags remain validated. The Package
+workflow focuses on release-boundary checks: building and validating the
+wheel/sdist, checksums/SBOM, and clean installed-wheel smoke tests. It does
+not repeat the source test, typing, lint, documentation, benchmark, or
 security suites. `./tests/full_validate.sh` remains the one-command local
 aggregate of all source gates.
 
