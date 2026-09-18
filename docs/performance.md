@@ -54,8 +54,9 @@ foreground pass (protected bundles and unreadable entries are retained):
 When a bound prevents a complete reconciliation, base-cli leaves the
 unprocessed bundles intact, writes a partial index with `complete: false`, and
 emits a warning describing the remaining policy debt. A later invocation
-continues from the filesystem; the index is an observation aid, never an
-authorization to delete a path. The retention regression suite covers count,
+continues from the filesystem. An atomic advisory cursor rotates the bounded
+byte-size walk across invocations, including after process restart; the index
+is an observation aid, never an authorization to delete a path. The retention regression suite covers count,
 age, byte limits, deep trees, corrupt metadata/index files, unreadable files,
 concurrent invocations, and live-run lease protection.
 
