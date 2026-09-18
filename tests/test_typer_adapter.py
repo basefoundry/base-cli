@@ -57,6 +57,30 @@ class TyperAdapterTests(unittest.TestCase):
         self.assertIsInstance(observed["run_id"], str)
         self.assertEqual(observed["command"], "typer-cli")
 
+    def test_get_lifecycle_values_resolves_the_active_typer_context(self) -> None:
+        admin = self.typer.Typer()
+        cli = self.typer.Typer()
+        cli.add_typer(admin, name="admin")
+        observed: list[base_cli.LifecycleValues] = []
+
+        @admin.command()
+        def status() -> None:
+            observed.append(base_cli.get_lifecycle_values())
+
+        command = base_cli.attach_typer(
+            cli,
+            name="typer-values",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                debug=base_cli.LifecycleOption("--debug/--no-debug"),
+            ),
+        )
+        with tempfile.TemporaryDirectory() as home:
+            enabled = base_cli.testing.invoke(command, ["--debug", "admin", "status"], home=Path(home))
+
+        self.assertEqual(enabled.exit_code, 0, enabled.output)
+        self.assertEqual([value.debug for value in observed], [True])
+
     def test_nested_apps_help_and_click_exception_remain_native(self) -> None:
         admin = self.typer.Typer(help="Administrative commands")
         cli = self.typer.Typer(help="Root help")
