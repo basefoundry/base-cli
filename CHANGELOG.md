@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Surface expected output-format and optional-dependency failures as actionable
+  usage errors at the process boundary, including a stable JSON error code.
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by
