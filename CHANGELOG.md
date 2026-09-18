@@ -13,6 +13,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Validate nested configuration mappings before merge/provenance traversal,
+  reject recursive or excessively deep values with source-aware errors, and
+  continue to accept shared YAML aliases.
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by
