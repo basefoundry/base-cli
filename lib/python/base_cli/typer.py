@@ -67,7 +67,7 @@ def get_typer_command(typer_app: _TyperApp) -> _ClickCommand:
     if not isinstance(command, dialect.Command):
         raise TypeError(
             "Typer did not produce a Click command; upgrade to a supported "
-            "Typer release (currently 0.12 through 0.27.x)."
+            "Typer release (currently 0.25.1 through 0.27.x)."
         )
     return mark_command_dialect(command, dialect)
 
