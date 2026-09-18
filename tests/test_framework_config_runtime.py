@@ -233,7 +233,13 @@ class FrameworkConfigRuntimeTests(unittest.TestCase):
                 metadata = json.loads(metadata_files[0].read_text(encoding="utf-8"))
                 self.assertEqual(metadata["preserve"], expected_keep)
                 temp_dir = Path(observed["temp_dir"])
-                self.assertEqual((temp_dir / "marker").exists(), expected_keep)
+                marker = temp_dir / "marker"
+                if expected_keep:
+                    self.assertTrue(marker.exists())
+                elif marker.exists():
+                    # Platforms without safe directory-handle cleanup fail closed,
+                    # so a false keep-temp value is recorded but cleanup is warned.
+                    self.assertIn("Temp directory cleanup failed", result.stderr)
 
     def test_config_overrides_callable_defaults_but_environment_and_default_map_override_config(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
