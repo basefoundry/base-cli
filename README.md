@@ -883,8 +883,9 @@ app = base_cli.App(
 Retention runs during startup after the current run's default log file is
 resolved. The active invocation, inherited parent bundle, and bundles marked
 `preserve` (including `--keep-temp`) are never removed. Each lifecycle-owned
-running bundle also holds an advisory `.base-cli-run-lease` for its lifetime;
-retention never removes a bundle whose lease is active. A stale `running`
+bundle holds an advisory `.base-cli-run-lease` through final cleanup, including
+the brief period after metadata becomes terminal; retention never removes a
+bundle whose lease is active or whose liveness cannot be established. A stale `running`
 bundle is eligible for crash recovery only when an age bound is configured and
 its lease can be acquired, proving that the original process has exited.
 Missing, unreadable, or unsupported leases fail closed and remain retained for
