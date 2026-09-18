@@ -15,7 +15,7 @@ class RunJsonPreflightTests(unittest.TestCase):
     def _attached_click_command(self, counters: dict[str, Any], *, lazy: bool = False) -> Any:
         import click
 
-        class CountingType(click.ParamType[str]):
+        class CountingType(click.ParamType):
             name = "counted"
 
             def convert(self, value: Any, param: Any, ctx: Any) -> Any:
