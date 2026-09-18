@@ -76,6 +76,41 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         with self.assertRaises(base_cli.ExtensionsDisabledError):
             disabled.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "allowed")
 
+    def test_allowlist_loads_the_exact_approved_source_across_collisions_and_refresh(self) -> None:
+        for trusted_first in (False, True):
+            with self.subTest(trusted_first=trusted_first):
+                denied = _entry_point("shared", "same.module:plugin", distribution="denied")
+                trusted = _entry_point("shared", "same.module:plugin", distribution="trusted")
+                denied.load = mock.Mock(return_value="denied")
+                trusted.load = mock.Mock(return_value="trusted")
+                entries = (trusted, denied) if trusted_first else (denied, trusted)
+                discovery = base_cli.ExtensionDiscovery(entry_points=entries, allowlist={"trusted"})
+
+                descriptors = discovery.list_commands()
+                self.assertEqual(len(descriptors), 1)
+                self.assertEqual(descriptors[0].distribution, "trusted")
+                self.assertEqual(discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "shared"), "trusted")
+                result = discovery.load_all(base_cli.COMMAND_ENTRY_POINT_GROUP)
+                self.assertEqual([item.value for item in result], ["trusted"])
+                denied.load.assert_not_called()
+                trusted.load.assert_called_once_with()
+
+                discovery.refresh()
+                self.assertEqual(discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "shared"), "trusted")
+                denied.load.assert_not_called()
+                trusted.load.assert_has_calls([mock.call(), mock.call()])
+
+    def test_allowlisted_entry_point_identity_change_fails_closed(self) -> None:
+        trusted = _entry_point("shared", "same.module:plugin", distribution="trusted")
+        trusted.load = mock.Mock(return_value="trusted")
+        discovery = base_cli.ExtensionDiscovery(entry_points=(trusted,), allowlist={"trusted"})
+        self.assertEqual(len(discovery.list_commands()), 1)
+
+        trusted.dist.name = "denied"
+        with self.assertRaisesRegex(base_cli.ExtensionLoadError, "identity changed"):
+            discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "shared")
+        trusted.load.assert_not_called()
+
     def test_malformed_metadata_is_skipped_without_hiding_healthy_extensions(self) -> None:
         malformed = _entry_point(
             "broken",
