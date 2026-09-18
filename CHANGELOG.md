@@ -13,6 +13,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Honor all five validated framework `log_level` values on native and attached
+  user-facing streams while preserving DEBUG-level persistent diagnostics.
+- Let explicitly supplied lifecycle values, including negative boolean flags,
+  environment variables, and Click `default_map` entries, override validated
+  file configuration while keeping config ahead of Click defaults.
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by

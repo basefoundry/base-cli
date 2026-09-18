@@ -37,6 +37,41 @@ class ConfigureLoggerTests(unittest.TestCase):
 
         self.assertEqual(stream.getvalue().strip(), "INFO:hello formatter")
 
+    def test_configure_logger_accepts_and_validates_explicit_stream_threshold(self) -> None:
+        cases = (
+            ("debug", ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")),
+            ("info", ("INFO", "WARNING", "ERROR", "CRITICAL")),
+            ("warning", ("WARNING", "ERROR", "CRITICAL")),
+            ("error", ("ERROR", "CRITICAL")),
+            ("critical", ("CRITICAL",)),
+        )
+        for level, expected in cases:
+            with self.subTest(level=level):
+                stream = io.StringIO()
+                logger = base_cli.configure_logger(
+                    f"configured-level-{level}",
+                    None,
+                    debug=False,
+                    stream=stream,
+                    log_level=level,
+                )
+                for log_level in ("debug", "info", "warning", "error", "critical"):
+                    getattr(logger, log_level)(f"{log_level}-message")
+
+                output = stream.getvalue()
+                for candidate in ("debug", "info", "warning", "error", "critical"):
+                    self.assertEqual(
+                        f"{candidate}-message" in output,
+                        candidate.upper() in expected,
+                        output,
+                    )
+                for handler in list(logger.handlers):
+                    handler.close()
+                    logger.removeHandler(handler)
+
+        with self.assertRaisesRegex(ValueError, "log_level must be one of"):
+            base_cli.configure_logger("configured-level-invalid", None, debug=False, log_level="verbose")
+
     def test_base_formatter_includes_exception_tracebacks(self) -> None:
         stream = io.StringIO()
         logger = base_cli.configure_logger("exception-traceback", None, debug=True, stream=stream)
