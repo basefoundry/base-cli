@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Bind an allowlisted Python extension to its discovered entry-point source and
+  fail closed if its distribution identity changes before loading.
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by

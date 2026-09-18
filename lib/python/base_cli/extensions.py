@@ -183,6 +183,7 @@ class ExtensionDiscovery:
         self._raw_cache: tuple[Any, ...] | None = None
         self._metadata_cache: tuple[ExtensionDescriptor, ...] | None = None
         self._descriptor_cache: dict[str, tuple[ExtensionDescriptor, ...]] = {}
+        self._entry_point_cache: dict[ExtensionDescriptor, Any] = {}
         self._loaded_cache: dict[tuple[str, str], Any] = {}
         self._lock = RLock()
 
@@ -268,6 +269,7 @@ class ExtensionDiscovery:
             self._raw_cache = None
             self._metadata_cache = None
             self._descriptor_cache.clear()
+            self._entry_point_cache.clear()
             self._loaded_cache.clear()
 
     def _metadata_descriptors(self) -> tuple[ExtensionDescriptor, ...]:
@@ -288,6 +290,7 @@ class ExtensionDiscovery:
                 continue
             if self._allowed(descriptor):
                 descriptors.append(descriptor)
+                self._entry_point_cache[descriptor] = entry_point
         descriptors.sort(key=_descriptor_sort_key)
         self._metadata_cache = tuple(descriptors)
         return self._metadata_cache
@@ -319,14 +322,16 @@ class ExtensionDiscovery:
         )
 
     def _load_descriptor(self, descriptor: ExtensionDescriptor) -> Any:
-        for entry_point in self._raw_entry_points():
-            if (
-                getattr(entry_point, "group", None) == descriptor.group
-                and getattr(entry_point, "name", None) == descriptor.name
-                and getattr(entry_point, "value", None) == descriptor.value
-            ):
-                return entry_point.load()
-        raise ImportError("entry point disappeared before it could be loaded")
+        entry_point = self._entry_point_cache.get(descriptor)
+        if entry_point is None:
+            raise ImportError("approved entry point disappeared before it could be loaded")
+        try:
+            current_descriptor = _descriptor_from_entry_point(entry_point)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise ImportError("approved entry point identity changed before it could be loaded") from exc
+        if current_descriptor != descriptor or not self._allowed(current_descriptor):
+            raise ImportError("approved entry point identity changed before it could be loaded")
+        return entry_point.load()
 
 
 def _validate_group(group: str) -> None:
