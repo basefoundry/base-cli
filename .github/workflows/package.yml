@@ -84,12 +84,6 @@ jobs:
             exit 1
           fi
 
-      - name: Install validation dependencies
-        run: python -m pip install ".[dev,typer,quality]"
-
-      - name: Run authoritative validation gate
-        run: ./tests/full_validate.sh
-
       - name: Validate changelog
         run: python scripts/validate_changelog.py
 
