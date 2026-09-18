@@ -47,6 +47,12 @@ WARM_INVOCATION_P95_BUDGETS_MS = {
     "windows": 100.0,
     "wsl": 100.0,
 }
+PERSISTENCE_ENABLED_P95_BUDGETS_MS = {
+    "unix": 50.0,
+    "macos": 50.0,
+    "windows": 250.0,
+    "wsl": 50.0,
+}
 DEFAULT_ITERATIONS = 31
 FRAMEWORKS = ("base-cli", "click", "typer", "cyclopts")
 RESULT_SCHEMA = "base-cli.benchmark"
@@ -218,6 +224,7 @@ def _budgets_for_platform(platform_profile: str) -> dict[str, float]:
         "cold_invocation_p95": COLD_INVOCATION_P95_BUDGETS_MS[platform_profile],
         "lifecycle_increment_over_click_p95": LIFECYCLE_OVERHEAD_P95_BUDGETS_MS[platform_profile],
         "warm_invocation_p95": WARM_INVOCATION_P95_BUDGETS_MS[platform_profile],
+        "persistence_enabled_p95": PERSISTENCE_ENABLED_P95_BUDGETS_MS[platform_profile],
     }
 
 
@@ -323,8 +330,9 @@ def _check_results(results: dict[str, FrameworkMetrics]) -> list[str]:
     if isinstance(features, dict):
         for name, value in features.items():
             p95 = _metric_p95(cast(FrameworkMetrics, {"metric": value}), "metric")
-            if p95 is not None and p95 > warm_budget:
-                failures.append(f"base-cli {name} p95 exceeded {warm_budget:.0f} ms")
+            feature_budget = _feature_budget_for_platform(name, BENCHMARK_PLATFORM)
+            if p95 is not None and p95 > feature_budget:
+                failures.append(f"base-cli {name} p95 exceeded {feature_budget:.0f} ms")
     return failures
 
 
@@ -396,13 +404,17 @@ def _write_github_summary(report: dict[str, Any]) -> None:
             "",
             "### Base CLI feature scenarios (p95, milliseconds)",
             "",
-            "| Scenario | p95 |",
-            "| --- | ---: |",
+            "| Scenario | p95 | Budget |",
+            "| --- | ---: | ---: |",
         ]
     )
     features = report["results"].get("base-cli", {}).get("features", {})
     for feature, summary in sorted(features.items()):
-        lines.append(f"| {feature.removesuffix('_ms').replace('_', ' ')} | {_format_number(summary.get('p95'))} ms |")
+        feature_budget = _feature_budget_for_platform(feature, profile)
+        lines.append(
+            f"| {feature.removesuffix('_ms').replace('_', ' ')} | {_format_number(summary.get('p95'))} ms | "
+            f"{_format_number(feature_budget)} ms |"
+        )
     lines.append("")
     try:
         with Path(summary_path).open("a", encoding="utf-8") as stream:
@@ -416,6 +428,12 @@ def _summary_value(metrics: FrameworkMetrics, name: str) -> str:
     if not isinstance(summary, dict):
         return "—"
     return f"{_format_number(summary.get('p95'))} ms"
+
+
+def _feature_budget_for_platform(feature: str, platform_profile: str) -> float:
+    if feature == "persistence_enabled_ms":
+        return PERSISTENCE_ENABLED_P95_BUDGETS_MS[platform_profile]
+    return WARM_INVOCATION_P95_BUDGETS_MS[platform_profile]
 
 
 def _format_number(value: object) -> str:

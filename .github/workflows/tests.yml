@@ -100,11 +100,12 @@ jobs:
           SOURCE_REVISION: ${{ github.sha }}
         run: python scripts/benchmark_runtime.py --check --iterations 31 --output benchmark-results.json
       - name: Retain dated machine-readable benchmark evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: base-cli-benchmark-${{ matrix.profile }}-${{ github.run_id }}
           path: benchmark-results.json
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 90
 
   linux-distributions:
@@ -172,9 +173,10 @@ jobs:
           $revision = $env:GITHUB_SHA
           wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; apt-get update -qq; apt-get install -y -qq nodejs npm python3-venv python3.14-venv; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer,benchmark]'; bash tests/full_validate.sh --gate runtime; BASE_CLI_BENCHMARK_PLATFORM=wsl SOURCE_REVISION='$revision' python scripts/benchmark_runtime.py --check --iterations 31 --output base-cli-benchmark-wsl.json"
       - name: Retain WSL benchmark evidence
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: base-cli-benchmark-wsl-${{ github.run_id }}
           path: base-cli-benchmark-wsl.json
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 90

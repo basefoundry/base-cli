@@ -44,6 +44,7 @@ class BenchmarkSummaryTests(unittest.TestCase):
                     "cold_invocation_p95",
                     "lifecycle_increment_over_click_p95",
                     "warm_invocation_p95",
+                    "persistence_enabled_p95",
                 },
             )
             self.assertGreater(budgets["cold_invocation_p95"], budgets["cold_import_p95"])
@@ -103,6 +104,26 @@ class BenchmarkSummaryTests(unittest.TestCase):
             failures = benchmark_runtime._check_results(metrics)
 
         self.assertTrue(any("missing diagnostics_ms p95" in failure for failure in failures))
+
+    def test_windows_persistence_budget_does_not_weaken_other_warm_scenarios(self) -> None:
+        metrics = self._complete_results()
+        metrics["base-cli"]["features"]["persistence_enabled_ms"] = self._summary(201.0)
+        metrics["base-cli"]["features"]["diagnostics_ms"] = self._summary(101.0)
+
+        with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", "windows"):
+            failures = benchmark_runtime._check_results(metrics)
+
+        self.assertFalse(any("persistence_enabled_ms" in failure for failure in failures))
+        self.assertTrue(any("diagnostics_ms p95 exceeded 100 ms" in failure for failure in failures))
+
+    def test_windows_persistence_budget_rejects_material_regressions(self) -> None:
+        metrics = self._complete_results()
+        metrics["base-cli"]["features"]["persistence_enabled_ms"] = self._summary(251.0)
+
+        with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", "windows"):
+            failures = benchmark_runtime._check_results(metrics)
+
+        self.assertTrue(any("persistence_enabled_ms p95 exceeded 250 ms" in failure for failure in failures))
 
     def test_github_summary_separates_lifecycle_overhead_from_parser(self) -> None:
         metrics = self._complete_results(lifecycle_p95=4.0, click_p95=1.5)

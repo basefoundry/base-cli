@@ -51,24 +51,30 @@ required comparator or scenario is missing, a p95 exceeds its profile budget,
 or the measured base-cli lifecycle increment over Click exceeds its separate
 profile budget. The lifecycle-to-Click ratio remains visible for interpretation,
 but is not itself gated because Click's sub-millisecond baseline makes ratios
-highly sensitive to timer granularity. The warm budgets also apply to each
-base-cli feature scenario. Percentile gates catch practical regressions while
-keeping noisy single maxima visible without making one scheduler outlier block
-a change.
+highly sensitive to timer granularity. Warm budgets apply to all non-persistence
+base-cli feature scenarios; file persistence has a separate platform budget
+because runner filesystems vary materially. Percentile gates catch practical
+regressions while keeping noisy single maxima visible without making one
+scheduler outlier block a change.
 
 | Budget (p95) | Unix | macOS | Windows | WSL2 |
 | --- | ---: | ---: | ---: | ---: |
 | Cold import, including interpreter startup | 750 ms | 750 ms | 1,000 ms | 1,000 ms |
 | Cold no-op invocation, including startup and dispatch | 2,000 ms | 2,000 ms | 4,000 ms | 4,000 ms |
 | Base-cli lifecycle increment over Click warm dispatch | 5 ms | 5 ms | 15 ms | 15 ms |
-| Warm invocation and base-cli feature scenarios | 50 ms | 50 ms | 100 ms | 100 ms |
+| Warm invocation and non-persistence feature scenarios | 50 ms | 50 ms | 100 ms | 100 ms |
+| File-persistence-enabled scenario | 50 ms | 50 ms | 250 ms | 50 ms |
 
 An initial 31-sample local calibration on macOS (Python 3.14.6, Apple Silicon)
 measured approximately 101 ms for base-cli cold import, 0.56 ms for warm
 lifecycle dispatch, and 15.9 ms p95 for file-persisted logging. These are
 development-host measurements, not adoption claims or release comparisons.
-The first complete hosted run records the corresponding four-platform
-baselines; review that evidence before tightening any platform budget.
+The first hosted 31-sample baseline measured file-persistence p95 at 22 ms on
+Ubuntu, 21 ms on macOS, 158 ms on Windows, and 27 ms on WSL2. Windows also had
+a high median absolute deviation (26 ms), so persistence has its own Windows
+budget instead of weakening other warm-scenario gates. These measurements are
+CI calibration evidence, not adoption claims or release comparisons; review
+subsequent retained artifacts before tightening platform budgets.
 
 Each report is versioned as `base-cli.benchmark` schema version 1 and contains
 the package version, source revision, UTC timestamp, platform profile, Python
