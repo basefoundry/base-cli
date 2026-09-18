@@ -746,6 +746,13 @@ flag; otherwise the message says that diagnostic context was unavailable.
 Embedding code that needs the original exception can pass the keyword-only
 `reraise_unexpected=True` argument to `run_app()`.
 
+`run_app()` is non-reentrant and allows only one active invocation per process.
+Nested or concurrent calls fail fast before entering Click or replacing the
+active stdout/logging handlers. Put reusable command behavior in an ordinary
+function and call that function from another callback; use a separate process
+when an independent CLI invocation is required. This does not change the
+framework's supported multi-process logging and runtime coordination.
+
 | Command result or exception | `outcome` | Exit code | Default message |
 | --- | --- | ---: | --- |
 | `None` or returned `0` | `success` | 0 | none |
