@@ -506,11 +506,12 @@ def _discover_run_bundles(
                 continue
         age = max(0.0, now - started_at)
         running = status == "running"
+        # The owner keeps its lease through cleanup, which occurs after the
+        # run metadata has been made terminal. Liveness therefore protects
+        # every state, not only the transient "running" state.
+        if _run_lease_state(child) != "inactive":
+            continue
         if running:
-            # A running record is removable only when the lease proves that
-            # its owner has exited. Missing or unreadable leases fail closed.
-            if _run_lease_state(child) != "inactive":
-                continue
             if max_age_seconds is None or age < max_age_seconds:
                 continue
         if status not in {"running", "ok", "aborted", "error"}:
@@ -652,9 +653,9 @@ def _bundle_is_still_removable(path: Path, *, policy: RetentionPolicy, now: floa
     if metadata is None:
         return False
     status = str(metadata.get("status", ""))
+    if _run_lease_state(path) != "inactive":
+        return False
     if status == "running":
-        if _run_lease_state(path) != "inactive":
-            return False
         if policy.max_age_seconds is None:
             return False
         started_at = _timestamp_to_epoch(metadata.get("started_at"))
