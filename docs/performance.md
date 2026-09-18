@@ -1,42 +1,87 @@
 # Performance and adversarial-regression contract
 
 `base-cli` treats startup and filesystem behavior as part of its public
-quality contract. The checked benchmark is intentionally small and runs from
-the source checkout:
+quality contract. The benchmark is a comparative regression check, not a claim
+that a lifecycle framework should outpace bare parsers. Its scenarios separate
+interpreter/import cost, parser dispatch, the base-cli lifecycle, optional
+features, and persistence.
+
+Install the complete local validation set, including every comparator:
 
 ```bash
-python scripts/benchmark_runtime.py --check
+python -m pip install '.[dev,typer,quality,benchmark]'
+python scripts/benchmark_runtime.py --check --iterations 31 --output benchmark-results.json
 ```
 
-It records fresh-process import time and the cost of an isolated production
-invocation through `base_cli.testing.invoke`. The comparison mode measures
-equivalent no-op commands for base-cli, Click, Typer, and (when installed)
-Cyclopts. Install the optional benchmark extra to include Cyclopts:
+The benchmark is also part of the local aggregate:
 
 ```bash
-python -m pip install 'base-cli[benchmark]'
+./tests/full_validate.sh --gate benchmark
 ```
 
-The CI quality job checks the base-cli sample p95 against these budgets. The
-benchmark records the selected platform profile in both text and JSON output;
-set `BASE_CLI_BENCHMARK_PLATFORM` when a runner's filesystem or virtualization
-boundary is not represented by the host operating system. Supported profiles
-are `unix`, `macos`, `windows`, and `wsl`.
+## Scenario contract
 
-| Measurement | Budget |
-| --- | ---: |
-| Fresh `import base_cli` (native Unix/macOS) | 750 ms |
-| Fresh `import base_cli` (native Windows) | 1,000 ms |
-| Fresh `import base_cli` (WSL2 on a Windows-mounted checkout) | 1,000 ms |
-| Isolated invocation and runtime filesystem setup | 1,500 ms |
+The comparative set is Click, Typer, Cyclopts, and base-cli. Each framework
+registers an equivalent zero-argument no-op command. Fresh-process
+measurements include Python startup, framework import, command construction,
+and dispatch through the framework's normal entry point. Warm parser samples
+reuse command objects; Click and Typer use Click's `CliRunner`, Cyclopts uses
+its `App` call, and base-cli reports both a shared Click-runner lifecycle
+sample and an end-to-end `base_cli.testing.invoke()` sample. The runner shape
+for each value is recorded here so comparisons do not imply identical
+mechanisms where framework APIs differ.
 
-The benchmark reports the median, p95, and maximum for seven samples. Pass
-`--json` for a stable machine-readable result suitable for archiving or CI
-comparison. These
-budgets are intentionally broad enough for hosted runners while still
-detecting accidental quadratic startup work, unbounded metadata scans, or
-unexpected dependency imports. A performance improvement should preserve the
-same lifecycle and persistence assertions covered by the adversarial tests.
+Base-cli-only feature samples cover:
+
+- successful and failed JSON envelopes;
+- debug diagnostics on the user stream;
+- nested-command dispatch;
+- persistence disabled versus enabled, with the same log event in both cases.
+
+These feature costs are reported separately from parser comparisons. JSON
+success/error and nested dispatch use the public `App`/lifecycle API; persistence
+samples differ only in whether file logging is enabled. Measurements are
+in-process, warm, and use isolated temporary homes.
+
+## CI budgets and evidence
+
+CI collects 31 samples per scenario on Python 3.13 for each supported
+benchmark profile: native Unix, macOS, Windows, and WSL2. `--check` fails if a
+required comparator or scenario is missing, a p95 exceeds its profile budget,
+or the measured base-cli lifecycle increment over Click exceeds its separate
+profile budget. The lifecycle-to-Click ratio remains visible for interpretation,
+but is not itself gated because Click's sub-millisecond baseline makes ratios
+highly sensitive to timer granularity. The warm budgets also apply to each
+base-cli feature scenario. Percentile gates catch practical regressions while
+keeping noisy single maxima visible without making one scheduler outlier block
+a change.
+
+| Budget (p95) | Unix | macOS | Windows | WSL2 |
+| --- | ---: | ---: | ---: | ---: |
+| Cold import, including interpreter startup | 750 ms | 750 ms | 1,000 ms | 1,000 ms |
+| Cold no-op invocation, including startup and dispatch | 2,000 ms | 2,000 ms | 4,000 ms | 4,000 ms |
+| Base-cli lifecycle increment over Click warm dispatch | 5 ms | 5 ms | 15 ms | 15 ms |
+| Warm invocation and base-cli feature scenarios | 50 ms | 50 ms | 100 ms | 100 ms |
+
+An initial 31-sample local calibration on macOS (Python 3.14.6, Apple Silicon)
+measured approximately 101 ms for base-cli cold import, 0.56 ms for warm
+lifecycle dispatch, and 15.9 ms p95 for file-persisted logging. These are
+development-host measurements, not adoption claims or release comparisons.
+The first complete hosted run records the corresponding four-platform
+baselines; review that evidence before tightening any platform budget.
+
+Each report is versioned as `base-cli.benchmark` schema version 1 and contains
+the package version, source revision, UTC timestamp, platform profile, Python
+version/ABI, OS release, architecture, CPU count, sample count, medians, p95,
+maximum, median absolute deviation, and parser/lifecycle comparison values.
+The Tests workflow retains a distinct JSON artifact for each platform profile
+for 90 days. Download the artifact from the corresponding `Benchmark (...)`
+or `Validate (WSL)` Actions job to compare dated runs.
+
+The profile can be selected explicitly with
+`BASE_CLI_BENCHMARK_PLATFORM` when a runner's filesystem or virtualization
+boundary is not represented by its host OS. Supported values are `unix`,
+`macos`, `windows`, and `wsl`.
 
 ## Retention recovery work bounds
 

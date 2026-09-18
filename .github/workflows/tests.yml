@@ -69,10 +69,43 @@ jobs:
         run: ./tests/full_validate.sh --gate style
       - name: Validate docs, schemas, contracts, and generated files
         run: ./tests/full_validate.sh --gate contracts
-      - name: Enforce benchmark budget
-        run: ./tests/full_validate.sh --gate benchmark
       - name: Run dependency and static security checks
         run: ./tests/full_validate.sh --gate security
+
+  benchmarks:
+    name: Benchmark (${{ matrix.profile }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: unix
+            os: ubuntu-latest
+          - profile: macos
+            os: macos-latest
+          - profile: windows
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install declared benchmark comparators
+        run: python -m pip install ".[typer,benchmark]"
+      - name: Run calibrated comparative benchmark
+        env:
+          BASE_CLI_BENCHMARK_PLATFORM: ${{ matrix.profile }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: python scripts/benchmark_runtime.py --check --iterations 31 --output benchmark-results.json
+      - name: Retain dated machine-readable benchmark evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: base-cli-benchmark-${{ matrix.profile }}-${{ github.run_id }}
+          path: benchmark-results.json
+          if-no-files-found: error
+          retention-days: 90
 
   linux-distributions:
     name: Validate (${{ matrix.name }})
@@ -136,4 +169,12 @@ jobs:
           $drive = $env:GITHUB_WORKSPACE.Substring(0, 1).ToLowerInvariant()
           $path = $env:GITHUB_WORKSPACE.Substring(2).Replace('\', '/')
           $linuxWorkspace = "/mnt/$drive$path"
-          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; apt-get update -qq; apt-get install -y -qq nodejs npm python3-venv python3.14-venv; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer]'; bash tests/full_validate.sh --gate runtime"
+          $revision = $env:GITHUB_SHA
+          wsl --distribution Ubuntu --user root -- bash -lc "set -eu; cd '$linuxWorkspace'; sed -i 's/\r$//' tests/full_validate.sh tests/validate.sh; apt-get update -qq; apt-get install -y -qq nodejs npm python3-venv python3.14-venv; python3 -m venv /tmp/base-cli-venv; . /tmp/base-cli-venv/bin/activate; python -m pip install '.[dev,typer,benchmark]'; bash tests/full_validate.sh --gate runtime; BASE_CLI_BENCHMARK_PLATFORM=wsl SOURCE_REVISION='$revision' python scripts/benchmark_runtime.py --check --iterations 31 --output base-cli-benchmark-wsl.json"
+      - name: Retain WSL benchmark evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: base-cli-benchmark-wsl-${{ github.run_id }}
+          path: base-cli-benchmark-wsl.json
+          if-no-files-found: error
+          retention-days: 90
