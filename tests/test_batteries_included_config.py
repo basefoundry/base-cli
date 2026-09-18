@@ -107,11 +107,13 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
                     with self.subTest(target=target_name, json="--json" in args):
                         result = invoke(target, list(args), home=root / f"home-{target_name}-{len(args)}")
                         self.assertEqual(result.exit_code, 2, result.output)
-                        self.assertIn(str(config_path), result.output)
                         self.assertNotIn("RecursionError", result.output)
                         if "--json" in args:
                             payload = json.loads(result.stdout)
                             self.assertEqual(payload["code"], "usage_error")
+                            self.assertIn(str(config_path), payload["message"])
+                        else:
+                            self.assertIn(str(config_path), result.output)
 
     def test_layered_loader_merges_in_documented_order_and_records_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
