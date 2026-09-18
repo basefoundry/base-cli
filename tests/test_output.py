@@ -68,9 +68,7 @@ class OutputTest(unittest.TestCase):
     def test_json_emitters_reject_non_finite_values_without_partial_output(self) -> None:
         invalid_record = {"nested": [{"value": float("nan")}]}
         emitters = (
-            lambda stream: render_records(
-                (invalid_record,), requested_format="json", columns=(), stream=stream
-            ),
+            lambda stream: render_records((invalid_record,), requested_format="json", columns=(), stream=stream),
             lambda stream: render_document(invalid_record, requested_format="json", stream=stream),
             lambda stream: NdjsonWriter(stream).write(invalid_record),
         )
