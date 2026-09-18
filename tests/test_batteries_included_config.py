@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,6 +29,89 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
             provenance,
             {"host": "user", "db.host": "project", "db.tls.enabled": "project"},
         )
+
+    def test_nested_non_string_keys_are_rejected_before_first_insert_or_overlay(self) -> None:
+        for initial in ({}, {"nested": {"keep": True}}):
+            with self.subTest(initial=initial):
+                values = dict(initial)
+                provenance: dict[str, str] = {"existing": "prior"}
+                original_values = dict(values)
+                original_provenance = dict(provenance)
+                with self.assertRaisesRegex(base_cli.ConfigurationError, "nested"):
+                    _merge_mapping(values, provenance, {"nested": {2: "invalid"}}, "explicit")
+                self.assertEqual(values, original_values)
+                self.assertEqual(provenance, original_provenance)
+
+    def test_shared_mapping_alias_is_valid_but_recursive_alias_is_rejected_with_path(self) -> None:
+        shared = {"answer": 42}
+        valid = {"left": shared, "right": shared}
+        values: dict[str, object] = {}
+        provenance: dict[str, str] = {}
+        _merge_mapping(values, provenance, valid, "user")
+        self.assertEqual(values, {"left": shared, "right": shared})
+        self.assertEqual(provenance, {"left.answer": "user", "right.answer": "user"})
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "recursive.yaml"
+            _write_yaml(path, "nested: &node\n  child: *node\n")
+            with self.assertRaisesRegex(base_cli.ConfigurationError, "recursive.yaml.*recursive value.*nested.child"):
+                BatteriesIncludedConfigLoader(user_config_dir=Path(tmpdir) / "user").load(None, path)
+
+    def test_mapping_depth_is_bounded_before_recursive_merge_or_provenance(self) -> None:
+        nested: dict[str, object] = {"value": 1}
+        for index in range(65):
+            nested = {f"level{index}": nested}
+
+        with self.assertRaisesRegex(base_cli.ConfigurationError, "maximum nesting depth of 64"):
+            _merge_mapping({}, {}, nested, "explicit")
+
+    def test_nested_invalid_yaml_shape_is_usage_error_in_human_and_json_modes(self) -> None:
+        import click
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            config_path = root / "invalid.yaml"
+            _write_yaml(config_path, "nested:\n  2: invalid\n")
+            profile = base_cli.CliProfile.batteries_included(
+                "invalid-nested-config",
+                user_config_dir=root / "user",
+            )
+            app = base_cli.App(
+                name="invalid-nested-config",
+                profile=profile,
+                log_to_file=False,
+                lifecycle_options=base_cli.LifecycleOptions(json=base_cli.LifecycleOption("--json")),
+            )
+
+            @app.command()
+            def main(ctx: base_cli.Context) -> None:
+                del ctx
+
+            @click.command(name="invalid-nested-config")
+            def attached_command() -> None:
+                pass
+
+            attached_app = base_cli.App(
+                name="invalid-nested-config",
+                profile=base_cli.CliProfile.batteries_included(
+                    "invalid-nested-config",
+                    user_config_dir=root / "user",
+                ),
+                log_to_file=False,
+                lifecycle_options=base_cli.LifecycleOptions(json=base_cli.LifecycleOption("--json")),
+            )
+            attached = attached_app.attach(attached_command)
+            targets = (("native", app), ("attached", attached))
+            for target_name, target in targets:
+                for args in (["--config", str(config_path)], ["--json", "--config", str(config_path)]):
+                    with self.subTest(target=target_name, json="--json" in args):
+                        result = invoke(target, list(args), home=root / f"home-{target_name}-{len(args)}")
+                        self.assertEqual(result.exit_code, 2, result.output)
+                        self.assertIn(str(config_path), result.output)
+                        self.assertNotIn("RecursionError", result.output)
+                        if "--json" in args:
+                            payload = json.loads(result.stdout)
+                            self.assertEqual(payload["code"], "usage_error")
 
     def test_layered_loader_merges_in_documented_order_and_records_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
