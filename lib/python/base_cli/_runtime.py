@@ -508,8 +508,16 @@ def _discover_run_bundles(
         running = status == "running"
         # The owner keeps its lease through cleanup, which occurs after the
         # run metadata has been made terminal. Liveness therefore protects
-        # every state, not only the transient "running" state.
-        if _run_lease_state(child) != "inactive":
+        # every state, not only the transient "running" state. Legacy bundle
+        # fixtures may have no lease file at all; terminal bundles without a
+        # lease are eligible, while unknown liveness remains fail-closed for
+        # running records or a present but unreadable lease.
+        lease_state = _run_lease_state(child)
+        lease_path = child / _RUN_LEASE_NAME
+        lease_present = lease_path.exists() or lease_path.is_symlink()
+        if lease_state == "active" or (lease_present and lease_state == "unknown"):
+            continue
+        if running and lease_state != "inactive":
             continue
         if running:
             if max_age_seconds is None or age < max_age_seconds:
@@ -653,9 +661,14 @@ def _bundle_is_still_removable(path: Path, *, policy: RetentionPolicy, now: floa
     if metadata is None:
         return False
     status = str(metadata.get("status", ""))
-    if _run_lease_state(path) != "inactive":
+    lease_state = _run_lease_state(path)
+    lease_path = path / _RUN_LEASE_NAME
+    lease_present = lease_path.exists() or lease_path.is_symlink()
+    if lease_state == "active" or (lease_present and lease_state == "unknown"):
         return False
     if status == "running":
+        if lease_state != "inactive":
+            return False
         if policy.max_age_seconds is None:
             return False
         started_at = _timestamp_to_epoch(metadata.get("started_at"))
