@@ -250,6 +250,9 @@ class MultiprocessingRegressionTests(unittest.TestCase):
                         "preserve": False,
                     },
                 )
+                # Retention now fails closed if a bundle has no lease record,
+                # because missing liveness cannot prove that it is inactive.
+                (bundle / ".base-cli-run-lease").write_bytes(b"0")
 
             _run_processes(_prune_worker, [(str(runs_root),) for _seed in SEEDS])
 
