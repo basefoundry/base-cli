@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Reject recursive and concurrent in-process `run_app()` calls before they can
+  replace another invocation's stdout or logging handlers.
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by

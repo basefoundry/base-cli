@@ -10,6 +10,7 @@ import tempfile
 import traceback
 from collections.abc import Callable, Mapping
 from contextlib import redirect_stdout
+from threading import Lock
 from typing import Any, TextIO, cast
 
 from ._app_core import (
@@ -33,6 +34,7 @@ from .lifecycle_options import LifecycleOption, LifecycleOptions
 from .redaction import option_aliases_from_decls
 
 _MAX_JSON_CAPTURE_BYTES = 8 * 1_048_576
+_RUN_APP_LOCK = Lock()
 
 
 class JsonCaptureLimitError(RuntimeError):
@@ -100,10 +102,49 @@ def run_app(
     *,
     reraise_unexpected: bool = False,
 ) -> int:
-    """Run an App, registered command, or attached Click tree and return its status."""
+    """Run an App, registered command, or attached Click tree and return its status.
+
+    ``run_app`` is a process-wide boundary: recursive or concurrent calls fail
+    fast before entering Click or changing stdout and logging handlers.
+    """
 
     if not isinstance(app, App):
         app = get_command_app(app)
+
+    if not _RUN_APP_LOCK.acquire(blocking=False):
+        active_state = _INVOCATION_STATE.get()
+        if active_state is not None:
+            identity = getattr(active_state.owner_app, "name", app.name)
+            print(
+                f"ERROR: Nested run_app() for CLI identity '{identity}' is not supported; "
+                "call the command logic directly instead.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "ERROR: Concurrent run_app() calls in one process are not supported; "
+                "invoke each CLI in a separate process or serialize calls.",
+                file=sys.stderr,
+            )
+        return ExitCode.FAILURE
+
+    try:
+        return _run_app_invocation(
+            app,
+            argv,
+            reraise_unexpected=reraise_unexpected,
+        )
+    finally:
+        _RUN_APP_LOCK.release()
+
+
+def _run_app_invocation(
+    app: App,
+    argv: list[str] | None = None,
+    *,
+    reraise_unexpected: bool = False,
+) -> int:
+    """Run one process-wide invocation after acquiring the output/runtime boundary."""
 
     try:
         click = _require_click()
