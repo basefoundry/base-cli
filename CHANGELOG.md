@@ -13,6 +13,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Rotate bounded byte-retention size walks across invocations with a persisted
+  advisory cursor so bundles beyond the first scan budget are eventually seen.
 - Preserve run bundles while their lease is held through terminal metadata
   writing and cleanup; recheck lease state before deletion.
 - Preserve explicit application identities losslessly while using
