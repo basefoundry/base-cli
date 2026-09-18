@@ -1128,7 +1128,7 @@ base_cli.get_typer_command(...)
 **Kind:** function  
 **Signature:** `get_lifecycle_values(click_context: 'Any | None' = None) -> 'LifecycleValues'`
 
-**Behavior:** Return normalized lifecycle values stored on an active Click context. When omitted, the context is resolved from upstream Click or the active supported Typer Click dialect.
+**Behavior:** Return normalized lifecycle values stored on an active Click context.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 
