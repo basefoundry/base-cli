@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import sys
 import tempfile
 import unittest
@@ -48,7 +49,7 @@ class OptionalYamlDependencyTests(unittest.TestCase):
 
                 self.assertEqual(result.exit_code, base_cli.ExitCode.USAGE_ERROR)
                 if args:
-                    payload = __import__("json").loads(result.stdout)
+                    payload = json.loads(result.stdout)
                     self.assertEqual(payload["code"], "output_format_error")
                     self.assertEqual(payload["details"]["exit_code"], base_cli.ExitCode.USAGE_ERROR)
                     self.assertIn("base-cli[yaml]", payload["message"])
