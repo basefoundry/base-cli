@@ -68,13 +68,6 @@ their own structured `details` records. Secret-looking keys (`token`,
 `password`, `secret`, `api_key`, and `authorization`) and credential-bearing
 URLs are redacted recursively.
 
-Golden payloads for each public contract live in
-[`tests/fixtures/contracts`](https://github.com/basefoundry/base-cli/tree/main/tests/fixtures/contracts).
-CI validates them against the packaged schemas with both a Python validator and
-a dependency-free Node.js reader; consumers can use the same fixtures as
-cross-language conformance tests.
-
-
 ## Strict JSON consumer validation with Node
 
 Base-cli's JSON output is intended to be consumed by strict parsers such as Node's `JSON.parse`.
