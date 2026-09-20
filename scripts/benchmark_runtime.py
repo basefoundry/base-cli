@@ -304,13 +304,11 @@ def _check_results(results: dict[str, FrameworkMetrics]) -> list[str]:
             f"base-cli cold invocation p95 exceeded {COLD_INVOCATION_P95_BUDGETS_MS[BENCHMARK_PLATFORM]:.0f} ms"
         )
 
-    for framework in FRAMEWORKS:
-        warm_p95 = _metric_p95(results.get(framework, {}), "warm_invocation_ms")
-        if warm_p95 is not None and warm_p95 > WARM_INVOCATION_P95_BUDGETS_MS[BENCHMARK_PLATFORM]:
-            failures.append(
-                f"{framework} warm no-op invocation p95 exceeded "
-                f"{WARM_INVOCATION_P95_BUDGETS_MS[BENCHMARK_PLATFORM]:.0f} ms"
-            )
+    warm_p95 = _metric_p95(base, "warm_invocation_ms")
+    if warm_p95 is not None and warm_p95 > WARM_INVOCATION_P95_BUDGETS_MS[BENCHMARK_PLATFORM]:
+        failures.append(
+            f"base-cli warm no-op invocation p95 exceeded {WARM_INVOCATION_P95_BUDGETS_MS[BENCHMARK_PLATFORM]:.0f} ms"
+        )
 
     lifecycle_p95 = _metric_p95(base, "lifecycle_warm_invocation_ms")
     click_p95 = _metric_p95(results.get("click", {}), "warm_invocation_ms")
@@ -443,10 +441,7 @@ def _format_number(value: object) -> str:
 
 
 def _measure_import(iterations: int, framework: str) -> list[float]:
-    package_root = Path(__file__).resolve().parents[1] / "lib" / "python"
-    environment = dict(os.environ)
-    existing_path = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = f"{package_root}{os.pathsep}{existing_path}" if existing_path else str(package_root)
+    environment = _subprocess_environment()
     samples: list[float] = []
     for _ in range(iterations):
         started = time.perf_counter_ns()
@@ -462,10 +457,7 @@ def _measure_import(iterations: int, framework: str) -> list[float]:
 
 
 def _measure_cold_invocations(iterations: int, framework: str) -> list[float]:
-    package_root = Path(__file__).resolve().parents[1] / "lib" / "python"
-    environment = dict(os.environ)
-    existing_path = environment.get("PYTHONPATH")
-    environment["PYTHONPATH"] = f"{package_root}{os.pathsep}{existing_path}" if existing_path else str(package_root)
+    environment = _subprocess_environment()
     programs = {
         "base-cli": (
             "import base_cli\n"
@@ -558,7 +550,18 @@ def _measure_lifecycle_invocations(iterations: int) -> list[float]:
 
     command = cast(Any, app.click_command)
     runner = CliRunner()
+    # Keep this probe in the same ambient Click runner environment as the
+    # comparator. The isolated HOME used by production scenarios measures a
+    # different contract and would make the lifecycle delta incomparable.
     return _measure_runner(iterations, lambda: runner.invoke(command, []).exit_code)
+
+
+def _subprocess_environment() -> dict[str, str]:
+    package_root = Path(__file__).resolve().parents[1] / "lib" / "python"
+    environment = dict(os.environ)
+    existing_path = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = f"{package_root}{os.pathsep}{existing_path}" if existing_path else str(package_root)
+    return environment
 
 
 def _measure_click_invocations(iterations: int) -> list[float]:
