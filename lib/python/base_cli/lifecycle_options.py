@@ -192,16 +192,9 @@ def get_lifecycle_values(click_context: Any | None = None) -> LifecycleValues:
         except ImportError:
             pass
         else:
-            from ._click_compat import dialect_for_typer
+            from ._click_compat import current_context_candidates
 
-            dialect = dialect_for_typer(typer)
-            if dialect is not click:
-                get_context = getattr(dialect, "get_current_context", None)
-                if get_context is None:
-                    get_context = getattr(getattr(dialect, "globals", None), "get_current_context", None)
-                if callable(get_context):
-                    candidates.append(get_context(silent=True))
-        candidates.append(click.get_current_context(silent=True))
+            candidates.extend(current_context_candidates(typer, click))
         click_context = next(
             (
                 candidate
