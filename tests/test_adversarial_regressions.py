@@ -87,7 +87,7 @@ def _write_log_worker(path_text: str, seed: int, count: int) -> None:
 def _prune_worker(runs_root_text: str) -> None:
     prune_run_bundles(
         Path(runs_root_text),
-        policy=base_cli.RetentionPolicy(max_bundles=2),
+        policy=base_cli.RetentionPolicy(max_bundles=2, max_total_bytes=2),
     )
 
 

@@ -410,22 +410,20 @@ def prune_run_bundles(
         protected.add(_safe_resolved_path(current_run_root))
     clock = time.time() if now is None else now
 
-    # Filesystem discovery and recursive size accounting are deliberately
-    # outside the lock.  The destructive phase revalidates each candidate
-    # under the lock so another invocation can never turn a live bundle into a
-    # deletion candidate while discovery is in progress.
-    size_scan_cursor = _read_size_scan_cursor(runs_root)
-    bundles, size_scan_cursor = _discover_run_bundles(
-        runs_root,
-        protected=protected,
-        max_age_seconds=effective.max_age_seconds,
-        now=clock,
-        measure_sizes=effective.max_total_bytes is not None,
-        size_budget=_RETENTION_SIZE_MEASUREMENT_BUDGET,
-        size_scan_cursor=size_scan_cursor,
-    )
     try:
         with _retention_lock(runs_root):
+            # Keep cursor read, size walk, and index update in one critical
+            # section so concurrent pruners cannot overwrite scan progress.
+            size_scan_cursor = _read_size_scan_cursor(runs_root)
+            bundles, size_scan_cursor = _discover_run_bundles(
+                runs_root,
+                protected=protected,
+                max_age_seconds=effective.max_age_seconds,
+                now=clock,
+                measure_sizes=effective.max_total_bytes is not None,
+                size_budget=_RETENTION_SIZE_MEASUREMENT_BUDGET,
+                size_scan_cursor=size_scan_cursor,
+            )
             _apply_bundle_retention(
                 runs_root,
                 bundles,
@@ -487,6 +485,7 @@ def _discover_run_bundles(
     size_scan_cursor: str | None = None,
 ) -> tuple[list[dict[str, Any]], str | None]:
     bundles: list[dict[str, Any]] = []
+    scan_order: list[dict[str, Any]] = []
     try:
         children = sorted(runs_root.iterdir(), key=lambda path: path.name)
     except OSError:
@@ -538,15 +537,16 @@ def _discover_run_bundles(
                 "protected": resolved in protected,
             }
         )
+        if measure_sizes:
+            scan_order.append(bundles[-1])
     bundles.sort(key=lambda bundle: (float(bundle["started_at"]), str(bundle["path"])))
     if measure_sizes and bundles and size_budget > 0:
         # The run index's cursor affects only which discovered bundles receive
         # an expensive size walk. It never authorizes deletion; every candidate
         # is re-read and revalidated before the destructive phase.
-        scan_order = sorted(bundles, key=lambda bundle: Path(bundle["path"]).name)
         if size_scan_cursor is not None:
             start_index = next(
-                (index for index, bundle in enumerate(scan_order) if Path(bundle["path"]).name > size_scan_cursor),
+                (index for index, bundle in enumerate(scan_order) if bundle["path"].name > size_scan_cursor),
                 0,
             )
             scan_order = scan_order[start_index:] + scan_order[:start_index]
@@ -555,7 +555,7 @@ def _discover_run_bundles(
             if attempted >= size_budget:
                 break
             attempted += 1
-            path = Path(bundle["path"])
+            path = bundle["path"]
             size_scan_cursor = path.name
             try:
                 bundle["size"] = _bundle_size(path)
