@@ -72,6 +72,20 @@ class ConfigureLoggerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "log_level must be one of"):
             base_cli.configure_logger("configured-level-invalid", None, debug=False, log_level="verbose")
 
+    def test_configure_logger_accepts_uppercase_stream_threshold(self) -> None:
+        stream = io.StringIO()
+        logger = base_cli.configure_logger(
+            "configured-level-uppercase",
+            None,
+            debug=False,
+            stream=stream,
+            log_level="WARNING",
+        )
+        logger.info("hidden")
+        logger.warning("visible")
+        self.assertNotIn("hidden", stream.getvalue())
+        self.assertIn("visible", stream.getvalue())
+
     def test_base_formatter_includes_exception_tracebacks(self) -> None:
         stream = io.StringIO()
         logger = base_cli.configure_logger("exception-traceback", None, debug=True, stream=stream)

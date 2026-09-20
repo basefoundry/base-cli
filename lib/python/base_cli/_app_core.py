@@ -42,7 +42,7 @@ from .lifecycle_options import (
     LifecycleOptions,
     LifecycleValues,
 )
-from .logging import configure_logger, log_invocation
+from .logging import _CONFIGURED_LOG_LEVELS, configure_logger, log_invocation
 from .paths import (
     current_working_dir,
     normalize_cli_name,
@@ -279,7 +279,7 @@ def _default_log_file(layout: Any, configured_log_file: Path | None) -> Path:
 def _parameter_source_was_supplied(source: Any) -> bool:
     """Return whether Click resolved an option from an explicit input source."""
 
-    return getattr(source, "name", None) in {"COMMANDLINE", "PROMPT", "ENVIRONMENT", "DEFAULT_MAP"}
+    return _parameter_source_rank(source) >= 2
 
 
 def _configured_stream_level(
@@ -299,14 +299,7 @@ def _configured_stream_level(
         elif level == "debug":
             level = "info"
     if _parameter_source_was_supplied(quiet_source) and quiet:
-        rank = {
-            "debug": logging.DEBUG,
-            "info": logging.INFO,
-            "warning": logging.WARNING,
-            "error": logging.ERROR,
-            "critical": logging.CRITICAL,
-        }
-        if level is None or rank.get(level, logging.INFO) < logging.WARNING:
+        if level is None or _CONFIGURED_LOG_LEVELS.get(level, logging.INFO) < logging.WARNING:
             level = "warning"
     return level
 
@@ -1146,7 +1139,8 @@ class App:
         self,
         standard: dict[str, Any],
         dry_run: bool = False,
-        option_sources: Mapping[str, Any] | None = None,
+        *,
+        option_sources: Mapping[str, Any],
     ) -> Context[dict[str, Any], Any, Any]:
         project = self.profile.discover_project(current_working_dir())
         manifest_path = project.manifest if project is not None else None
@@ -1178,7 +1172,7 @@ class App:
             or "dev"
         )
         log_level = framework_config.log_level if framework_config is not None else None
-        sources = option_sources or {}
+        sources = option_sources
         debug_source = sources.get("debug")
         quiet_source = sources.get("quiet")
         keep_temp_source = sources.get("keep_temp")
@@ -1190,7 +1184,7 @@ class App:
         quiet = bool(standard.get("quiet"))
         if framework_config is None or _parameter_source_was_supplied(keep_temp_source):
             keep_temp = bool(standard.get("keep_temp"))
-        elif "keep_temp" in config_provenance or framework_config.keep_temp:
+        elif "keep_temp" in config_provenance:
             keep_temp = framework_config.keep_temp
         else:
             keep_temp = bool(standard.get("keep_temp"))

@@ -62,10 +62,15 @@ def configure_logger(
     INFO, WARNING, ERROR, or CRITICAL. The persistent file handler remains at
     DEBUG. When omitted, the existing ``debug`` and ``quiet`` policy applies.
     """
-    if log_level is not None and log_level not in _CONFIGURED_LOG_LEVELS:
+    normalized_log_level = log_level.lower() if log_level is not None else None
+    if normalized_log_level is not None and normalized_log_level not in _CONFIGURED_LOG_LEVELS:
         supported = ", ".join(_CONFIGURED_LOG_LEVELS)
         raise ValueError(f"log_level must be one of: {supported}.")
-    stream_level = _user_stream_level(debug, quiet) if log_level is None else _CONFIGURED_LOG_LEVELS[log_level]
+    stream_level = (
+        _user_stream_level(debug, quiet)
+        if normalized_log_level is None
+        else _CONFIGURED_LOG_LEVELS[normalized_log_level]
+    )
     logger = logging.getLogger(f"base_cli.{cli_name}")
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
