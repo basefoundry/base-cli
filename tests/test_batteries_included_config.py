@@ -65,6 +65,10 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(base_cli.ConfigurationError, "maximum nesting depth of 64"):
             _merge_mapping({}, {}, nested, "explicit")
 
+    def test_scalar_nodes_count_toward_configuration_graph_limit(self) -> None:
+        with self.assertRaisesRegex(base_cli.ConfigurationError, "maximum of 100000 nested values"):
+            _merge_mapping({}, {}, {"values": [0] * 100_000}, "explicit")
+
     def test_nested_invalid_yaml_shape_is_usage_error_in_human_and_json_modes(self) -> None:
         import click
 

@@ -114,21 +114,21 @@ def _validate_config_graph(value: Mapping[str, Any], *, source: str) -> None:
         if exiting:
             active.remove(identity)
             continue
+        visited_nodes += 1
+        if visited_nodes > _CONFIG_MAX_NODES:
+            raise ConfigurationError(
+                f"Configuration source {source} exceeds the maximum of {_CONFIG_MAX_NODES} nested values."
+            )
         if not isinstance(current, (Mapping, list, tuple)):
             continue
         if identity in active:
             location = path or "<root>"
-            raise ConfigurationError(f"Configuration source '{source}' contains a recursive value at '{location}'.")
+            raise ConfigurationError(f"Configuration source {source} contains a recursive value at '{location}'.")
         if depth > _CONFIG_MAX_DEPTH:
             location = path or "<root>"
             raise ConfigurationError(
-                f"Configuration source '{source}' exceeds the maximum nesting depth of {_CONFIG_MAX_DEPTH} at "
+                f"Configuration source {source} exceeds the maximum nesting depth of {_CONFIG_MAX_DEPTH} at "
                 f"'{location}'."
-            )
-        visited_nodes += 1
-        if visited_nodes > _CONFIG_MAX_NODES:
-            raise ConfigurationError(
-                f"Configuration source '{source}' exceeds the maximum of {_CONFIG_MAX_NODES} nested values."
             )
         active.add(identity)
         stack.append((True, current, path, depth))
@@ -137,9 +137,7 @@ def _validate_config_graph(value: Mapping[str, Any], *, source: str) -> None:
             for key, child in reversed(children):
                 if not isinstance(key, str):
                     location = path or "<root>"
-                    raise ConfigurationError(
-                        f"Configuration source '{source}' has a non-string key under '{location}'."
-                    )
+                    raise ConfigurationError(f"Configuration source {source} has a non-string key under '{location}'.")
                 child_path = f"{path}.{key}" if path else key
                 stack.append((False, child, child_path, depth + 1))
         else:

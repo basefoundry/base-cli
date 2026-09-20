@@ -33,6 +33,17 @@ class OptionalYamlDependencyTests(unittest.TestCase):
                 with self.assertRaisesRegex(ConfigurationError, r"base-cli\[yaml\]"):
                     load_yaml_file(path, required=True)
 
+    def test_yaml_config_converts_parser_recursion_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "config.yaml"
+            path.write_text("answer: 42\n", encoding="utf-8")
+            yaml = mock.Mock()
+            yaml.safe_load.side_effect = RecursionError("parser recursion")
+            yaml.YAMLError = type("YAMLError", (Exception,), {})
+            with mock.patch("base_cli.config.require_yaml", return_value=yaml):
+                with self.assertRaisesRegex(ConfigurationError, r"maximum nesting depth of 64"):
+                    load_yaml_file(path, required=True)
+
     def test_core_facade_import_does_not_import_yaml(self) -> None:
         self.assertIn("base_cli", sys.modules)
         self.assertTrue(hasattr(base_cli, "App"))
