@@ -213,6 +213,8 @@ def run_app(
                 return outcome.exit_code
             raise
         except OutputFormatError as exc:
+            if reraise_unexpected:
+                raise
             outcome = InvocationOutcome("output_format_error", "error", ExitCode.USAGE_ERROR)
             if state.json_output:
                 _emit_json_error(state, outcome, str(exc), output_capture)

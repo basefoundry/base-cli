@@ -11,6 +11,7 @@ from ._runtime import refresh_run_bundle_index
 from .context import Context
 from .exit_codes import ExitCode
 from .history import compact_optional_path, format_timestamp, status_for_exit_code
+from .output import OutputFormatError
 
 
 @dataclass(frozen=True)
@@ -125,6 +126,8 @@ def outcome_from_exception(click: Any, exc: BaseException) -> InvocationOutcome:
         return InvocationOutcome("interrupted", "aborted", ExitCode.INTERRUPTED)
     if isinstance(exc, EOFError):
         return InvocationOutcome("aborted", "error", ExitCode.FAILURE)
+    if isinstance(exc, OutputFormatError):
+        return InvocationOutcome("output_format_error", "error", ExitCode.USAGE_ERROR)
     if isinstance(exc, click.Abort):
         if isinstance(exc.__cause__, KeyboardInterrupt):
             return InvocationOutcome("interrupted", "aborted", ExitCode.INTERRUPTED)
