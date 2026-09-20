@@ -369,16 +369,31 @@ jobs:
           trap 'rm -rf "$release_tmp"' EXIT
           release_json="$release_tmp/release.json"
           release_error="$release_tmp/release-error.txt"
+          release_response="$release_tmp/release-response.txt"
 
           read_release_metadata() {
-            if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >"$release_json" 2>"$release_error"; then
-              return 0
-            fi
-            if grep -Fq "(HTTP 404)" "$release_error"; then
-              return 1
-            fi
-            cat "$release_error" >&2
-            return 2
+            local retry_404="${1:-false}"
+            local attempt=1
+            local status_line
+            while :; do
+              if gh api --include "repos/$GITHUB_REPOSITORY/releases/tags/$tag" \
+                >"$release_response" 2>"$release_error"; then
+                awk 'BEGIN { body = 0 } { sub(/\r$/, ""); if (body) print; else if ($0 == "") body = 1 }' \
+                  "$release_response" >"$release_json"
+                return 0
+              fi
+              status_line="$(sed -n '1s/\r$//p' "$release_response")"
+              if [[ "$status_line" =~ ^HTTP/[0-9.]+[[:space:]]404[[:space:]] ]]; then
+                if [[ "$retry_404" != true || "$attempt" -ge 5 ]]; then
+                  return 1
+                fi
+                sleep $((attempt * 2))
+                attempt=$((attempt + 1))
+                continue
+              fi
+              cat "$release_error" >&2
+              return 2
+            done
           }
 
           verify_existing_release() {
@@ -414,8 +429,12 @@ jobs:
             --notes "Published distributions and release metadata for $tag. See CHANGELOG.md for the reviewed release notes." \
             || create_status=$?
 
-          if read_release_metadata; then
+          if read_release_metadata true; then
             verify_existing_release
+            if [[ "$create_status" -ne 0 ]]; then
+              echo "gh release create failed with status $create_status; refusing to hide the publication error." >&2
+              exit "$create_status"
+            fi
             echo "Verified immutable release $tag after publication."
           else
             release_status=$?

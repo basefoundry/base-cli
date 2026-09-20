@@ -14,7 +14,7 @@ def test_package_workflow_does_not_replace_published_release_assets() -> None:
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
     verifier = (Path(__file__).resolve().parents[1] / "scripts/verify_release_assets.py").read_text(encoding="utf-8")
 
-    assert "Create GitHub Release" in workflow
+    assert "Verify and create immutable GitHub Release" in workflow
     assert "verify_release_assets.py" in workflow
     assert "refusing to replace immutable release assets" in verifier
     assert "gh release download" in workflow

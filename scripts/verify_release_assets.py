@@ -4,26 +4,22 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
+try:
+    from .release_metadata_helpers import sha256_file
+except ImportError:  # pragma: no cover - direct script execution
+    from release_metadata_helpers import sha256_file
+
 SBOM_NAME = "SBOM.spdx.json"
 CHECKSUMS_NAME = "SHA256SUMS"
 BOM_ROW_NAME = "RELEASE-BOM-ROW.json"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _files(directory: Path, label: str, errors: list[str]) -> dict[str, Path]:
@@ -129,7 +125,7 @@ def validate_release_assets(
         if set(checksum_rows) != binary_names:
             errors.append(f"{CHECKSUMS_NAME} must cover exactly the reviewed wheel and sdist")
         for name in binary_names & set(expected):
-            actual = _sha256(expected[name])
+            actual = sha256_file(expected[name])
             if checksum_rows.get(name) != actual:
                 errors.append(f"{CHECKSUMS_NAME} digest for {name} does not match the reviewed artifact")
 
@@ -142,8 +138,8 @@ def validate_release_assets(
             "refusing to replace immutable release assets"
         )
     for name in sorted(expected_names & existing_names):
-        expected_digest = _sha256(expected[name])
-        existing_digest = _sha256(existing[name])
+        expected_digest = sha256_file(expected[name])
+        existing_digest = sha256_file(existing[name])
         if expected_digest != existing_digest:
             errors.append(
                 f"release asset {name} differs: expected SHA-256 {expected_digest}, "
