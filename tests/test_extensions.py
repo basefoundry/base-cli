@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -110,6 +111,41 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(base_cli.ExtensionLoadError, "identity changed"):
             discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "shared")
         trusted.load.assert_not_called()
+
+    def test_refresh_cannot_race_an_inflight_descriptor_load(self) -> None:
+        entry_point = _entry_point("shared", "same.module:plugin", distribution="trusted")
+        entered = threading.Event()
+        release = threading.Event()
+
+        def load() -> str:
+            entered.set()
+            release.wait(timeout=5)
+            return "trusted"
+
+        entry_point.load = load
+        discovery = base_cli.ExtensionDiscovery(entry_points=(entry_point,), allowlist={"trusted"})
+        result: list[object] = []
+
+        def worker() -> None:
+            result.append(discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "shared"))
+
+        thread = threading.Thread(target=worker)
+        thread.start()
+        self.assertTrue(entered.wait(timeout=5))
+        refresh_done = threading.Event()
+
+        def refresh() -> None:
+            discovery.refresh()
+            refresh_done.set()
+
+        refresh_thread = threading.Thread(target=refresh)
+        refresh_thread.start()
+        self.assertFalse(refresh_done.wait(timeout=0.05))
+        release.set()
+        thread.join(timeout=5)
+        refresh_thread.join(timeout=5)
+        self.assertEqual(result, ["trusted"])
+        self.assertTrue(refresh_done.is_set())
 
     def test_malformed_metadata_is_skipped_without_hiding_healthy_extensions(self) -> None:
         malformed = _entry_point(
