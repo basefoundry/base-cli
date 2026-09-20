@@ -186,6 +186,12 @@ class AppRunMetadataTests(unittest.TestCase):
                     if child.stderr is not None:
                         child.stderr.close()
 
+                index_path = run_root.parent / ".base-cli-run-index.json"
+                index = json.loads(index_path.read_text(encoding="utf-8"))
+                indexed = {bundle["path"]: bundle for bundle in index["bundles"]}
+                self.assertTrue(indexed)
+                self.assertTrue(all(Path(path).is_dir() for path in indexed))
+
                 prune_run_bundles(
                     run_root.parent,
                     policy=RetentionPolicy(max_age_seconds=60),
@@ -193,6 +199,25 @@ class AppRunMetadataTests(unittest.TestCase):
                     now=time.time() + 3_600,
                 )
                 self.assertFalse(run_root.exists(), "eligible terminal run was not pruned after its lease was released")
+
+    def test_terminal_run_is_indexed_while_its_lease_is_held(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            app = base_cli.App(name="terminal-index")
+
+            @app.command()
+            def main(ctx: base_cli.Context) -> None:
+                del ctx
+
+            status, stderr = _run(app, home)
+            self.assertEqual(status, 0, stderr)
+            run_path, metadata = _load_only_metadata(self, home)
+            index_path = run_path.parent.parent / ".base-cli-run-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            indexed = {bundle["path"]: bundle for bundle in index["bundles"]}
+            run_root = str(run_path.parent.resolve())
+            self.assertIn(run_root, indexed)
+            self.assertEqual(indexed[run_root]["status"], metadata["status"])
 
     def test_normal_returns_finalize_core_owned_metadata(self) -> None:
         cases = (

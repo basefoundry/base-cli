@@ -885,7 +885,7 @@ resolved. The active invocation, inherited parent bundle, and bundles marked
 `preserve` (including `--keep-temp`) are never removed. Each lifecycle-owned
 bundle holds an advisory `.base-cli-run-lease` through final cleanup, including
 the brief period after metadata becomes terminal; retention never removes a
-bundle whose lease is active or whose liveness cannot be established. A stale `running`
+bundle whose lease is active or whose lease file is present but liveness cannot be established. A stale `running`
 bundle is eligible for crash recovery only when an age bound is configured and
 its lease can be acquired, proving that the original process has exited.
 Missing, unreadable, or unsupported leases fail closed and remain retained for
