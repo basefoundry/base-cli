@@ -59,15 +59,16 @@ run_contracts() {
   python scripts/validate_contract_fixtures.py
   if command -v node >/dev/null 2>&1; then
     node scripts/validate_contract_fixtures.mjs
-  elif [[ "$gate" == "all" ]]; then
+  else
     node_contracts_missing=1
     printf 'Node.js is unavailable; the cross-language contract gate is incomplete.\n' >&2
-  else
-    printf 'Node.js is unavailable; the cross-language contract gate is incomplete.\n' >&2
-    return 2
   fi
   python scripts/generate_compatibility_dashboard.py --check
   python -m compileall -q examples
+  if ((node_contracts_missing)) && [[ "$gate" != "all" ]]; then
+    printf 'Install Node.js to complete the cross-language contract gate.\n' >&2
+    return 2
+  fi
 }
 
 run_benchmark() {
@@ -83,7 +84,11 @@ run_security() {
   # unpublished editable checkout itself.
   local audit_requirements
   audit_requirements="$(mktemp)"
-  trap 'rm -f "$audit_requirements"' RETURN
+  # Keep the path in a global shell variable so the EXIT trap still sees it
+  # when errexit terminates the script from inside this function.
+  SECURITY_AUDIT_REQUIREMENTS="$audit_requirements"
+  cleanup_security_audit() { rm -f -- "$SECURITY_AUDIT_REQUIREMENTS"; }
+  trap cleanup_security_audit EXIT
   python -m pip freeze \
     | sed -E '/(^-e .*#egg=base[_-]cli|^base[_-]cli([[:space:]=@]|$))/Id' \
     > "$audit_requirements"
