@@ -206,13 +206,6 @@ def run_app(
     args = list(sys.argv[1:] if argv is None else argv)
     command = app.click_command
     click = dialect_for_command(command)
-    preliminary_json = _json_requested(
-        args,
-        app.lifecycle_options,
-        default_map=_command_default_map(command),
-        command=command,
-        prog_name=app.name,
-    )
     leading_debug, leading_quiet = _leading_output_flags(
         args,
         app.lifecycle_options,
@@ -224,7 +217,6 @@ def run_app(
         debug_option=_primary_lifecycle_declaration(
             app.lifecycle_options.debug,
         ),
-        json_output=bool(preliminary_json),
     )
     state_token = _INVOCATION_STATE.set(state)
     output_capture: TextIO | None = None
@@ -510,7 +502,7 @@ def _click_lifecycle_value(
             parent_context = context
             current_command = next_command
             current_args = remaining[1:]
-            info_name = command_name
+            info_name = normalize(command_name) if callable(normalize) else command_name
             depth += 1
     except (Exception, SystemExit):
         # The real parser owns malformed-command diagnostics. Keep the best

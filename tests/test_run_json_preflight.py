@@ -130,6 +130,36 @@ class RunJsonPreflightTests(unittest.TestCase):
                     self.assertEqual(result.stdout, "")
                     self.assertIn("No such option", result.stderr)
 
+    def test_click_usage_errors_use_the_resolved_default_json_mode(self) -> None:
+        import click
+
+        @click.group(name="default-map-json", context_settings={"default_map": {"json": True}})
+        def group() -> None:
+            pass
+
+        @group.command()
+        @click.argument("required", required=True)
+        def child(required: str) -> None:
+            click.echo(required)
+
+        app = base_cli.App(
+            name="default-map-json",
+            log_to_file=False,
+            lifecycle_options=base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json/--no-json"),
+            ),
+        )
+        command = app.attach(group)
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(command, ["child"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 2, result.output)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "base-cli.error")
+        self.assertEqual(payload["code"], "usage_error")
+        self.assertIn("Missing argument", payload["message"])
+
     def test_lazy_command_resolver_is_called_only_by_real_dispatch(self) -> None:
         counters: dict[str, Any] = {}
         command = self._attached_click_command(counters, lazy=True)
