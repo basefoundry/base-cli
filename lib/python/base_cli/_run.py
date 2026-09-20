@@ -115,16 +115,23 @@ def run_app(
         active_state = _INVOCATION_STATE.get()
         if active_state is not None:
             identity = getattr(active_state.owner_app, "name", app.name)
-            print(
-                f"ERROR: Nested run_app() for CLI identity '{identity}' is not supported; "
+            _emit_run_rejection(
+                active_state,
+                f"Nested run_app() for CLI identity '{identity}' is not supported; "
                 "call the command logic directly instead.",
-                file=sys.stderr,
             )
         else:
-            print(
-                "ERROR: Concurrent run_app() calls in one process are not supported; "
+            state = _InvocationState(
+                owner_app=app,
+                json_output=_json_requested(
+                    list(sys.argv[1:] if argv is None else argv),
+                    app.lifecycle_options,
+                ),
+            )
+            _emit_run_rejection(
+                state,
+                "Concurrent run_app() calls in one process are not supported; "
                 "invoke each CLI in a separate process or serialize calls.",
-                file=sys.stderr,
             )
         return ExitCode.FAILURE
 
@@ -444,6 +451,18 @@ def _command_default_map(command: Any) -> Mapping[str, Any] | None:
 
 def _new_json_capture() -> TextIO:
     return cast(TextIO, _BoundedJsonCapture(_MAX_JSON_CAPTURE_BYTES))
+
+
+def _emit_run_rejection(state: _InvocationState, message: str) -> None:
+    if state.json_output:
+        _emit_json_error(
+            state,
+            InvocationOutcome("invocation_rejected", "error", ExitCode.FAILURE),
+            message,
+            None,
+        )
+        return
+    print(f"ERROR: {message}", file=sys.stderr)
 
 
 def _explicit_lifecycle_value(

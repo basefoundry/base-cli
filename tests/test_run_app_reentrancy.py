@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import tempfile
 import threading
 import unittest
@@ -63,7 +64,27 @@ class RunAppReentrancyTests(unittest.TestCase):
                 self.assertIn("outer-after", log_text)
                 self.assertEqual(log_text.count("outer-before"), 1)
                 self.assertEqual(log_text.count("outer-after"), 1)
-                self.assertEqual(len(close_calls), 1)
+        self.assertEqual(len(close_calls), 1)
+
+    def test_nested_invocation_in_json_mode_preserves_the_output_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            nested_statuses: list[int] = []
+            app = base_cli.App(name=f"nested-json-{home.name}")
+            app.lifecycle_options = base_cli.LifecycleOptions(
+                json=base_cli.LifecycleOption("--json"),
+            )
+            app.command()(_outer_callback(app, nested_statuses))
+
+            result = base_cli.testing.invoke(app, ["--json", "--fail-inner"], home=home)
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["schema"], "base-cli.output")
+        nested = json.loads(payload["details"]["stdout"])
+        self.assertEqual(nested["schema"], "base-cli.error")
+        self.assertEqual(nested["code"], "invocation_rejected")
+        self.assertNotIn("Nested run_app()", result.stderr)
 
     def test_concurrent_in_process_invocation_fails_fast_without_entering_second_command(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
