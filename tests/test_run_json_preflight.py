@@ -133,7 +133,10 @@ class RunJsonPreflightTests(unittest.TestCase):
     def test_click_usage_errors_use_the_resolved_default_json_mode(self) -> None:
         import click
 
-        @click.group(name="default-map-json", context_settings={"default_map": {"json": True}})
+        @click.group(
+            name="default-map-json",
+            context_settings={"default_map": {"json": True}, "token_normalize_func": str.lower},
+        )
         def group() -> None:
             pass
 
