@@ -43,6 +43,7 @@ __all__ = [
     "error_envelope",
     "success_envelope",
     "dumps_envelope",
+    "dumps_strict_json",
     "redact_json_value",
 ]
 
@@ -91,14 +92,20 @@ def dumps_envelope(envelope: Mapping[str, Any]) -> str:
     """Serialize an envelope as one compact, newline-terminated JSON record."""
 
     return (
-        json.dumps(
+        dumps_strict_json(
             redact_json_value(dict(envelope)),
             ensure_ascii=False,
             separators=(",", ":"),
-            allow_nan=False,
         )
         + "\n"
     )
+
+
+def dumps_strict_json(value: Any, **kwargs: Any) -> str:
+    """Serialize JSON while rejecting non-finite numeric values."""
+
+    kwargs["allow_nan"] = False
+    return json.dumps(value, **kwargs)
 
 
 def redact_json_value(value: Any, *, _key: str | None = None) -> Any:
@@ -141,7 +148,7 @@ class JsonLogFormatter(logging.Formatter):
             payload["details"] = {
                 "exception_type": record.exc_info[0].__name__,
             }
-        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+        return dumps_strict_json(payload, ensure_ascii=False, separators=(",", ":"))
 
 
 def _timestamp(value: float) -> str:

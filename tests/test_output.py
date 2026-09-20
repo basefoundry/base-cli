@@ -80,6 +80,17 @@ class OutputTest(unittest.TestCase):
                     emit(stream)
                 self.assertEqual(stream.getvalue(), "")
 
+    def test_delimited_emitters_validate_nested_values_before_writing(self) -> None:
+        records = ({"name": "valid"}, {"name": {"value": float("nan")}})
+        for requested_format in ("csv", "tsv"):
+            with self.subTest(format=requested_format):
+                stream = io.StringIO()
+                with self.assertRaises(ValueError):
+                    render_records(
+                        records, requested_format=requested_format, columns=(("NAME", "name"),), stream=stream
+                    )
+                self.assertEqual(stream.getvalue(), "")
+
     def test_tsv_consumes_one_pass_iterable_without_materializing(self) -> None:
         consumed = False
 
