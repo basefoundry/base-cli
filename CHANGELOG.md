@@ -23,6 +23,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Bind an allowlisted Python extension to its discovered entry-point source and
+  fail closed if its distribution identity changes before loading.
+
 - Preserve run bundles while their lease is held through terminal metadata
   writing and cleanup; recheck lease state before deletion.
 
