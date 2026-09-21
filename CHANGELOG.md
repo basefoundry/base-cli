@@ -11,6 +11,16 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Added
+
+- Publish versioned, comparative CLI benchmark reports with lifecycle and
+  feature scenarios, platform-specific regression gates, and retained CI evidence.
+
+### Changed
+
+- Align the Typer support floor with the tested matrix and cover representative
+  minimum/maximum Typer and Click version pairings.
+
 ### Fixed
 
 - Honor all five validated framework `log_level` values on native and attached
@@ -18,6 +28,11 @@ and versions are tracked in the repo-root `VERSION` file.
 - Let explicitly supplied lifecycle values, including negative boolean flags,
   environment variables, and Click `default_map` entries, override validated
   file configuration while keeping config ahead of Click defaults.
+
+- Detect JSON capture without running Click callbacks, callable defaults, type
+  converters, or close hooks a second time; respect option-value arity so a
+  payload equal to `--json` remains human output.
+
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by

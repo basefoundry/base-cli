@@ -126,6 +126,7 @@ class _InvocationState:
     options_parsed: bool = False
     attached_completion: bool = False
     json_output: bool = False
+    output_router: Any = None
 
 
 @dataclass(frozen=True)
@@ -331,6 +332,10 @@ def _capture_standard_options(standard: dict[str, Any], owner_app: App) -> None:
     state.quiet = bool(standard.get("quiet"))
     state.json_output = bool(standard.get("json"))
     state.options_parsed = True
+    router = state.output_router
+    resolve_json_output = getattr(router, "resolve_json_output", None)
+    if callable(resolve_json_output):
+        resolve_json_output(state.json_output)
 
 
 def _capture_effective_output_options(
