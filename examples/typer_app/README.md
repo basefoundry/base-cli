@@ -13,8 +13,10 @@ python -m pip install .
 base-typer --help
 ```
 
-The example pins the supported Typer range (`0.12` through `0.25`) because
-newer releases use a private Click fork that the adapter intentionally rejects.
+The example uses the supported Typer range (`0.25.1` through `0.27.x`). Typer
+0.26 and later use a private Click fork; the adapter selects the matching Click
+dialect and the compatibility workflow tests both the minimum and current
+lines.
 
 ## Configuration
 
@@ -60,6 +62,7 @@ publishing. Announce adapter support-range changes as release notes.
 
 - Run with `--debug` and capture `--log-file` when diagnosing a command.
 - If help fails after a Typer upgrade, check that the version is within the
-  supported `>=0.12,<0.28` range.
+  supported `>=0.25.1,<0.28` range and review the Click/Typer pair in the
+  compatibility matrix.
 - Use `--count 1` to distinguish application failures from input validation.
 - Redact access codes and other credentials from issue reports and transcripts.

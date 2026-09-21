@@ -50,8 +50,17 @@ the exact reviewed wheel, sdist, `SHA256SUMS`, `SBOM.spdx.json`, and
 comparison notes are supplemented by the
 dated section in `CHANGELOG.md`; the tagged release is rejected when `VERSION`
 or that section does not match the tag. Published tags and release assets are
-immutable. A rerun that finds an existing GitHub Release fails closed;
-corrections require a new patch version.
+immutable. Before creating a release, the workflow verifies that the tag still
+resolves to the reviewed commit, that the wheel and sdist have provenance and
+SBOM attestations for that tag and commit, and that the release metadata binds
+the same version, commit, and assets. If an existing GitHub Release is found,
+the workflow downloads its assets and permits an idempotent rerun only when the
+published release is non-draft, has the same tag identity, and every filename
+and byte matches the reviewed artifacts. It makes no changes to an identical
+release. Any changed, missing, extra, or renamed asset fails with expected and
+observed checksums; corrections require a new patch version rather than
+overwriting published bytes. A failed first upload that leaves a partial
+release must be reviewed and recovered with a new release version.
 
 ## Independent verification
 
