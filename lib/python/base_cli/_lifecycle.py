@@ -61,7 +61,11 @@ class RunRecorder:
         write_private_json(self.context._run_metadata_path, metadata)
         owner_root = self.context.owner_root
         if owner_root is not None:
-            refresh_run_bundle_index(owner_root / "runs", logger=self.context.log)
+            refresh_run_bundle_index(
+                owner_root / "runs",
+                current_run_root=self.context.run_root,
+                logger=self.context.log,
+            )
 
     def _existing_metadata(self) -> dict[str, Any]:
         path = self.context._run_metadata_path
