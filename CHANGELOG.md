@@ -11,6 +11,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Changed
+
+- Align the Typer support floor with the tested matrix and cover representative
+  minimum/maximum Typer and Click version pairings.
+
 ### Fixed
 
 - Preserve explicit application identities losslessly while using
