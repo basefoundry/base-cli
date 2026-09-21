@@ -5,7 +5,10 @@ import io
 import json
 import logging
 import os
+import subprocess
+import sys
 import tempfile
+import time
 import unittest
 from contextlib import redirect_stderr
 from dataclasses import replace
@@ -16,8 +19,9 @@ from unittest import mock
 import base_cli
 import base_cli._lifecycle as lifecycle_module
 import base_cli.app as app_module
+from base_cli import RetentionPolicy
 from base_cli._lifecycle import RunRecorder
-from base_cli._runtime import runtime_layout
+from base_cli._runtime import prune_run_bundles, runtime_layout
 
 
 def _run(app: base_cli.App, home: Path, args: list[str] | None = None) -> tuple[int, str]:
@@ -78,6 +82,143 @@ def _assert_terminal_metadata(
 
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
 class AppRunMetadataTests(unittest.TestCase):
+    def test_terminal_run_lease_survives_a_concurrent_invocation_during_cleanup(self) -> None:
+        import click
+
+        child_program = "\n".join(
+            (
+                "import json, sys, time",
+                "from pathlib import Path",
+                "import click, base_cli",
+                "from base_cli import RetentionPolicy",
+                "mode, app_name, cache_text, ready_text, release_text = sys.argv[1:]",
+                "cache, ready, release = Path(cache_text), Path(ready_text), Path(release_text)",
+                "profile = base_cli.CliProfile.generic(cache_root=cache)",
+                "app = base_cli.App(name=app_name, profile=profile, retention=RetentionPolicy(max_bundles=1))",
+                "def block_cleanup(ctx):",
+                "    metadata = json.loads((ctx.run_root / 'run.json').read_text(encoding='utf-8'))",
+                "    (ctx.run_root / 'cleanup-marker').write_text('held', encoding='utf-8')",
+                "    ready.write_text(json.dumps({'run_root': str(ctx.run_root), 'status': metadata['status']}), encoding='utf-8')",
+                "    while not release.exists(): time.sleep(0.01)",
+                "if mode == 'native':",
+                "    @app.command()",
+                "    def main(ctx: base_cli.Context): ctx.on_cleanup(lambda: block_cleanup(ctx))",
+                "    target = app",
+                "else:",
+                "    @click.command(name=app_name)",
+                "    def command(): base_cli.get_current_context().on_cleanup(lambda: block_cleanup(base_cli.get_current_context()))",
+                "    target = app.attach(command)",
+                "base_cli.run_app(target, [])",
+            )
+        )
+
+        for mode in ("native", "attached"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmpdir:
+                root = Path(tmpdir)
+                cache = root / "cache"
+                home = root / "home"
+                home.mkdir()
+                ready = root / "ready.json"
+                release = root / "release"
+                app_name = f"terminal-lease-{mode}"
+                child_env = {
+                    key: value for key, value in os.environ.items() if not key.startswith(("COV_CORE_", "COVERAGE_"))
+                }
+                child_env.update(HOME=str(home), BASE_CLI_CACHE_DIR=str(cache))
+                child = subprocess.Popen(
+                    [sys.executable, "-c", child_program, mode, app_name, str(cache), str(ready), str(release)],
+                    cwd=Path(__file__).resolve().parents[1],
+                    env=child_env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                try:
+                    deadline = time.monotonic() + 10
+                    while not ready.exists() and child.poll() is None and time.monotonic() < deadline:
+                        time.sleep(0.01)
+                    if not ready.exists():
+                        stdout, stderr = child.communicate(timeout=5)
+                        self.fail(f"cleanup hook did not become ready (exit={child.returncode}): {stdout}\n{stderr}")
+
+                    ready_payload = json.loads(ready.read_text(encoding="utf-8"))
+                    run_root = Path(ready_payload["run_root"])
+                    self.assertEqual(ready_payload["status"], "ok")
+                    self.assertEqual(json.loads((run_root / "run.json").read_text())["status"], "ok")
+                    self.assertTrue((run_root / "cleanup-marker").is_file())
+
+                    profile = base_cli.CliProfile.generic(cache_root=cache)
+                    concurrent_app = base_cli.App(
+                        name=app_name,
+                        profile=profile,
+                        retention=RetentionPolicy(max_bundles=1),
+                    )
+                    if mode == "native":
+
+                        @concurrent_app.command()
+                        def concurrent_main(ctx: base_cli.Context) -> None:
+                            del ctx
+
+                        target = concurrent_app
+                    else:
+
+                        @click.command(name=app_name)
+                        def concurrent_command() -> None:
+                            pass
+
+                        target = concurrent_app.attach(concurrent_command)
+
+                    result = base_cli.testing.invoke(target, [], home=home)
+                    self.assertEqual(result.exit_code, 0, result.output)
+                    self.assertTrue(
+                        run_root.is_dir(), "retention deleted a run whose cleanup hook still held its lease"
+                    )
+                    self.assertTrue((run_root / "cleanup-marker").is_file())
+                finally:
+                    release.touch()
+                    try:
+                        child.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        child.kill()
+                        child.wait(timeout=5)
+                    if child.stdout is not None:
+                        child.stdout.close()
+                    if child.stderr is not None:
+                        child.stderr.close()
+
+                index_path = run_root.parent / ".base-cli-run-index.json"
+                index = json.loads(index_path.read_text(encoding="utf-8"))
+                indexed = {bundle["path"]: bundle for bundle in index["bundles"]}
+                self.assertTrue(indexed)
+                self.assertTrue(all(Path(path).is_dir() for path in indexed))
+
+                prune_run_bundles(
+                    run_root.parent,
+                    policy=RetentionPolicy(max_age_seconds=60),
+                    logger=logging.getLogger(__name__),
+                    now=time.time() + 3_600,
+                )
+                self.assertFalse(run_root.exists(), "eligible terminal run was not pruned after its lease was released")
+
+    def test_terminal_run_is_indexed_while_its_lease_is_held(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            home = Path(tmpdir)
+            app = base_cli.App(name="terminal-index")
+
+            @app.command()
+            def main(ctx: base_cli.Context) -> None:
+                del ctx
+
+            status, stderr = _run(app, home)
+            self.assertEqual(status, 0, stderr)
+            run_path, metadata = _load_only_metadata(self, home)
+            index_path = run_path.parent.parent / ".base-cli-run-index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            indexed = {bundle["path"]: bundle for bundle in index["bundles"]}
+            run_root = str(run_path.parent.resolve())
+            self.assertIn(run_root, indexed)
+            self.assertEqual(indexed[run_root]["status"], metadata["status"])
+
     def test_normal_returns_finalize_core_owned_metadata(self) -> None:
         cases = (
             ("none", None, 0, "ok", "success"),

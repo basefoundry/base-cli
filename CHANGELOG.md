@@ -26,6 +26,9 @@ and versions are tracked in the repo-root `VERSION` file.
 - Bind an allowlisted Python extension to its discovered entry-point source and
   fail closed if its distribution identity changes before loading.
 
+- Preserve run bundles while their lease is held through terminal metadata
+  writing and cleanup; recheck lease state before deletion.
+
 - Detect JSON capture without running Click callbacks, callable defaults, type
   converters, or close hooks a second time; respect option-value arity so a
   payload equal to `--json` remains human output.
