@@ -11,10 +11,25 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Added
+
+- Publish versioned, comparative CLI benchmark reports with lifecycle and
+  feature scenarios, platform-specific regression gates, and retained CI evidence.
+
+### Changed
+
+- Align the Typer support floor with the tested matrix and cover representative
+  minimum/maximum Typer and Click version pairings.
+
 ### Fixed
 
 - Bind an allowlisted Python extension to its discovered entry-point source and
   fail closed if its distribution identity changes before loading.
+
+- Detect JSON capture without running Click callbacks, callable defaults, type
+  converters, or close hooks a second time; respect option-value arity so a
+  payload equal to `--json` remains human output.
+
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by
