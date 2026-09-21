@@ -23,6 +23,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Detect JSON capture without running Click callbacks, callable defaults, type
+  converters, or close hooks a second time; respect option-value arity so a
+  payload equal to `--json` remains human output.
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by
