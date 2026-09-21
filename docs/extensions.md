@@ -76,3 +76,9 @@ Use `allowlist={"base_cli.commands:audit"}` to restrict names, or
 `ExtensionDiscovery(disabled=True)` to disable discovery entirely. Allowlist
 entries may be a bare entry-point name, a fully-qualified `group:name`, or a
 distribution name.
+
+Loading uses the exact entry-point source and distribution identity approved by
+discovery rather than re-selecting an entry point by a potentially colliding
+name/value tuple. If that identity changes before loading, the load fails
+closed. An allowlist is a selection boundary, not a sandbox for installed
+Python code.
