@@ -29,6 +29,9 @@ and versions are tracked in the repo-root `VERSION` file.
   environment variables, and Click `default_map` entries, override validated
   file configuration while keeping config ahead of Click defaults.
 
+- Surface expected output-format and optional-dependency failures as actionable
+  usage errors at the process boundary, including a stable JSON error code.
+
 - Bind an allowlisted Python extension to its discovered entry-point source and
   fail closed if its distribution identity changes before loading.
 
