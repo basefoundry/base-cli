@@ -11,6 +11,11 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Added
+
+- Publish versioned, comparative CLI benchmark reports with lifecycle and
+  feature scenarios, platform-specific regression gates, and retained CI evidence.
+
 ### Fixed
 
 - Preserve explicit application identities losslessly while using
