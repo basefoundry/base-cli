@@ -29,6 +29,7 @@ from ._lifecycle import InvocationOutcome, outcome_from_exception, outcome_from_
 from .exit_codes import ExitCode
 from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import LifecycleOption, LifecycleOptions
+from .output import OutputFormatError
 from .redaction import option_aliases_from_decls
 
 _MAX_JSON_CAPTURE_BYTES = 8 * 1_048_576
@@ -311,6 +312,15 @@ def run_app(
                 _emit_json_error(state, outcome, str(exc), output_capture)
                 return outcome.exit_code
             raise
+        except OutputFormatError as exc:
+            if reraise_unexpected:
+                raise
+            outcome = InvocationOutcome("output_format_error", "error", ExitCode.USAGE_ERROR)
+            if state.json_output:
+                _emit_json_error(state, outcome, str(exc), output_capture)
+            else:
+                print(f"Error: {exc}", file=sys.stderr)
+            return outcome.exit_code
         except Exception as exc:
             if reraise_unexpected:
                 raise
