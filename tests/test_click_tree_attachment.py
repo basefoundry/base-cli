@@ -5,6 +5,7 @@ import json
 import os
 import tempfile
 import unittest
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -45,9 +46,10 @@ class _CountingApp(base_cli.App):
         self,
         standard: dict[str, Any],
         dry_run: bool = False,
+        option_sources: Mapping[str, Any] | None = None,
     ) -> base_cli.Context:
         self.context_create_count += 1
-        context = super()._create_context(standard, dry_run=dry_run)
+        context = super()._create_context(standard, dry_run=dry_run, option_sources=option_sources)
         self.created_contexts.append(context)
         original_cleanup = context.cleanup
 
@@ -682,9 +684,10 @@ class ClickTreeAttachmentTests(unittest.TestCase):
                 self,
                 standard: dict[str, Any],
                 dry_run: bool = False,
+                option_sources: Mapping[str, Any] | None = None,
             ) -> base_cli.Context:
                 events.append("lifecycle-enter")
-                context = super()._create_context(standard, dry_run=dry_run)
+                context = super()._create_context(standard, dry_run=dry_run, option_sources=option_sources)
                 original_cleanup = context.cleanup
 
                 def ordered_cleanup() -> None:
@@ -1321,9 +1324,10 @@ class ClickTreeAttachmentTests(unittest.TestCase):
                 self,
                 standard: dict[str, Any],
                 dry_run: bool = False,
+                option_sources: Mapping[str, Any] | None = None,
             ) -> base_cli.Context:
                 events.append("lifecycle-enter")
-                context = super()._create_context(standard, dry_run=dry_run)
+                context = super()._create_context(standard, dry_run=dry_run, option_sources=option_sources)
                 original_cleanup = context.cleanup
 
                 def ordered_cleanup() -> None:
