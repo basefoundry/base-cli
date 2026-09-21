@@ -26,6 +26,11 @@ in memory and rolls the remainder to a temporary file, so both temporary-disk
 use and finalization memory remain bounded. The temporary file is removed when
 the invocation ends.
 
+The mode check respects Click option arity: a value such as
+`--payload --json` does not activate JSON when `--json` is the payload. It does
+not run consumer callbacks, defaults, type converters, or close hooks as a
+second parse before the real invocation.
+
 If a command exceeds the limit, base-cli emits one `base-cli.error` envelope
 with `code: "capture_limit"` and exit code `1`; it never silently truncates
 the captured text. Use the NDJSON contract for larger record sets.
