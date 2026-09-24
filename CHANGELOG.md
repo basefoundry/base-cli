@@ -11,10 +11,41 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Added
+
+- Publish versioned, comparative CLI benchmark reports with lifecycle and
+  feature scenarios, platform-specific regression gates, and retained CI evidence.
+
+### Changed
+
+- Align the Typer support floor with the tested matrix and cover representative
+  minimum/maximum Typer and Click version pairings.
+
 ### Fixed
 
 - Reject non-finite numbers in JSON and NDJSON output so emitted records remain
   standards-compliant and failed NDJSON writes do not leave partial records.
+
+- Honor all five validated framework `log_level` values on native and attached
+  user-facing streams while preserving DEBUG-level persistent diagnostics.
+- Let explicitly supplied lifecycle values, including negative boolean flags,
+  environment variables, and Click `default_map` entries, override validated
+  file configuration while keeping config ahead of Click defaults.
+
+- Surface expected output-format and optional-dependency failures as actionable
+  usage errors at the process boundary, including a stable JSON error code.
+
+- Bind an allowlisted Python extension to its discovered entry-point source and
+  fail closed if its distribution identity changes before loading.
+
+- Preserve run bundles while their lease is held through terminal metadata
+  writing and cleanup; recheck lease state before deletion.
+
+
+- Detect JSON capture without running Click callbacks, callable defaults, type
+  converters, or close hooks a second time; respect option-value arity so a
+  payload equal to `--json` remains human output.
+
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by

@@ -34,6 +34,13 @@ _LEVEL_COLORS = {
     logging.ERROR: "\033[0;31m",
     logging.CRITICAL: "\033[0;31m",
 }
+_CONFIGURED_LOG_LEVELS = {
+    "debug": logging.DEBUG,
+    "info": logging.INFO,
+    "warning": logging.WARNING,
+    "error": logging.ERROR,
+    "critical": logging.CRITICAL,
+}
 
 
 # pylint: disable=too-many-arguments
@@ -47,7 +54,23 @@ def configure_logger(
     formatter: logging.Formatter | None = None,
     json_logs: bool = False,
     run_id: str | None = None,
+    log_level: str | None = None,
 ) -> logging.Logger:
+    """Configure user-facing and persistent handlers for a CLI logger.
+
+    ``log_level`` optionally selects the user-stream threshold from DEBUG,
+    INFO, WARNING, ERROR, or CRITICAL. The persistent file handler remains at
+    DEBUG. When omitted, the existing ``debug`` and ``quiet`` policy applies.
+    """
+    normalized_log_level = log_level.lower() if log_level is not None else None
+    if normalized_log_level is not None and normalized_log_level not in _CONFIGURED_LOG_LEVELS:
+        supported = ", ".join(_CONFIGURED_LOG_LEVELS)
+        raise ValueError(f"log_level must be one of: {supported}.")
+    stream_level = (
+        _user_stream_level(debug, quiet)
+        if normalized_log_level is None
+        else _CONFIGURED_LOG_LEVELS[normalized_log_level]
+    )
     logger = logging.getLogger(f"base_cli.{cli_name}")
     logger.setLevel(logging.DEBUG)
     logger.propagate = False
@@ -57,7 +80,7 @@ def configure_logger(
 
     user_stream = stream if stream is not None else sys.stderr
     user_handler = logging.StreamHandler(user_stream)
-    user_handler.setLevel(_user_stream_level(debug, quiet))
+    user_handler.setLevel(stream_level)
     user_handler.setFormatter(
         _handler_formatter(
             formatter,
