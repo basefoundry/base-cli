@@ -11,7 +11,7 @@ format available.
 | --- | --- | --- |
 | Human text, CSV, TSV, JSON, and NDJSON records | none | Available from the core package through `base_cli.output`; redirected text is TSV. |
 | YAML configuration or YAML output | `base-cli[yaml]` | Provides `PyYAML>=6.0,<7`; loading or rendering YAML without it fails with an actionable error. |
-| Typer application adapter | `base-cli[typer]` | Provides `typer>=0.12,<0.28`; importing the adapter without it fails with an actionable error. |
+| Typer application adapter | `base-cli[typer]` | Provides `typer>=0.25.1,<0.28`; importing the adapter without it fails with an actionable error. |
 | Rich interactive tables | `base-cli[rich]` | Optional presentation enhancement; the built-in deterministic table remains the fallback. |
 | OpenTelemetry lifecycle spans | `base-cli[telemetry]` | Optional instrumentation; missing or unhealthy telemetry is a no-op for command status. |
 

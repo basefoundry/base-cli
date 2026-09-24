@@ -8,6 +8,7 @@ and choose when a selected entry point is loaded.
 from __future__ import annotations
 
 import importlib.metadata as metadata
+import zipfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -183,6 +184,7 @@ class ExtensionDiscovery:
         self._raw_cache: tuple[Any, ...] | None = None
         self._metadata_cache: tuple[ExtensionDescriptor, ...] | None = None
         self._descriptor_cache: dict[str, tuple[ExtensionDescriptor, ...]] = {}
+        self._entry_point_cache: dict[ExtensionDescriptor, Any] = {}
         self._loaded_cache: dict[tuple[str, str], Any] = {}
         self._lock = RLock()
 
@@ -223,25 +225,24 @@ class ExtensionDiscovery:
         if self.disabled:
             raise ExtensionsDisabledError("Python extension discovery is disabled")
         _validate_group(group)
-        matches = tuple(descriptor for descriptor in self.list(group) if descriptor.name == name)
-        if not matches:
-            raise ExtensionDiscoveryError(f"No extension named '{name}' exists in group '{group}'.")
-        if len(matches) > 1:
-            raise ExtensionCollisionError(group, name, matches)
-        key = (group, name)
         with self._lock:
+            matches = tuple(descriptor for descriptor in self.list(group) if descriptor.name == name)
+            if not matches:
+                raise ExtensionDiscoveryError(f"No extension named '{name}' exists in group '{group}'.")
+            if len(matches) > 1:
+                raise ExtensionCollisionError(group, name, matches)
+            key = (group, name)
             if key in self._loaded_cache:
                 return self._loaded_cache[key]
-        descriptor = matches[0]
-        if descriptor.api_version not in self.supported_api_versions:
-            raise ExtensionCompatibilityError(descriptor, tuple(sorted(self.supported_api_versions)))
-        try:
-            value = self._load_descriptor(descriptor)
-        except Exception as exc:  # isolate ordinary third-party import failures
-            raise ExtensionLoadError(descriptor, exc) from exc
-        with self._lock:
+            descriptor = matches[0]
+            if descriptor.api_version not in self.supported_api_versions:
+                raise ExtensionCompatibilityError(descriptor, tuple(sorted(self.supported_api_versions)))
+            try:
+                value = self._load_descriptor(descriptor)
+            except Exception as exc:  # isolate ordinary third-party import failures
+                raise ExtensionLoadError(descriptor, exc) from exc
             self._loaded_cache[key] = value
-        return value
+            return value
 
     def load_all(self, group: str) -> tuple[ExtensionLoadResult, ...]:
         """Load every allowed extension independently, preserving good results."""
@@ -268,6 +269,7 @@ class ExtensionDiscovery:
             self._raw_cache = None
             self._metadata_cache = None
             self._descriptor_cache.clear()
+            self._entry_point_cache.clear()
             self._loaded_cache.clear()
 
     def _metadata_descriptors(self) -> tuple[ExtensionDescriptor, ...]:
@@ -288,6 +290,7 @@ class ExtensionDiscovery:
                 continue
             if self._allowed(descriptor):
                 descriptors.append(descriptor)
+                self._entry_point_cache[descriptor] = entry_point
         descriptors.sort(key=_descriptor_sort_key)
         self._metadata_cache = tuple(descriptors)
         return self._metadata_cache
@@ -319,14 +322,16 @@ class ExtensionDiscovery:
         )
 
     def _load_descriptor(self, descriptor: ExtensionDescriptor) -> Any:
-        for entry_point in self._raw_entry_points():
-            if (
-                getattr(entry_point, "group", None) == descriptor.group
-                and getattr(entry_point, "name", None) == descriptor.name
-                and getattr(entry_point, "value", None) == descriptor.value
-            ):
-                return entry_point.load()
-        raise ImportError("entry point disappeared before it could be loaded")
+        entry_point = self._entry_point_cache.get(descriptor)
+        if entry_point is None:
+            raise ImportError("approved entry point disappeared before it could be loaded")
+        try:
+            current_descriptor = _descriptor_from_entry_point(entry_point)
+        except (AttributeError, TypeError, ValueError, OSError, KeyError, zipfile.BadZipFile) as exc:
+            raise ImportError("approved entry point identity changed before it could be loaded") from exc
+        if current_descriptor != descriptor or not self._allowed(current_descriptor):
+            raise ImportError("approved entry point identity changed before it could be loaded")
+        return entry_point.load()
 
 
 def _validate_group(group: str) -> None:

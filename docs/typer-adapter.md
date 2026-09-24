@@ -7,12 +7,16 @@ without making Typer a core dependency:
 python -m pip install 'base-cli[typer]'
 ```
 
-The extra supports Typer 0.12 through 0.27.x. Typer 0.26 and later ship a
+The extra supports Typer 0.25.1 through 0.27.x. Typer 0.26 and later ship a
 private Click fork, so the adapter selects the Click dialect that owns the
 generated command tree. Lifecycle options, parameter types, command
 instrumentation, and exception handling are always created and interpreted by
 that same dialect; base-cli never mixes public Click objects into a vendored
-Typer tree.
+Typer tree. The declared minimum is the oldest Typer line exercised by the
+compatibility workflow; older releases are not part of the supported window.
+Typer 0.25.1 itself requires Click 8.2.1 or newer, so `base-cli[typer]`
+resolves the effective Click window to `>=8.2.1,<8.6`; Click 8.1 remains part
+of the core-only compatibility contract.
 
 Use `attach_typer()` at the same boundary where a Click app would use
 `attach()`:
@@ -78,5 +82,7 @@ Typer is an optional extra and is imported lazily.  Importing `base_cli` and
 using the Click integration never imports or requires Typer.
 
 The compatibility workflow exercises the adapter and a typed consumer against
-Typer 0.25.1, 0.26.0, 0.27.1, and 0.27.2 on Python 3.10 through 3.14. Keep
-this matrix green before widening the supported Typer range again.
+Typer 0.25.1, 0.26.0, 0.27.1, and 0.27.2 on Python 3.10 through 3.14. It also
+tests the lower and upper Click boundaries with the minimum and latest
+supported Typer lines. Keep these combinations green before widening the
+supported Typer range again.
