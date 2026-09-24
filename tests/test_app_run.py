@@ -11,6 +11,8 @@ from pathlib import Path
 from unittest import mock
 
 import base_cli
+from base_cli._lifecycle import outcome_from_exception
+from base_cli.output import OutputFormatError
 
 
 def generic_app(**kwargs: object) -> base_cli.App:
@@ -18,6 +20,30 @@ def generic_app(**kwargs: object) -> base_cli.App:
 
 
 class RunAppTests(unittest.TestCase):
+    @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
+    def test_output_format_errors_are_usage_outcomes_and_can_be_reraised(self) -> None:
+        import click
+
+        outcome = outcome_from_exception(click, OutputFormatError("unsupported format"))
+        self.assertEqual((outcome.kind, outcome.exit_code), ("output_format_error", 2))
+
+        app = base_cli.App(name="output-format-reraise", log_to_file=False)
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            raise OutputFormatError("unsupported format")
+
+        with (
+            tempfile.TemporaryDirectory() as tmpdir,
+            mock.patch.dict(
+                os.environ,
+                {"HOME": tmpdir, "BASE_CLI_CACHE_DIR": str(Path(tmpdir) / ".cache")},
+            ),
+        ):
+            with self.assertRaises(OutputFormatError):
+                base_cli.run_app(app, [], reraise_unexpected=True)
+
     @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
     def test_malformed_click_exit_code_before_context_is_an_unexpected_error(self) -> None:
         import click

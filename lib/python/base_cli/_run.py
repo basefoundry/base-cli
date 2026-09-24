@@ -18,7 +18,6 @@ from ._app_core import (
     _INVOCATION_ARGV,
     _INVOCATION_MAIN_BYPASS,
     _INVOCATION_STATE,
-    _LIFECYCLE_CAPTURE_META_KEY,
     DISPLAY_COMMAND_ENV,
     App,
     _InvocationState,
@@ -31,6 +30,7 @@ from ._lifecycle import InvocationOutcome, outcome_from_exception, outcome_from_
 from .exit_codes import ExitCode
 from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import LifecycleOption, LifecycleOptions
+from .output import OutputFormatError
 from .redaction import option_aliases_from_decls
 
 _MAX_JSON_CAPTURE_BYTES = 8 * 1_048_576
@@ -82,6 +82,99 @@ class _BoundedJsonCapture(io.TextIOBase):
 
     def tell(self) -> int:
         return self._stream.tell()
+
+    def close(self) -> None:
+        try:
+            super().close()
+        finally:
+            self._stream.close()
+
+
+class _DeferredJsonCapture(io.TextIOBase):
+    """Buffer parser-time stdout until Click resolves the lifecycle output mode."""
+
+    encoding = "utf-8"
+    errors = "strict"
+
+    def __init__(self, stream: TextIO, limit_bytes: int) -> None:
+        super().__init__()
+        self._stdout = stream
+        self._limit_bytes = limit_bytes
+        self._bytes_written = 0
+        self._mode: bool | None = None
+        self._stream = cast(
+            TextIO,
+            tempfile.SpooledTemporaryFile(
+                max_size=min(limit_bytes, 1_048_576),
+                mode="w+",
+                encoding="utf-8",
+                newline="",
+            ),
+        )
+
+    @property
+    def pending(self) -> bool:
+        return self._mode is None
+
+    @property
+    def json_output(self) -> bool:
+        return self._mode is True
+
+    def resolve_json_output(self, enabled: bool) -> None:
+        if self._mode is not None:
+            if self._mode == enabled:
+                return
+            if not self._mode and enabled:
+                raise RuntimeError("JSON output mode was resolved after stdout had been released.")
+        if enabled:
+            self._mode = True
+            if self._bytes_written > self._limit_bytes:
+                raise JsonCaptureLimitError(
+                    f"JSON stdout exceeded the {_format_bytes(self._limit_bytes)} limit; use NDJSON for large record sets."
+                )
+            return
+
+        self._stream.flush()
+        self._stream.seek(0)
+        while chunk := self._stream.read(64 * 1024):
+            self._stdout.write(chunk)
+        self._stdout.flush()
+        self._mode = False
+
+    def write(self, value: str) -> int:
+        if self._mode is False:
+            return self._stdout.write(value)
+        encoded_size = len(value.encode("utf-8"))
+        if self._mode is True and self._bytes_written + encoded_size > self._limit_bytes:
+            raise JsonCaptureLimitError(
+                f"JSON stdout exceeded the {_format_bytes(self._limit_bytes)} limit; use NDJSON for large record sets."
+            )
+        written = self._stream.write(value)
+        self._bytes_written += encoded_size
+        return written
+
+    def flush(self) -> None:
+        if self._mode is False:
+            self._stdout.flush()
+        else:
+            self._stream.flush()
+
+    def read(self, size: int | None = -1) -> str:
+        return self._stream.read(-1 if size is None else size)
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        return self._stream.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._stream.tell()
+
+    def isatty(self) -> bool:
+        if self._mode is True:
+            return False
+        try:
+            return bool(self._stdout.isatty())
+        except (AttributeError, OSError, ValueError):
+            return False
 
     def close(self) -> None:
         try:
@@ -160,6 +253,8 @@ def _run_app_invocation(
         return ExitCode.FAILURE
 
     args = list(sys.argv[1:] if argv is None else argv)
+    command = app.click_command
+    click = dialect_for_command(command)
     leading_debug, leading_quiet = _leading_output_flags(
         args,
         app.lifecycle_options,
@@ -171,7 +266,6 @@ def _run_app_invocation(
         debug_option=_primary_lifecycle_declaration(
             app.lifecycle_options.debug,
         ),
-        json_output=_json_requested(args, app.lifecycle_options),
     )
     state_token = _INVOCATION_STATE.set(state)
     output_capture: TextIO | None = None
@@ -179,22 +273,24 @@ def _run_app_invocation(
         try:
             display_command = app.profile.display_command()
             invocation_argv = _effective_invocation_argv(app, args, display_command)
-            command = app.click_command
-            click = dialect_for_command(command)
-            if not state.json_output:
-                state.json_output = _json_requested(
-                    args,
-                    app.lifecycle_options,
-                    default_map=_command_default_map(command),
-                    command=command,
-                    prog_name=display_command or app.name,
-                )
+            json_decision = _json_requested(
+                args,
+                app.lifecycle_options,
+                default_map=_command_default_map(command),
+                command=command,
+                prog_name=display_command or app.name,
+            )
+            state.json_output = bool(json_decision)
             invocation_token = _INVOCATION_ARGV.set(invocation_argv)
             try:
                 bypass_token = _INVOCATION_MAIN_BYPASS.set(command)
-                # Capture only an active JSON invocation. Human and NDJSON
-                # paths retain the real stdout stream and its flush behavior.
-                output_capture = _new_json_capture() if state.json_output else None
+                if json_decision is None:
+                    output_capture = cast(TextIO, _DeferredJsonCapture(sys.stdout, _MAX_JSON_CAPTURE_BYTES))
+                    state.output_router = output_capture
+                else:
+                    # Human and NDJSON paths retain the real stdout stream;
+                    # only a resolved JSON invocation uses the bounded spool.
+                    output_capture = _new_json_capture() if state.json_output else None
                 try:
                     if output_capture is None:
                         result = command.main(
@@ -210,6 +306,11 @@ def _run_app_invocation(
                                 standalone_mode=False,
                             )
                 finally:
+                    if isinstance(output_capture, _DeferredJsonCapture):
+                        if output_capture.pending:
+                            output_capture.resolve_json_output(state.json_output)
+                        if not output_capture.json_output:
+                            output_capture = None
                     _reset_context_var(_INVOCATION_MAIN_BYPASS, bypass_token)
             finally:
                 _reset_context_var(_INVOCATION_ARGV, invocation_token)
@@ -259,6 +360,15 @@ def _run_app_invocation(
                 _emit_json_error(state, outcome, str(exc), output_capture)
                 return outcome.exit_code
             raise
+        except OutputFormatError as exc:
+            if reraise_unexpected:
+                raise
+            outcome = InvocationOutcome("output_format_error", "error", ExitCode.USAGE_ERROR)
+            if state.json_output:
+                _emit_json_error(state, outcome, str(exc), output_capture)
+            else:
+                print(f"Error: {exc}", file=sys.stderr)
+            return outcome.exit_code
         except Exception as exc:
             if reraise_unexpected:
                 raise
@@ -306,10 +416,19 @@ def _json_requested(
     default_map: Mapping[str, Any] | None = None,
     command: Any | None = None,
     prog_name: str | None = None,
-) -> bool:
+) -> bool | None:
     option = lifecycle_options.json
     if option is None:
         return False
+
+    if command is not None:
+        return _click_lifecycle_value(
+            command,
+            args,
+            option,
+            prog_name,
+            default_map=default_map,
+        )
 
     positive_declarations, negative_declarations = _lifecycle_flag_declarations(option)
     explicit_value: bool | None = None
@@ -325,16 +444,6 @@ def _json_requested(
     if explicit_value is not None:
         return explicit_value
 
-    # Once the command object is available, let Click resolve the option. Its
-    # parser knows about auto_envvar_prefix, nested default maps, callable
-    # defaults, and the complete boolean environment grammar (including `t`
-    # and `y`). This is used only for the pre-invocation capture decision; the
-    # real command is still parsed and invoked exactly once below.
-    if command is not None:
-        click_value = _click_lifecycle_value(command, args, option, prog_name)
-        if click_value is not None:
-            return click_value
-
     if option.envvar is not None:
         envvars = (option.envvar,) if isinstance(option.envvar, str) else option.envvar
         if any(os.environ.get(name, "").lower() in {"1", "true", "yes", "on"} for name in envvars):
@@ -344,6 +453,8 @@ def _json_requested(
         value = default_map.get(key)
         if isinstance(value, bool):
             return value
+    if callable(option.default):
+        return None
     return option.default is True
 
 
@@ -352,86 +463,132 @@ def _click_lifecycle_value(
     args: list[str],
     option: LifecycleOption,
     prog_name: str | None,
+    *,
+    default_map: Mapping[str, Any] | None = None,
 ) -> bool | None:
-    """Resolve a lifecycle flag with the owning Click command parser."""
+    """Inspect Click's raw parsers without processing parameter values.
 
-    contexts: list[Any] = []
+    ``make_context`` is intentionally avoided: parsing a temporary context
+    executes user parameter types, defaults, callbacks, lazy group resolvers,
+    and close hooks. The low-level parser only tokenizes values and option
+    arity, which is enough to decide whether stdout needs JSON capture.
+    """
+
+    click = dialect_for_command(command)
+    destination = option.name or _option_destination(option)
+    selected: tuple[int, int, bool] | None = None
+    unresolved: tuple[int, int] | None = None
     current_command = command
     current_args = list(args)
-    current_context: Any | None = None
+    parent_context: Any | None = None
+    info_name = prog_name or getattr(command, "name", None) or "cli"
+    depth = 0
     try:
-        current_context = command.make_context(
-            prog_name,
-            current_args,
-            resilient_parsing=True,
-        )
-        contexts.append(current_context)
-        while current_args:
-            resolve_command = getattr(current_command, "resolve_command", None)
-            if not callable(resolve_command):
-                break
-            command_name, next_command, remaining = resolve_command(
-                current_context,
-                _remaining_context_args(current_context),
-            )
-            if command_name is None or next_command is None:
-                break
-            next_context = next_command.make_context(
-                command_name,
-                remaining,
-                parent=current_context,
+        for _ in range(64):
+            context_settings = dict(getattr(current_command, "context_settings", None) or {})
+            context_settings.update(
                 resilient_parsing=True,
+                allow_extra_args=True,
+                ignore_unknown_options=True,
             )
-            contexts.append(next_context)
-            current_command = next_command
-            current_context = next_context
-            current_args = _remaining_context_args(current_context)
+            if parent_context is None and default_map is not None:
+                context_settings["default_map"] = default_map
+            context = click.Context(
+                current_command,
+                parent=parent_context,
+                info_name=info_name,
+                **context_settings,
+            )
+            parameters = current_command.get_params(context)
+            parser = current_command.make_parser(context)
+            parsed_values, remaining, _parameter_order = parser.parse_args(list(current_args))
+            parameter = next((candidate for candidate in parameters if candidate.name == destination), None)
 
-        destination = option.name or _option_destination(option)
-        for context in reversed(contexts):
-            params = getattr(context, "params", {})
-            value = params.get(destination) if isinstance(params, Mapping) else None
-            if isinstance(value, bool):
-                return value
+            if parameter is not None:
+                parsed_value = parsed_values.get(destination)
+                if isinstance(parsed_value, bool):
+                    selected = _prefer_json_value(selected, 4, depth, parsed_value)
+
+                try:
+                    environment_value = parameter.value_from_envvar(context)
+                    if environment_value is not None:
+                        converted = parameter.type_cast_value(context, environment_value)
+                        if isinstance(converted, bool):
+                            selected = _prefer_json_value(selected, 3, depth, converted)
+                except Exception:
+                    # The real Click parse owns diagnostics for malformed
+                    # environment values; preflight only needs a safe hint.
+                    pass
+
+                parameter_default = getattr(parameter, "default", None)
+                if callable(parameter_default):
+                    unresolved = _prefer_json_source(unresolved, 1, depth)
+                elif isinstance(parameter_default, bool) or parameter_default is None:
+                    selected = _prefer_json_value(
+                        selected,
+                        1,
+                        depth,
+                        bool(parameter_default),
+                    )
+
             context_default_map = getattr(context, "default_map", None)
-            if isinstance(context_default_map, Mapping):
-                mapped_value = context_default_map.get(destination)
+            if isinstance(context_default_map, Mapping) and destination in context_default_map:
+                mapped_value = context_default_map[destination]
                 if isinstance(mapped_value, bool):
-                    return mapped_value
-            meta = getattr(context, "meta", {})
-            captures = meta.get(_LIFECYCLE_CAPTURE_META_KEY) if isinstance(meta, Mapping) else None
-            if isinstance(captures, Mapping):
-                for captured in captures.values():
-                    if not isinstance(captured, Mapping):
-                        continue
-                    raw = captured.get("json")
-                    raw_value = getattr(raw, "value", None)
-                    if isinstance(raw_value, bool):
-                        return raw_value
+                    selected = _prefer_json_value(selected, 2, depth, mapped_value)
+                elif callable(mapped_value):
+                    unresolved = _prefer_json_source(unresolved, 2, depth)
+
+            if not remaining or not isinstance(getattr(current_command, "commands", None), Mapping):
+                break
+            command_name = remaining[0]
+            commands = current_command.commands
+            next_command = commands.get(command_name)
+            normalize = getattr(context, "token_normalize_func", None)
+            if next_command is None and callable(normalize):
+                next_command = commands.get(normalize(command_name))
+            if next_command is None:
+                # A lazy group may resolve this name during the real dispatch.
+                # Defer only successful stdout until Click supplies the actual
+                # lifecycle value; never call get_command speculatively.
+                resolver = getattr(type(current_command), "get_command", None)
+                group_type = getattr(click, "Group", None)
+                base_resolver = getattr(group_type, "get_command", None)
+                if callable(resolver) and resolver is not base_resolver:
+                    unresolved = _prefer_json_source(unresolved, 4, depth + 1)
+                break
+            parent_context = context
+            current_command = next_command
+            current_args = remaining[1:]
+            info_name = normalize(command_name) if callable(normalize) else command_name
+            depth += 1
     except (Exception, SystemExit):
-        # Invalid command lines still need the lightweight explicit-token
-        # detector above so Click can render its normal machine error. A
-        # resilient parse may not be able to resolve a leaf command; in that
-        # case retain the existing fallback behavior.
+        # The real parser owns malformed-command diagnostics. Keep the best
+        # known source without running consumer parsing hooks here.
+        pass
+
+    if unresolved is not None and (selected is None or unresolved >= selected[:2]):
         return None
-    finally:
-        for context in reversed(contexts):
-            close = getattr(context, "close", None)
-            if callable(close):
-                close()
-    return None
+    return False if selected is None else selected[2]
 
 
-def _remaining_context_args(context: Any) -> list[str]:
-    """Return unparsed group/command arguments without Click deprecation warnings."""
+def _prefer_json_value(
+    selected: tuple[int, int, bool] | None,
+    rank: int,
+    depth: int,
+    value: bool,
+) -> tuple[int, int, bool]:
+    candidate = (rank, depth, value)
+    return candidate if selected is None or candidate[:2] >= selected[:2] else selected
 
-    values = getattr(context, "__dict__", {})
-    if isinstance(values, Mapping):
-        protected = values.get("_protected_args", values.get("protected_args", ()))
-    else:
-        protected = ()
-    args = getattr(context, "args", ())
-    return [*protected, *args]
+
+def _prefer_json_source(
+    selected: tuple[int, int] | None,
+    rank: int,
+    depth: int,
+) -> tuple[int, int]:
+    candidate = (rank, depth)
+    return candidate if selected is None or candidate >= selected else selected
 
 
 def _option_destination(option: LifecycleOption) -> str:

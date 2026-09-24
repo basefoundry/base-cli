@@ -831,15 +831,21 @@ def helper() -> None:
 `base_cli` configures two handlers:
 
 - a user-facing stderr handler at INFO by default, DEBUG with `--debug`, or
-  WARNING with `--quiet` / `-q`
+  WARNING with `--quiet` / `-q`; a batteries-included profile's configured
+  `log_level` (`debug`, `info`, `warning`, `error`, or `critical`) sets this
+  handler's threshold when no higher-precedence lifecycle option is supplied
 - a persistent file handler that records DEBUG logs when persistent logging is
   enabled
 
 `--quiet` suppresses INFO output on the user-facing stream but still shows
 warnings and errors. `--debug` and `--quiet` cannot be used together. Persistent
 log files still receive DEBUG-level detail, including INFO messages suppressed
-from stderr. User-facing logs use colors automatically on interactive terminals;
-persistent log files remain plain text. Set `NO_COLOR=1` or
+from stderr, regardless of the configured user-stream threshold. Explicit
+`--debug` enables DEBUG output; an explicit negative form such as
+`--no-debug` cancels a configured `log_level: debug` and returns to INFO unless
+a more restrictive configured level applies. `--quiet` raises the user-stream
+threshold to at least WARNING. User-facing logs use colors automatically on
+interactive terminals; persistent log files remain plain text. Set `NO_COLOR=1` or
 `BASE_CLI_COLOR=0` to disable colors. A consumer wrapper may add its own color
 option and map it to the environment variable.
 
@@ -849,11 +855,12 @@ with `zsh` or `fish` as needed. `base_cli` leaves installation to the caller so
 shell startup files remain under user control.
 
 Advanced tests and CI wrappers can call `base_cli.configure_logger(...,
-stream=..., formatter=...)` to capture user-facing logs or apply a custom
-formatter. Leave those arguments as `None` to keep the default stderr stream
-and formatter. Log timestamps use the host's local timezone and include its
-numeric offset by default. A consumer can set `LOG_UTC=1` to use UTC and
-include an explicit `UTC` marker.
+stream=..., formatter=..., log_level="warning")` to capture user-facing logs,
+apply a custom formatter, or select a stream threshold. Omit `log_level` to
+retain the existing `debug`/`quiet` behavior; leave `stream` and `formatter` as
+`None` to keep the default stderr stream and formatter. Log timestamps use the
+host's local timezone and include its numeric offset by default. A consumer can
+set `LOG_UTC=1` to use UTC and include an explicit `UTC` marker.
 
 This setting affects log presentation only. Run metadata, history records, and
 run IDs retain their canonical UTC representation.
@@ -890,8 +897,9 @@ app = base_cli.App(
 Retention runs during startup after the current run's default log file is
 resolved. The active invocation, inherited parent bundle, and bundles marked
 `preserve` (including `--keep-temp`) are never removed. Each lifecycle-owned
-running bundle also holds an advisory `.base-cli-run-lease` for its lifetime;
-retention never removes a bundle whose lease is active. A stale `running`
+bundle holds an advisory `.base-cli-run-lease` through final cleanup, including
+the brief period after metadata becomes terminal; retention never removes a
+bundle whose lease is active or whose lease file is present but liveness cannot be established. A stale `running`
 bundle is eligible for crash recovery only when an age bound is configured and
 its lease can be acquired, proving that the original process has exited.
 Missing, unreadable, or unsupported leases fail closed and remain retained for
