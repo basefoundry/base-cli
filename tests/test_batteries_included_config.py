@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import base_cli
@@ -14,6 +15,17 @@ from base_cli.testing import invoke
 def _write_yaml(path: Path, contents: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(contents, encoding="utf-8")
+
+
+def _combined_output(result: Any) -> str:
+    """Return human-readable output across Click's split/combined result APIs."""
+
+    output = result.output
+    try:
+        stderr = result.stderr
+    except ValueError:
+        stderr = ""
+    return output if not stderr or stderr in output else output + stderr
 
 
 class BatteriesIncludedConfigTests(unittest.TestCase):
@@ -110,14 +122,15 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
                 for args in (["--config", str(config_path)], ["--json", "--config", str(config_path)]):
                     with self.subTest(target=target_name, json="--json" in args):
                         result = invoke(target, list(args), home=root / f"home-{target_name}-{len(args)}")
-                        self.assertEqual(result.exit_code, 2, result.output)
-                        self.assertNotIn("RecursionError", result.output)
+                        output = _combined_output(result)
+                        self.assertEqual(result.exit_code, 2, output)
+                        self.assertNotIn("RecursionError", output)
                         if "--json" in args:
                             payload = json.loads(result.stdout)
                             self.assertEqual(payload["code"], "usage_error")
                             self.assertIn(str(config_path), payload["message"])
                         else:
-                            self.assertIn(str(config_path), result.output)
+                            self.assertIn(str(config_path), output)
 
     def test_layered_loader_merges_in_documented_order_and_records_provenance(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
