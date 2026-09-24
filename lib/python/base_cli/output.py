@@ -143,14 +143,14 @@ def render_records(
         _validate_delimited_records(record_list, columns)
         delimiter = "," if resolved == "csv" else "\t"
         writer = csv.writer(target, delimiter=delimiter, lineterminator="\n")
-        for record in record_list:
-            writer.writerow([_delimited_value(record.get(key)) for _header, key in columns])
+        for row in record_list:
+            writer.writerow([_delimited_value(row.get(key)) for _header, key in columns])
         return resolved
 
     if resolved == "ndjson":
         ndjson_writer = NdjsonWriter(target)
-        for record in records:
-            ndjson_writer.write(record)
+        for structured_record in records:
+            ndjson_writer.write(structured_record)
         return resolved
 
     record_list = [dict(record) for record in records]
