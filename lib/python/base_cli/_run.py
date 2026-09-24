@@ -216,9 +216,11 @@ def run_app(
         else:
             state = _InvocationState(
                 owner_app=app,
-                json_output=_json_requested(
-                    list(sys.argv[1:] if argv is None else argv),
-                    app.lifecycle_options,
+                json_output=bool(
+                    _json_requested(
+                        list(sys.argv[1:] if argv is None else argv),
+                        app.lifecycle_options,
+                    )
                 ),
             )
             _emit_run_rejection(
