@@ -195,6 +195,8 @@ def get_lifecycle_values(click_context: Any | None = None) -> LifecycleValues:
             from ._click_compat import current_context_candidates
 
             candidates.extend(current_context_candidates(typer, click))
+        if not candidates:
+            candidates.append(click.get_current_context(silent=True))
         click_context = next(
             (
                 candidate
