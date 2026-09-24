@@ -11,6 +11,7 @@ from ._runtime import refresh_run_bundle_index
 from .context import Context
 from .exit_codes import ExitCode
 from .history import compact_optional_path, format_timestamp, status_for_exit_code
+from .output import OutputFormatError
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,11 @@ class RunRecorder:
         write_private_json(self.context._run_metadata_path, metadata)
         owner_root = self.context.owner_root
         if owner_root is not None:
-            refresh_run_bundle_index(owner_root / "runs", logger=self.context.log)
+            refresh_run_bundle_index(
+                owner_root / "runs",
+                current_run_root=self.context.run_root,
+                logger=self.context.log,
+            )
 
     def _existing_metadata(self) -> dict[str, Any]:
         path = self.context._run_metadata_path
@@ -125,6 +130,8 @@ def outcome_from_exception(click: Any, exc: BaseException) -> InvocationOutcome:
         return InvocationOutcome("interrupted", "aborted", ExitCode.INTERRUPTED)
     if isinstance(exc, EOFError):
         return InvocationOutcome("aborted", "error", ExitCode.FAILURE)
+    if isinstance(exc, OutputFormatError):
+        return InvocationOutcome("output_format_error", "error", ExitCode.USAGE_ERROR)
     if isinstance(exc, click.Abort):
         if isinstance(exc.__cause__, KeyboardInterrupt):
             return InvocationOutcome("interrupted", "aborted", ExitCode.INTERRUPTED)

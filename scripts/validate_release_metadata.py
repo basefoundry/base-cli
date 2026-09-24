@@ -4,25 +4,21 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import re
 from pathlib import Path
 from typing import Any
 
+try:
+    from .release_metadata_helpers import sha256_file
+except ImportError:  # pragma: no cover - direct script execution
+    from release_metadata_helpers import sha256_file
+
 SBOM_NAME = "SBOM.spdx.json"
 CHECKSUMS_NAME = "SHA256SUMS"
 BOM_ROW_NAME = "RELEASE-BOM-ROW.json"
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _fail(message: str) -> None:
@@ -47,7 +43,7 @@ def main() -> None:
     if set(rows) != {path.name for path in artifacts} or len(artifacts) != 2:
         _fail("SHA256SUMS must cover exactly one wheel and one sdist")
     for path in artifacts:
-        if _sha256(path) != rows[path.name]:
+        if sha256_file(path) != rows[path.name]:
             _fail(f"checksum mismatch for {path.name}")
     try:
         sbom: dict[str, Any] = json.loads(sbom_path.read_text(encoding="utf-8"))
