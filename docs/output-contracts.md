@@ -44,5 +44,5 @@ Some output formats require additional dependencies. Install the corresponding e
 
 | Format | Extra | Install command | If missing |
 |--------|-------|-----------------|------------|
-| YAML   | yaml  | `pip install base-cli[yaml]` | `OutputFormatError: PyYAML is required for YAML output.` |
+| YAML   | yaml  | `pip install base-cli[yaml]` | `OutputFormatError: PyYAML is required for YAML output. Install the optional dependency with python -m pip install 'base-cli[yaml]'.` |
 | Rich text (when `rich=True` is used in `render_records()`) | rich | `pip install base-cli[rich]` | Falls back to the built-in text renderer (no error, but output lacks Rich styling) |

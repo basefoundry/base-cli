@@ -152,13 +152,6 @@ Example error envelope for a missing required argument:
 }
 ```
 
-### Contract fixtures and validator
-
-Golden payloads for each public contract live in
-[`tests/fixtures/contracts`](https://github.com/basefoundry/base-cli/tree/main/tests/fixtures/contracts).
-The CI validates them against the packaged schemas with both a Python validator and a dependency-free Node.js reader.
-Consumers can use the same fixtures as cross-language conformance tests.
-
 ## Inspection envelopes
 
 Read-only inspection commands can use the stable inspection helpers when their
