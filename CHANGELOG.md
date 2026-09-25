@@ -25,6 +25,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Reject recursive and concurrent in-process `run_app()` calls before they can
   replace another invocation's stdout or logging handlers.
+- Resolve lifecycle values through the active Typer/Click context for attached
+  commands, including renamed options, defaults, and environment variables.
+- Reject non-finite numbers in JSON and NDJSON output so emitted records remain
+  standards-compliant and failed NDJSON writes do not leave partial records.
 
 - Honor all five validated framework `log_level` values on native and attached
   user-facing streams while preserving DEBUG-level persistent diagnostics.

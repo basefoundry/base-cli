@@ -164,6 +164,7 @@ class PublicApiTests(unittest.TestCase):
                 "error_envelope",
                 "success_envelope",
                 "dumps_envelope",
+                "dumps_strict_json",
                 "redact_json_value",
             },
         )

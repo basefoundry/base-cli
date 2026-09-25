@@ -15,6 +15,7 @@ from typing import Any, Protocol, TextIO, TypeAlias
 
 from ._dependencies import require_yaml
 from .integrations import try_render_rich_table
+from .json_contracts import dumps_strict_json
 
 PUBLIC_OUTPUT_FORMATS = ("text", "csv", "tsv", "yaml", "json", "ndjson")
 NDJSON_SCHEMA = "base-cli.record"
@@ -62,7 +63,10 @@ class NdjsonWriter:
             "schema": self.schema,
             "record": dict(record),
         }
-        self.stream.write(json.dumps(payload, separators=(",", ":")))
+        # Serialize the complete record before touching the sink: with strict
+        # JSON, a nested NaN/Infinity must not leave a partial NDJSON line.
+        encoded = json.dumps(payload, separators=(",", ":"), allow_nan=False)
+        self.stream.write(encoded)
         self.stream.write("\n")
         self.stream.flush()
 
@@ -135,21 +139,23 @@ def render_records(
     resolved = resolve_output_format(requested_format, stream=target)
 
     if resolved in ("csv", "tsv"):
+        record_list = [dict(record) for record in records]
+        _validate_delimited_records(record_list, columns)
         delimiter = "," if resolved == "csv" else "\t"
         writer = csv.writer(target, delimiter=delimiter, lineterminator="\n")
-        for record in records:
-            writer.writerow([_delimited_value(record.get(key)) for _header, key in columns])
+        for row in record_list:
+            writer.writerow([_delimited_value(row.get(key)) for _header, key in columns])
         return resolved
 
     if resolved == "ndjson":
         ndjson_writer = NdjsonWriter(target)
-        for record in records:
-            ndjson_writer.write(record)
+        for structured_record in records:
+            ndjson_writer.write(structured_record)
         return resolved
 
     record_list = [dict(record) for record in records]
     if resolved == "json":
-        target.write(json.dumps(record_list, separators=(",", ":")))
+        target.write(dumps_strict_json(record_list, separators=(",", ":")))
         target.write("\n")
         return resolved
 
@@ -195,7 +201,7 @@ def render_document(
     if resolved == "text":
         return resolved
     if resolved == "json":
-        target.write(json.dumps(dict(document), indent=2))
+        target.write(dumps_strict_json(dict(document), indent=2))
         target.write("\n")
         return resolved
     if resolved == "yaml":
@@ -249,8 +255,21 @@ def _cell_value(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (Mapping, list, tuple)):
-        return json.dumps(value, separators=(",", ":"))
+        return dumps_strict_json(value, separators=(",", ":"))
     return str(value)
+
+
+def _validate_delimited_records(
+    records: Sequence[Mapping[str, Any]],
+    columns: Sequence[tuple[str, str]],
+) -> None:
+    """Validate nested cell values before a delimited stream is touched."""
+
+    for record in records:
+        for _header, key in columns:
+            value = record.get(key)
+            if isinstance(value, (Mapping, list, tuple)):
+                dumps_strict_json(value, separators=(",", ":"))
 
 
 def _delimited_value(value: Any) -> str:

@@ -125,6 +125,10 @@ class ClickCompatibilityEdgeTests(unittest.TestCase):
         self.assertIsNone(click_compat._vendored_typer_dialect(types.SimpleNamespace()))  # pylint: disable=protected-access
         self.assertIs(click_compat.dialect_for_typer(types.SimpleNamespace()), __import__("click"))
 
+    def test_vendored_dialect_rejects_incomplete_click_module(self) -> None:
+        incomplete = types.SimpleNamespace(Command=object, core=None, exceptions=None)
+        self.assertIsNone(click_compat._vendored_typer_dialect(types.SimpleNamespace(_click=incomplete)))  # pylint: disable=protected-access
+
     def test_marking_an_immutable_command_is_best_effort(self) -> None:
         class Immutable:
             __slots__ = ()
