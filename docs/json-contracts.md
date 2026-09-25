@@ -58,6 +58,11 @@ contains the numeric `exit_code` and captured command stdout. A command's
 human output is represented as a JSON string, so it cannot introduce prose or
 ANSI escapes as a second stdout record.
 
+All JSON and NDJSON emitters use strict JSON serialization and reject
+non-finite numeric values (`NaN`, positive infinity, and negative infinity).
+An invalid NDJSON record is fully serialized before it is written, so it does
+not leave a partial line in the output stream.
+
 `run_id` is the lifecycle run identifier when startup reached a runtime
 context, otherwise it is `null`. Unexpected failures intentionally expose only
 the generic message `Unexpected internal error.`; diagnostics stay in logs.

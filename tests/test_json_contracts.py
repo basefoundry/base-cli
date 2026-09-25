@@ -52,6 +52,12 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(failure["message"], "authorization=[REDACTED]")
         self.assertEqual(json.loads(base_cli.dumps_envelope(failure)), failure)
 
+    def test_json_contract_emitters_reject_nested_non_finite_values(self) -> None:
+        invalid = {"nested": [{"value": float("inf")}]}
+        envelope = base_cli.success_envelope(run_id=None, details=invalid)
+        with self.assertRaises(ValueError):
+            base_cli.dumps_envelope(envelope)
+
     def test_inline_secret_redaction_keeps_delimiters_inside_values(self) -> None:
         for value in ("abc,def", "abc;def"):
             with self.subTest(value=value):

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from typing import Any, Literal
+
+from .json_contracts import dumps_strict_json
 
 InspectionStatus = Literal["ok", "warn", "error"]
 
@@ -35,7 +36,7 @@ def render_inspection_json(
 ) -> str:
     """Serialize the stable inspection envelope with Python's JSON encoder."""
     return (
-        json.dumps(
+        dumps_strict_json(
             inspection_envelope(command=command, status=status, data=data, error=error),
             ensure_ascii=False,
             indent=2,

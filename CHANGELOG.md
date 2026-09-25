@@ -23,6 +23,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Reject non-finite numbers in JSON and NDJSON output so emitted records remain
+  standards-compliant and failed NDJSON writes do not leave partial records.
+
 - Honor all five validated framework `log_level` values on native and attached
   user-facing streams while preserving DEBUG-level persistent diagnostics.
 - Let explicitly supplied lifecycle values, including negative boolean flags,
