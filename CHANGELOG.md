@@ -23,6 +23,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Resolve lifecycle values through the active Typer/Click context for attached
+  commands, including renamed options, defaults, and environment variables.
 - Reject non-finite numbers in JSON and NDJSON output so emitted records remain
   standards-compliant and failed NDJSON writes do not leave partial records.
 

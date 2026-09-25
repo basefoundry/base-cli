@@ -643,7 +643,9 @@ subcommand. Disabled and hidden options do not appear in help; renamed options
 appear only under their configured declarations.
 
 Normalized values are available as one typed `LifecycleValues` record in the
-active Click context's namespaced metadata:
+active Click context's namespaced metadata. The context argument is optional;
+when omitted, base-cli resolves the active upstream Click or supported Typer
+context automatically:
 
 ```python
 @click.pass_context
