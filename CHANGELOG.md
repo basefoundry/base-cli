@@ -23,6 +23,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Rotate bounded byte-retention size walks across invocations with a persisted
+  advisory cursor so bundles beyond the first scan budget are eventually seen.
 - Resolve lifecycle values through the active Typer/Click context for attached
   commands, including renamed options, defaults, and environment variables.
 - Reject non-finite numbers in JSON and NDJSON output so emitted records remain
@@ -47,7 +49,6 @@ and versions are tracked in the repo-root `VERSION` file.
 - Detect JSON capture without running Click callbacks, callable defaults, type
   converters, or close hooks a second time; respect option-value arity so a
   payload equal to `--json` remains human output.
-
 - Preserve explicit application identities losslessly while using
   collision-resistant, path-safe runtime namespace components.
 - Give `BatteriesIncludedConfigLoader.cli_name` a documented identity role by

@@ -87,7 +87,7 @@ def _write_log_worker(path_text: str, seed: int, count: int) -> None:
 def _prune_worker(runs_root_text: str) -> None:
     prune_run_bundles(
         Path(runs_root_text),
-        policy=base_cli.RetentionPolicy(max_bundles=2),
+        policy=base_cli.RetentionPolicy(max_bundles=2, max_total_bytes=2),
     )
 
 
@@ -250,6 +250,9 @@ class MultiprocessingRegressionTests(unittest.TestCase):
                         "preserve": False,
                     },
                 )
+                # Retention now fails closed if a bundle has no lease record,
+                # because missing liveness cannot prove that it is inactive.
+                (bundle / ".base-cli-run-lease").write_bytes(b"0")
 
             _run_processes(_prune_worker, [(str(runs_root),) for _seed in SEEDS])
 
