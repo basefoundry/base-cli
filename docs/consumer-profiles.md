@@ -144,6 +144,11 @@ explicit, project, or user base `environment` value is used, falling back to
 lower-precedence value. `Context.config_provenance` records the winning source
 for each dotted key.
 
+All mapping keys must be strings, including keys nested inside sequences.
+Recursive configuration values are rejected, nesting is limited to 64 levels,
+and shared YAML aliases are accepted when they do not form a cycle. Errors name
+the configuration source and relevant nested path.
+
 The reserved framework keys `environment`, `log_level`, and `keep_temp` are
 validated into `Context.framework_config` and are excluded from the consumer
 configuration dictionary. All other keys remain consumer-owned and are exposed

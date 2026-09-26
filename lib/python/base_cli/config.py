@@ -26,6 +26,8 @@ _FRAMEWORK_KEYS = frozenset({"environment", "log_level", "keep_temp"})
 _LOG_LEVELS = frozenset({"debug", "info", "warning", "error", "critical"})
 _SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 _SAFE_FILENAME = re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9_.-]*|\.[A-Za-z0-9][A-Za-z0-9_.-]*)\Z")
+_CONFIG_MAX_DEPTH = 64
+_CONFIG_MAX_NODES = 100_000
 
 
 @dataclass(frozen=True)
@@ -100,6 +102,49 @@ def _leaf_provenance(
     return {prefix: source} if prefix else {}
 
 
+def _validate_config_graph(value: Mapping[str, Any], *, source: str) -> None:
+    """Validate nested mapping keys, cycles, depth, and traversal cost."""
+
+    active: set[int] = set()
+    stack: list[tuple[bool, Any, str, int]] = [(False, value, "", 0)]
+    visited_nodes = 0
+    while stack:
+        exiting, current, path, depth = stack.pop()
+        identity = id(current)
+        if exiting:
+            active.remove(identity)
+            continue
+        visited_nodes += 1
+        if visited_nodes > _CONFIG_MAX_NODES:
+            raise ConfigurationError(
+                f"Configuration source {source} exceeds the maximum of {_CONFIG_MAX_NODES} nested values."
+            )
+        if not isinstance(current, (Mapping, list, tuple)):
+            continue
+        if identity in active:
+            location = path or "<root>"
+            raise ConfigurationError(f"Configuration source {source} contains a recursive value at '{location}'.")
+        if depth > _CONFIG_MAX_DEPTH:
+            location = path or "<root>"
+            raise ConfigurationError(
+                f"Configuration source {source} exceeds the maximum nesting depth of {_CONFIG_MAX_DEPTH} at "
+                f"'{location}'."
+            )
+        active.add(identity)
+        stack.append((True, current, path, depth))
+        if isinstance(current, Mapping):
+            children = list(current.items())
+            for key, child in reversed(children):
+                if not isinstance(key, str):
+                    location = path or "<root>"
+                    raise ConfigurationError(f"Configuration source {source} has a non-string key under '{location}'.")
+                child_path = f"{path}.{key}" if path else key
+                stack.append((False, child, child_path, depth + 1))
+        else:
+            for index, child in reversed(tuple(enumerate(current))):
+                stack.append((False, child, f"{path}[{index}]", depth + 1))
+
+
 def _merge_mapping(
     target: dict[str, Any],
     provenance: dict[str, str],
@@ -108,13 +153,23 @@ def _merge_mapping(
     *,
     prefix: str = "",
 ) -> None:
+    _validate_config_graph(incoming, source=source)
+    _merge_mapping_validated(target, provenance, incoming, source, prefix=prefix)
+
+
+def _merge_mapping_validated(
+    target: dict[str, Any],
+    provenance: dict[str, str],
+    incoming: Mapping[str, Any],
+    source: str,
+    *,
+    prefix: str = "",
+) -> None:
     for key, value in incoming.items():
-        if not isinstance(key, str):
-            raise ConfigurationError("Configuration keys must be strings.")
         path = f"{prefix}.{key}" if prefix else key
         previous = target.get(key)
         if isinstance(previous, Mapping) and isinstance(value, Mapping):
-            _merge_mapping(target[key], provenance, value, source, prefix=path)
+            _merge_mapping_validated(target[key], provenance, value, source, prefix=path)
             continue
         for existing_path in tuple(provenance):
             if existing_path == path or existing_path.startswith(f"{path}."):
@@ -267,10 +322,15 @@ def load_yaml_file(path: Path, *, required: bool = False) -> dict[str, Any]:
         raise ConfigurationError(f"Unable to read config file '{path}': {exc}") from exc
     try:
         data = yaml.safe_load(contents)
+    except RecursionError as exc:
+        raise ConfigurationError(
+            f"Config file '{path}' exceeds the maximum nesting depth of {_CONFIG_MAX_DEPTH}."
+        ) from exc
     except yaml.YAMLError as exc:
         raise ConfigurationError(f"Config file '{path}' contains invalid YAML: {exc}") from exc
     if data is None:
         return {}
     if not isinstance(data, dict):
         raise ConfigurationError(f"Config file '{path}' must contain a YAML mapping.")
+    _validate_config_graph(data, source=f"Config file '{path}'")
     return data

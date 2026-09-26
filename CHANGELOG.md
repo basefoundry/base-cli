@@ -23,6 +23,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Validate nested configuration mappings before merge/provenance traversal,
+  reject recursive or excessively deep values with source-aware errors, and
+  continue to accept shared YAML aliases.
 - Reject recursive and concurrent in-process `run_app()` calls before they can
   replace another invocation's stdout or logging handlers.
 - Rotate bounded byte-retention size walks across invocations with a persisted
