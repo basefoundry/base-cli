@@ -913,7 +913,9 @@ Recovery work is bounded on the foreground command path. Count- and age-only
 policies inspect metadata without recursively sizing bundle contents. A byte
 policy performs at most 512 recursive size walks and removes at most 256
 bundles per pass; any remaining policy debt is retained safely and reported as
-a warning for a later invocation. The diagnostic index records at most 512
+a warning for a later invocation. An atomic advisory cursor rotates the size
+walk across invocations, so repeated passes eventually inspect the full set;
+the cursor never authorizes deletion. The diagnostic index records at most 512
 entries and sets `complete: false` plus `omitted_bundles` when a cache is
 larger, so a stale, corrupt, or missing index is always reconciled from the
 filesystem rather than trusted for deletion.
