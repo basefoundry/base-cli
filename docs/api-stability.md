@@ -53,7 +53,7 @@ Click `>=8.1,<8.6`; the compatibility suite covers the 8.1, 8.2, 8.3, 8.4,
 and 8.5 lines on Python 3.10 and 3.14. YAML configuration and YAML output are provided by the
 optional `base-cli[yaml]` extra, which supplies PyYAML `>=6.0,<7`. Other
 optional integrations are independently versioned and constrained in `pyproject.toml`: Typer
-`>=0.12,<0.28`, Rich `>=13.7,<15`, and OpenTelemetry API `>=1.24,<2`. The
+`>=0.25.1,<0.28`, Rich `>=13.7,<15`, and OpenTelemetry API `>=1.24,<2`. The
 lower bounds are the minimum supported versions; a dependency minor or major
 release is supported only after it passes the compatibility suite. The tested core
 dependency matrix is maintained in [`dependency-support.md`](dependency-support.md).

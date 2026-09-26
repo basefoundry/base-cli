@@ -451,6 +451,7 @@ def prune_run_bundles(
 def refresh_run_bundle_index(
     runs_root: Path,
     *,
+    current_run_root: Path | None = None,
     logger: logging.Logger | None = None,
 ) -> None:
     """Refresh the diagnostic bundle index after a run becomes terminal."""
@@ -469,7 +470,7 @@ def refresh_run_bundle_index(
             size_budget=0,
         )
         with _retention_lock(runs_root):
-            _write_run_index(runs_root, bundles, log)
+            _write_run_index(runs_root, bundles, log, current_run_root=current_run_root)
     except (OSError, RuntimeError) as exc:
         log.debug("Could not refresh run bundle index under '%s': %s", runs_root, exc)
 
@@ -510,8 +511,14 @@ def _discover_run_bundles(
         running = status == "running"
         # The owner keeps its lease through cleanup, which occurs after the
         # run metadata has been made terminal. Liveness therefore protects
-        # every state, not only the transient "running" state.
-        if _run_lease_state(child) != "inactive":
+        # every state, not only the transient "running" state. Legacy bundle
+        # fixtures may have no lease file at all; terminal bundles without a
+        # lease are eligible, while unknown liveness remains fail-closed for
+        # running records or a present but unreadable lease.
+        lease_state = _run_lease_state(child)
+        if _lease_blocks_removal(child, lease_state):
+            continue
+        if running and lease_state != "inactive":
             continue
         if running:
             if max_age_seconds is None or age < max_age_seconds:
@@ -689,9 +696,12 @@ def _bundle_is_still_removable(path: Path, *, policy: RetentionPolicy, now: floa
     if metadata is None:
         return False
     status = str(metadata.get("status", ""))
-    if _run_lease_state(path) != "inactive":
+    lease_state = _run_lease_state(path)
+    if _lease_blocks_removal(path, lease_state):
         return False
     if status == "running":
+        if lease_state != "inactive":
+            return False
         if policy.max_age_seconds is None:
             return False
         started_at = _timestamp_to_epoch(metadata.get("started_at"))
@@ -712,6 +722,18 @@ def _bundle_is_still_removable(path: Path, *, policy: RetentionPolicy, now: floa
     )
 
 
+def _lease_blocks_removal(path: Path, lease_state: str | None = None) -> bool:
+    """Return whether a bundle's lease proves it must be retained."""
+
+    state = _run_lease_state(path) if lease_state is None else lease_state
+    if state == "active":
+        return True
+    if state != "unknown":
+        return False
+    lease_path = path / _RUN_LEASE_NAME
+    return lease_path.exists() or lease_path.is_symlink()
+
+
 def _write_run_index(
     runs_root: Path,
     bundles: list[dict[str, Any]],
@@ -725,15 +747,19 @@ def _write_run_index(
     if current_run_root is not None and current_run_root.exists():
         current_resolved = _safe_resolved_path(current_run_root)
         if not any(_safe_resolved_path(Path(bundle["path"])) == current_resolved for bundle in indexed):
+            metadata = _read_bundle_metadata(current_run_root) or {}
+            started_at = _timestamp_to_epoch(metadata.get("started_at"))
+            if started_at is None:
+                started_at = time.time() if now is None else now
             indexed.append(
                 {
                     "path": current_run_root,
                     "run_id": current_run_root.name,
-                    "status": "running",
-                    "started_at": time.time() if now is None else now,
+                    "status": str(metadata.get("status", "running")),
+                    "started_at": started_at,
                     "size": 0,
                     "size_known": False,
-                    "preserve": False,
+                    "preserve": bool(metadata.get("preserve")),
                 }
             )
     indexed.sort(key=lambda bundle: (float(bundle.get("started_at", 0)), str(bundle["path"])))

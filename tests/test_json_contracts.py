@@ -52,6 +52,12 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(failure["message"], "authorization=[REDACTED]")
         self.assertEqual(json.loads(base_cli.dumps_envelope(failure)), failure)
 
+    def test_json_contract_emitters_reject_nested_non_finite_values(self) -> None:
+        invalid = {"nested": [{"value": float("inf")}]}
+        envelope = base_cli.success_envelope(run_id=None, details=invalid)
+        with self.assertRaises(ValueError):
+            base_cli.dumps_envelope(envelope)
+
     def test_inline_secret_redaction_keeps_delimiters_inside_values(self) -> None:
         for value in ("abc,def", "abc;def"):
             with self.subTest(value=value):
@@ -259,11 +265,17 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(envelope["details"]["stdout"], "hello from auto env\n")
 
     def test_json_click_parser_handles_callable_defaults(self) -> None:
+        default_calls: list[bool] = []
+
+        def default_json() -> bool:
+            default_calls.append(True)
+            return True
+
         app = base_cli.App(
             name="json-callable-default",
             log_to_file=False,
             lifecycle_options=base_cli.LifecycleOptions(
-                json=base_cli.LifecycleOption("--json", default=lambda: True),
+                json=base_cli.LifecycleOption("--json", default=default_json),
             ),
         )
 
@@ -275,6 +287,7 @@ class JsonContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as home:
             result = base_cli.testing.invoke(app, [], home=Path(home))
         self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(default_calls, [True])
         envelope = json.loads(result.stdout)
         self.assertEqual(envelope["details"]["stdout"], "hello from default\n")
 

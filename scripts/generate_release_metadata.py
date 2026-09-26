@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from .release_metadata_helpers import sha256_file
+except ImportError:  # pragma: no cover - direct script execution
+    from release_metadata_helpers import sha256_file
 
 import tomllib  # type: ignore[import-untyped]
 
@@ -40,14 +44,6 @@ def _created_at() -> str:
     except ValueError:
         epoch = 0
     return datetime.fromtimestamp(epoch, tz=timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _spdx_id(value: str) -> str:
@@ -98,7 +94,7 @@ def generate(dist: Path, root: Path) -> None:
     source_id = _spdx_id(PACKAGE_NAME)
     dependency_packages, relationships = _dependency_packages(project)
     (dist / CHECKSUMS_NAME).write_text(
-        "\n".join(f"{_sha256(path)}  {path.name}" for path in artifacts) + "\n", encoding="utf-8"
+        "\n".join(f"{sha256_file(path)}  {path.name}" for path in artifacts) + "\n", encoding="utf-8"
     )
     sbom: dict[str, Any] = {
         "spdxVersion": "SPDX-2.3",

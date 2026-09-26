@@ -149,6 +149,23 @@ validated into `Context.framework_config` and are excluded from the consumer
 configuration dictionary. All other keys remain consumer-owned and are exposed
 through `Context.config`.
 
+For lifecycle flags such as `debug` and `keep_temp`, an explicitly supplied
+Click value takes precedence over validated file configuration. Click sources
+rank as command line or prompt, environment variable, then `default_map`; a
+file-configured value in turn takes precedence over a Click-declared default or
+callable default. Thus a declared default of `False` does not erase
+`keep_temp: true`, while an explicit `--no-keep-temp`, false environment value,
+or false `default_map` value can turn it off. When the same lifecycle flag is
+present on a native root command and a leaf, the stronger Click source wins and
+the leaf wins ties. Attached Click/Typer trees follow the same source policy.
+
+The configured `log_level` controls the user-facing log stream at all five
+accepted levels. Explicit `--debug` selects DEBUG; an explicit negative debug
+flag cancels a configured `debug` level and falls back to INFO unless a more
+restrictive configured level applies. `--quiet` raises the stream threshold to
+at least WARNING. Persistent diagnostic logs remain at DEBUG independently of
+the user-facing threshold.
+
 Custom `ConfigLoader` callbacks that return a plain mapping do not opt into
 those lifecycle settings: every mapping key, including names that resemble
 framework keys, remains consumer data. Return a `ConfigSnapshot` to supply

@@ -26,6 +26,11 @@ in memory and rolls the remainder to a temporary file, so both temporary-disk
 use and finalization memory remain bounded. The temporary file is removed when
 the invocation ends.
 
+The mode check respects Click option arity: a value such as
+`--payload --json` does not activate JSON when `--json` is the payload. It does
+not run consumer callbacks, defaults, type converters, or close hooks as a
+second parse before the real invocation.
+
 If a command exceeds the limit, base-cli emits one `base-cli.error` envelope
 with `code: "capture_limit"` and exit code `1`; it never silently truncates
 the captured text. Use the NDJSON contract for larger record sets.
@@ -52,6 +57,11 @@ Failures use `schema: "base-cli.error"`, `type: "error"`, and a deterministic
 contains the numeric `exit_code` and captured command stdout. A command's
 human output is represented as a JSON string, so it cannot introduce prose or
 ANSI escapes as a second stdout record.
+
+All JSON and NDJSON emitters use strict JSON serialization and reject
+non-finite numeric values (`NaN`, positive infinity, and negative infinity).
+An invalid NDJSON record is fully serialized before it is written, so it does
+not leave a partial line in the output stream.
 
 `run_id` is the lifecycle run identifier when startup reached a runtime
 context, otherwise it is `null`. Unexpected failures intentionally expose only
