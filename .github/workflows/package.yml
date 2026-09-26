@@ -17,12 +17,14 @@ on:
       - "scripts/verify_release_assets.py"
       - "scripts/validate_changelog.py"
       - "scripts/validate_release_ref.py"
+      - "scripts/validate_release_provenance.py"
       - "CHANGELOG.md"
       - "examples/**"
       - "compatibility/**"
       - "docs/releasing.md"
       - "tests/test_package_workflow.py"
       - "tests/test_verify_release_assets.py"
+      - "tests/test_validate_release_provenance.py"
       - "requirements/release.in"
       - "requirements/release.txt"
       - ".github/workflows/package.yml"
@@ -235,9 +237,31 @@ jobs:
       - name: Check installed dependency consistency
         run: python -m pip check
 
+  provenance:
+    name: Verify reviewed release provenance
+    needs: [build, smoke]
+    if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Fetch trusted main history
+        run: git fetch --no-tags --prune origin "refs/heads/main:refs/remotes/origin/main"
+
+      - name: Verify release provenance
+        env:
+          PUBLISH_TARGET: ${{ inputs.publish_target || '' }}
+        run: python scripts/validate_release_provenance.py
+
   publish:
     name: Publish reviewed distribution
-    needs: [build, smoke]
+    needs: [build, smoke, provenance]
     if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -269,7 +293,7 @@ jobs:
 
   attest:
     name: Attest reviewed release
-    needs: [build, smoke]
+    needs: [build, smoke, provenance]
     if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -303,7 +327,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build, smoke, publish, attest]
+    needs: [build, smoke, provenance, publish, attest]
     if: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
