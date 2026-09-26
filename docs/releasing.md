@@ -15,8 +15,15 @@ policy](https://github.com/basefoundry/base/blob/main/docs/ecosystem-policy.md).
 the wheel and sdist metadata, and `base_cli.__version__` reports the same value
 from a source checkout or from installed distribution metadata.
 
-Production releases use a matching annotated-style tag such as `v0.1.0`.
-The Package workflow rejects a tag that does not exactly match `v${VERSION}`.
+Production releases use a matching annotated tag such as `v0.1.0`, created from
+`main`. Lightweight tags, tags pointing at a commit outside `main`, forced tag
+updates, and tags that do not exactly match `v${VERSION}` are rejected before
+publication. The workflow fetches the complete trusted `main` history so an
+ancestor check fails closed instead of relying on shallow checkout state.
+The active default-branch ruleset also requires one approving pull-request
+review, approval from someone other than the last pusher, strict up-to-date
+status checks, and the policy, quality, runtime, and consumer checks listed in
+the repository ruleset. Deletion and non-fast-forward updates are disabled.
 
 ## Validation workflow
 
@@ -42,6 +49,13 @@ supported platforms, and passing release evidence. On tag and protected dispatch
 runs, GitHub's OIDC-backed `actions/attest` job records both build provenance
 and an SBOM attestation for the exact artifact digests; no PyPI token or other
 long-lived publish secret is used.
+
+The provenance job runs after build and smoke validation and before any
+publication, attestation, or GitHub Release write. It verifies the full source
+SHA, annotated tag object, exact tag target, trusted `origin/main` ancestry,
+non-shallow history, and push-event force/deletion flags. A TestPyPI dispatch
+from a branch remains available for rehearsal, but still requires full history
+and a full source SHA.
 
 For a version tag, the same Package workflow creates a GitHub Release after
 the protected PyPI publication and attestations succeed. The release attaches
@@ -174,9 +188,14 @@ publishing for this repository and workflow before the dispatch can upload.
      'import base_cli; import importlib.metadata as m; assert base_cli.__version__ == m.version("base-cli"); print(base_cli.__version__)'
    ```
 
-The `pypi` GitHub environment must require approval and be configured with the
-PyPI trusted publisher for `.github/workflows/package.yml`. No long-lived PyPI
-token is stored in the repository.
+The `pypi` GitHub environment requires approval, rejects self-review, disallows
+administrator bypass, and is configured with the PyPI trusted publisher for
+`.github/workflows/package.yml`. No long-lived PyPI token is stored in the
+repository. Production publication therefore waits for an independent
+reviewer until maintainer-capacity work in [#252](https://github.com/basefoundry/base-cli/issues/252)
+adds one. If a temporary solo-maintainer exception is ever needed, it must be
+time-bounded and record an owner, expiry, audit trail, and link to #252 before
+an administrator changes the environment policy.
 
 ## Recovery
 
