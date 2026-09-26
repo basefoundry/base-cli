@@ -125,6 +125,10 @@ class ClickCompatibilityEdgeTests(unittest.TestCase):
         self.assertIsNone(click_compat._vendored_typer_dialect(types.SimpleNamespace()))  # pylint: disable=protected-access
         self.assertIs(click_compat.dialect_for_typer(types.SimpleNamespace()), __import__("click"))
 
+    def test_vendored_dialect_rejects_incomplete_click_module(self) -> None:
+        incomplete = types.SimpleNamespace(Command=object, core=None, exceptions=None)
+        self.assertIsNone(click_compat._vendored_typer_dialect(types.SimpleNamespace(_click=incomplete)))  # pylint: disable=protected-access
+
     def test_marking_an_immutable_command_is_best_effort(self) -> None:
         class Immutable:
             __slots__ = ()
@@ -146,13 +150,14 @@ class RuntimeEdgeTests(unittest.TestCase):
             for index in range(3):
                 bundle = root / f"run-{index}"
                 bundle.mkdir()
+                (bundle / ".base-cli-run-lease").write_bytes(b"0")
                 (bundle / "run.json").write_text(
                     f'{{"run_id": "run-{index}", "status": "ok", '
                     '"started_at": "2020-01-01T00:00:00Z", "preserve": false}',
                     encoding="utf-8",
                 )
             with mock.patch.object(runtime, "_bundle_size", side_effect=AssertionError("unexpected size walk")):
-                bundles = runtime._discover_run_bundles(  # pylint: disable=protected-access
+                bundles, _size_scan_cursor = runtime._discover_run_bundles(  # pylint: disable=protected-access
                     root,
                     protected=set(),
                     max_age_seconds=None,

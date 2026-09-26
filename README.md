@@ -643,7 +643,9 @@ subcommand. Disabled and hidden options do not appear in help; renamed options
 appear only under their configured declarations.
 
 Normalized values are available as one typed `LifecycleValues` record in the
-active Click context's namespaced metadata:
+active Click context's namespaced metadata. The context argument is optional;
+when omitted, base-cli resolves the active upstream Click or supported Typer
+context automatically:
 
 ```python
 @click.pass_context
@@ -745,6 +747,13 @@ parsing can provide a traceback only when `--debug` is an unambiguous leading
 flag; otherwise the message says that diagnostic context was unavailable.
 Embedding code that needs the original exception can pass the keyword-only
 `reraise_unexpected=True` argument to `run_app()`.
+
+`run_app()` is non-reentrant and allows only one active invocation per process.
+Nested or concurrent calls fail fast before entering Click or replacing the
+active stdout/logging handlers. Put reusable command behavior in an ordinary
+function and call that function from another callback; use a separate process
+when an independent CLI invocation is required. This does not change the
+framework's supported multi-process logging and runtime coordination.
 
 | Command result or exception | `outcome` | Exit code | Default message |
 | --- | --- | ---: | --- |
@@ -904,7 +913,9 @@ Recovery work is bounded on the foreground command path. Count- and age-only
 policies inspect metadata without recursively sizing bundle contents. A byte
 policy performs at most 512 recursive size walks and removes at most 256
 bundles per pass; any remaining policy debt is retained safely and reported as
-a warning for a later invocation. The diagnostic index records at most 512
+a warning for a later invocation. An atomic advisory cursor rotates the size
+walk across invocations, so repeated passes eventually inspect the full set;
+the cursor never authorizes deletion. The diagnostic index records at most 512
 entries and sets `complete: false` plus `omitted_bundles` when a cache is
 larger, so a stale, corrupt, or missing index is always reconciled from the
 filesystem rather than trusted for deletion.

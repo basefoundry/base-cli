@@ -94,6 +94,40 @@ class RunBundleRetentionTests(unittest.TestCase):
             self.assertLessEqual(bundle_size.call_count, 512)
             self.assertTrue(any("size walk(s)" in str(call) for call in logger.warning.call_args_list))
 
+    def test_byte_retention_cursor_advances_across_restarted_bounded_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir) / "runs"
+            root.mkdir()
+            expected_names = {f"run-{index:05d}" for index in range(1_025)}
+            for index in range(1_025):
+                _bundle(
+                    root,
+                    f"run-{index:05d}",
+                    preserve=index < 1_024,
+                    size=1_048_576 if index == 1_024 else 1,
+                )
+
+            scanned: set[str] = set()
+            policy = RetentionPolicy(max_total_bytes=400_000)
+            for pass_number in range(1, 4):
+                with mock.patch.object(runtime, "_bundle_size", wraps=runtime._bundle_size) as bundle_size:
+                    prune_run_bundles(
+                        root,
+                        policy=policy,
+                        logger=logging.getLogger(__name__),
+                        now=1_600_000_000,
+                    )
+                scanned.update(Path(call.args[0]).name for call in bundle_size.call_args_list)
+                self.assertLessEqual(bundle_size.call_count, 512)
+                index = json.loads((root / ".base-cli-run-index.json").read_text(encoding="utf-8"))
+                self.assertIn("byte_scan_cursor", index)
+                if pass_number < 3:
+                    self.assertTrue((root / "run-01024").exists())
+
+            self.assertTrue(expected_names <= scanned)
+            self.assertFalse((root / "run-01024").exists())
+            self.assertTrue(all((root / name).exists() for name in expected_names if name != "run-01024"))
+
     def test_corrupt_index_is_reconciled_without_trusting_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir) / "runs"

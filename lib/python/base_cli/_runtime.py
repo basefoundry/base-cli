@@ -410,20 +410,20 @@ def prune_run_bundles(
         protected.add(_safe_resolved_path(current_run_root))
     clock = time.time() if now is None else now
 
-    # Filesystem discovery and recursive size accounting are deliberately
-    # outside the lock.  The destructive phase revalidates each candidate
-    # under the lock so another invocation can never turn a live bundle into a
-    # deletion candidate while discovery is in progress.
-    bundles = _discover_run_bundles(
-        runs_root,
-        protected=protected,
-        max_age_seconds=effective.max_age_seconds,
-        now=clock,
-        measure_sizes=effective.max_total_bytes is not None,
-        size_budget=_RETENTION_SIZE_MEASUREMENT_BUDGET,
-    )
     try:
         with _retention_lock(runs_root):
+            # Keep cursor read, size walk, and index update in one critical
+            # section so concurrent pruners cannot overwrite scan progress.
+            size_scan_cursor = _read_size_scan_cursor(runs_root)
+            bundles, size_scan_cursor = _discover_run_bundles(
+                runs_root,
+                protected=protected,
+                max_age_seconds=effective.max_age_seconds,
+                now=clock,
+                measure_sizes=effective.max_total_bytes is not None,
+                size_budget=_RETENTION_SIZE_MEASUREMENT_BUDGET,
+                size_scan_cursor=size_scan_cursor,
+            )
             _apply_bundle_retention(
                 runs_root,
                 bundles,
@@ -439,6 +439,7 @@ def prune_run_bundles(
                 log,
                 current_run_root=current_run_root,
                 now=clock,
+                size_scan_cursor=size_scan_cursor,
             )
     except (OSError, RuntimeError) as exc:
         # Retention is maintenance.  An unavailable lock or a transient
@@ -460,7 +461,7 @@ def refresh_run_bundle_index(
     if not runs_root.exists() or runs_root.is_symlink():
         return
     try:
-        bundles = _discover_run_bundles(
+        bundles, _size_scan_cursor = _discover_run_bundles(
             runs_root,
             protected=set(),
             max_age_seconds=None,
@@ -482,13 +483,14 @@ def _discover_run_bundles(
     now: float,
     measure_sizes: bool,
     size_budget: int,
-) -> list[dict[str, Any]]:
+    size_scan_cursor: str | None = None,
+) -> tuple[list[dict[str, Any]], str | None]:
     bundles: list[dict[str, Any]] = []
-    measured_sizes = 0
+    scan_order: list[dict[str, Any]] = []
     try:
         children = sorted(runs_root.iterdir(), key=lambda path: path.name)
     except OSError:
-        return bundles
+        return bundles, size_scan_cursor
     for child in children:
         if child.name.startswith(".") or child.is_symlink() or not child.is_dir():
             continue
@@ -524,18 +526,6 @@ def _discover_run_bundles(
         if status not in {"running", "ok", "aborted", "error"}:
             continue
         resolved = _safe_resolved_path(child)
-        size = 0
-        size_known = False
-        if measure_sizes and measured_sizes < size_budget:
-            try:
-                size = _bundle_size(child)
-                size_known = True
-                measured_sizes += 1
-            except OSError:
-                # A file that disappears or becomes unreadable remains a
-                # retention candidate for count/age policy, but its byte
-                # contribution is unknown and must be reported below.
-                pass
         retention_metadata = metadata.get("retention")
         preserve = bool(metadata.get("preserve")) or (
             isinstance(retention_metadata, dict) and retention_metadata.get("preserve") is True
@@ -548,14 +538,60 @@ def _discover_run_bundles(
                 "status": status,
                 "started_at": started_at,
                 "age": age,
-                "size": size,
-                "size_known": size_known,
+                "size": 0,
+                "size_known": False,
                 "preserve": preserve,
                 "protected": resolved in protected,
             }
         )
+        if measure_sizes:
+            scan_order.append(bundles[-1])
     bundles.sort(key=lambda bundle: (float(bundle["started_at"]), str(bundle["path"])))
-    return bundles
+    if measure_sizes and bundles and size_budget > 0:
+        # The run index's cursor affects only which discovered bundles receive
+        # an expensive size walk. It never authorizes deletion; every candidate
+        # is re-read and revalidated before the destructive phase.
+        if size_scan_cursor is not None:
+            start_index = next(
+                (index for index, bundle in enumerate(scan_order) if bundle["path"].name > size_scan_cursor),
+                0,
+            )
+            scan_order = scan_order[start_index:] + scan_order[:start_index]
+        attempted = 0
+        for bundle in scan_order:
+            if attempted >= size_budget:
+                break
+            attempted += 1
+            path = bundle["path"]
+            size_scan_cursor = path.name
+            try:
+                bundle["size"] = _bundle_size(path)
+                bundle["size_known"] = True
+            except OSError:
+                # A file that disappears or becomes unreadable remains a
+                # retention candidate for count/age policy, but its byte
+                # contribution is unknown and reported below. Advancing the
+                # cursor prevents one unreadable entry from starving others.
+                pass
+    return bundles, size_scan_cursor
+
+
+def _read_size_scan_cursor(runs_root: Path) -> str | None:
+    """Read the advisory byte-scan cursor; never use it to select deletions."""
+
+    index_path = runs_root / _RUN_INDEX_NAME
+    try:
+        if index_path.is_symlink() or not index_path.is_file() or index_path.stat().st_size > 1_048_576:
+            return None
+        payload = json.loads(index_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    cursor = payload.get("byte_scan_cursor")
+    if not isinstance(cursor, str) or not cursor or len(cursor) > 1024 or "/" in cursor or "\\" in cursor:
+        return None
+    return cursor
 
 
 def _apply_bundle_retention(
@@ -705,6 +741,7 @@ def _write_run_index(
     *,
     current_run_root: Path | None = None,
     now: float | None = None,
+    size_scan_cursor: str | None = None,
 ) -> None:
     indexed = list(bundles)
     if current_run_root is not None and current_run_root.exists():
@@ -734,6 +771,7 @@ def _write_run_index(
         "version": 1,
         "complete": omitted_bundles == 0,
         "omitted_bundles": omitted_bundles,
+        "byte_scan_cursor": size_scan_cursor if size_scan_cursor is not None else _read_size_scan_cursor(runs_root),
         "bundles": [
             {
                 "path": str(bundle["path"]),

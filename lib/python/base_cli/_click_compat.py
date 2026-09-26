@@ -97,8 +97,16 @@ def _vendored_typer_dialect(typer: Any) -> _VendoredClickDialect | None:
     except (ImportError, AttributeError):
         return None
 
-    core = module.core
-    exceptions = module.exceptions
+    core = getattr(module, "core", None)
+    exceptions = getattr(module, "exceptions", None)
+    echo = getattr(module, "echo", None)
+    click_exception = getattr(module, "ClickException", None)
+    abort = getattr(module, "Abort", getattr(exceptions, "Abort", getattr(core, "Abort", None)))
+    usage_error = getattr(module, "UsageError", getattr(core, "UsageError", None))
+    if core is None or exceptions is None or not callable(echo):
+        return None
+    if not isinstance(abort, type) or not isinstance(usage_error, type) or not isinstance(click_exception, type):
+        return None
 
     def option(param_decls: list[str], **attrs: Any) -> Any:
         return TyperOption(param_decls=list(param_decls), **attrs)
@@ -108,11 +116,11 @@ def _vendored_typer_dialect(typer: Any) -> _VendoredClickDialect | None:
         Command=module.Command,
         Option=option,
         Path=TyperPath,
-        version_option=_vendor_version_option_factory(TyperOption, module.echo),
+        version_option=_vendor_version_option_factory(TyperOption, echo),
         exceptions=exceptions,
-        Abort=getattr(module, "Abort", getattr(exceptions, "Abort", core.Abort)),
-        UsageError=getattr(module, "UsageError", core.UsageError),
-        ClickException=module.ClickException,
+        Abort=abort,
+        UsageError=usage_error,
+        ClickException=click_exception,
     )
 
 
@@ -123,6 +131,21 @@ def dialect_for_typer(typer: Any) -> Any:
 
     dialect = _vendored_typer_dialect(typer)
     return dialect if dialect is not None else click
+
+
+def current_context_candidates(typer: Any, click: Any) -> list[Any]:
+    """Return active contexts from Typer's dialect followed by public Click."""
+
+    dialect = dialect_for_typer(typer)
+    candidates: list[Any] = []
+    if dialect is not click:
+        get_context = getattr(dialect, "get_current_context", None)
+        if get_context is None:
+            get_context = getattr(getattr(dialect, "globals", None), "get_current_context", None)
+        if callable(get_context):
+            candidates.append(get_context(silent=True))
+    candidates.append(click.get_current_context(silent=True))
+    return candidates
 
 
 def exit_exception_type(click: Any) -> type[BaseException]:
@@ -189,4 +212,11 @@ def is_command(command: Any) -> bool:
     return dialect is not click and isinstance(command, dialect.Command)
 
 
-__all__ = ["dialect_for_command", "dialect_for_typer", "exit_exception_type", "is_command", "mark_command_dialect"]
+__all__ = [
+    "current_context_candidates",
+    "dialect_for_command",
+    "dialect_for_typer",
+    "exit_exception_type",
+    "is_command",
+    "mark_command_dialect",
+]

@@ -65,6 +65,32 @@ COLUMNS = (("PROJECT", "name"), ("PATH", "path"))
 
 
 class OutputTest(unittest.TestCase):
+    def test_json_emitters_reject_non_finite_values_without_partial_output(self) -> None:
+        invalid_record = {"nested": [{"value": float("nan")}]}
+        emitters = (
+            lambda stream: render_records((invalid_record,), requested_format="json", columns=(), stream=stream),
+            lambda stream: render_document(invalid_record, requested_format="json", stream=stream),
+            lambda stream: NdjsonWriter(stream).write(invalid_record),
+        )
+
+        for emit in emitters:
+            with self.subTest(emit=emit):
+                stream = io.StringIO()
+                with self.assertRaises(ValueError):
+                    emit(stream)
+                self.assertEqual(stream.getvalue(), "")
+
+    def test_delimited_emitters_validate_nested_values_before_writing(self) -> None:
+        records = ({"name": "valid"}, {"name": {"value": float("nan")}})
+        for requested_format in ("csv", "tsv"):
+            with self.subTest(format=requested_format):
+                stream = io.StringIO()
+                with self.assertRaises(ValueError):
+                    render_records(
+                        records, requested_format=requested_format, columns=(("NAME", "name"),), stream=stream
+                    )
+                self.assertEqual(stream.getvalue(), "")
+
     def test_tsv_consumes_one_pass_iterable_without_materializing(self) -> None:
         consumed = False
 
