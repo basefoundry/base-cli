@@ -23,6 +23,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Reject recursive and concurrent in-process `run_app()` calls before they can
+  replace another invocation's stdout or logging handlers.
 - Rotate bounded byte-retention size walks across invocations with a persisted
   advisory cursor so bundles beyond the first scan budget are eventually seen.
 - Resolve lifecycle values through the active Typer/Click context for attached
