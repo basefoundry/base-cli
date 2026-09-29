@@ -22,3 +22,13 @@ def test_package_workflow_does_not_replace_published_release_assets() -> None:
     assert '--source-digest "$GITHUB_SHA"' in workflow
     assert '--source-ref "$GITHUB_REF"' in workflow
     assert "--clobber" not in workflow
+
+
+def test_package_workflow_gates_writes_on_release_provenance() -> None:
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
+
+    assert "name: Verify reviewed release provenance" in workflow
+    assert 'git fetch --no-tags --prune origin "refs/heads/main:refs/remotes/origin/main"' in workflow
+    assert "python scripts/validate_release_provenance.py" in workflow
+    assert "needs: [build, smoke, provenance]" in workflow
+    assert "needs: [build, smoke, provenance, publish, attest]" in workflow
