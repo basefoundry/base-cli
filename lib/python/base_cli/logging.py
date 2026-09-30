@@ -220,15 +220,15 @@ class CliFormatter(logging.Formatter):
         else:
             configured_use_utc = os.environ.get("BASE_CLI_LOG_UTC")
             legacy_use_utc = os.environ.get("LOG_UTC")
+            if legacy_use_utc:
+                warnings.warn(
+                    "LOG_UTC is deprecated since 0.5 and will be removed in 0.7; use BASE_CLI_LOG_UTC instead.",
+                    BaseCliDeprecationWarning,
+                    stacklevel=2,
+                )
             if configured_use_utc is not None:
                 resolved_use_utc = configured_use_utc == "1"
             else:
-                if legacy_use_utc is not None:
-                    warnings.warn(
-                        "LOG_UTC is deprecated since 0.5 and will be removed in 0.6; use BASE_CLI_LOG_UTC instead.",
-                        BaseCliDeprecationWarning,
-                        stacklevel=2,
-                    )
                 resolved_use_utc = legacy_use_utc == "1"
         self.use_utc = resolved_use_utc
         self.use_color = use_color

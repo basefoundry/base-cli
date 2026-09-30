@@ -20,6 +20,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Align the Typer support floor with the tested matrix and cover representative
   minimum/maximum Typer and Click version pairings.
+- Add the namespaced `BASE_CLI_LOG_UTC` environment variable and deprecate
+  `LOG_UTC` with a migration warning; the legacy alias is scheduled for removal
+  no earlier than 0.7.
 
 ### Fixed
 

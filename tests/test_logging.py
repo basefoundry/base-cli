@@ -127,10 +127,13 @@ class ConfigureLoggerTests(unittest.TestCase):
         stream = io.StringIO()
 
         with mock.patch.dict(os.environ, {"BASE_CLI_LOG_UTC": "1", "LOG_UTC": "0"}):
-            logger = base_cli.configure_logger("namespaced-utc-stream", None, debug=False, stream=stream)
-            logger.info("hello utc")
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", base_cli.BaseCliDeprecationWarning)
+                logger = base_cli.configure_logger("namespaced-utc-stream", None, debug=False, stream=stream)
+                logger.info("hello utc")
 
         self.assertRegex(stream.getvalue(), r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC INFO")
+        self.assertEqual(len(caught), 1)
 
     def test_legacy_log_utc_emits_deprecation_warning(self) -> None:
         with mock.patch.dict(os.environ, {"LOG_UTC": "1"}, clear=True):
@@ -140,6 +143,21 @@ class ConfigureLoggerTests(unittest.TestCase):
 
         self.assertEqual(len(caught), 1)
         self.assertIn("BASE_CLI_LOG_UTC", str(caught[0].message))
+
+    def test_empty_legacy_log_utc_does_not_warn(self) -> None:
+        with mock.patch.dict(os.environ, {"LOG_UTC": ""}, clear=True):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", base_cli.BaseCliDeprecationWarning)
+                CliFormatter()
+
+        self.assertEqual(caught, [])
+
+    def test_deprecation_warning_respects_an_explicit_error_filter(self) -> None:
+        with mock.patch.dict(os.environ, {"LOG_UTC": "1"}, clear=True):
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", base_cli.BaseCliDeprecationWarning)
+                with self.assertRaises(base_cli.BaseCliDeprecationWarning):
+                    CliFormatter()
 
     def test_configure_logger_colors_python_user_stream_when_requested(self) -> None:
         stream = self._TtyStream()
