@@ -86,6 +86,30 @@ class LegacySetRedactionTests(unittest.TestCase):
         self.assertEqual(redact_argv(argv, set()), expected)
         self.assertEqual(redact_history_argv(argv, set()), expected)
 
+    def test_extended_secret_name_heuristics_apply_consistently(self) -> None:
+        cases = (
+            ("--passwd", "old-password"),
+            ("--passphrase", "phrase"),
+            ("--credential", "credential-value"),
+            ("--private-key", "private-key-value"),
+            ("--access_key", "access-key-value"),
+            ("--bearer", "bearer-value"),
+            ("--session-cookie", "cookie-value"),
+            ("--signature", "signature-value"),
+            ("--otp", "123456"),
+            ("--salt", "salt-value"),
+            ("--pem", "pem-value"),
+        )
+        for option, value in cases:
+            with self.subTest(option=option):
+                argv = ["tool", option, value]
+                expected = ["tool", option, REDACTED]
+                self.assertEqual(redact_argv(argv, set()), expected)
+                self.assertEqual(redact_history_argv(argv, set()), expected)
+
+    def test_bare_key_is_not_treated_as_a_secret_name(self) -> None:
+        self.assertEqual(redact_argv(["tool", "--key", "visible"], set()), ["tool", "--key", "visible"])
+
     def test_embedded_secret_segments_are_redacted_without_registration(self) -> None:
         cases = (
             (

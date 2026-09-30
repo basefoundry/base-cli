@@ -76,7 +76,10 @@ The lower-level `success_envelope()`, `error_envelope()`, `dumps_envelope()`,
 and `redact_json_value()` helpers are public for commands that need to publish
 their own structured `details` records. Secret-looking keys (`token`,
 `password`, `secret`, `api_key`, and `authorization`) and credential-bearing
-URLs are redacted recursively.
+URLs are redacted recursively. The heuristic covers token, password/passphrase,
+credential, private/access/API key, authorization/bearer, session/cookie,
+signature, OTP, salt, SAS, and PEM names; a generic `key` name is not treated
+as secret by itself.
 
 Golden payloads for each public contract live in
 [`tests/fixtures/contracts`](https://github.com/basefoundry/base-cli/tree/main/tests/fixtures/contracts).
