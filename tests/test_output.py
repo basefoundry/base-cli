@@ -12,6 +12,7 @@ from base_cli.output import (
     NDJSON_SCHEMA_VERSION,
     NdjsonWriter,
     OutputFormatError,
+    _delimited_value,
     render_document,
     render_records,
     resolve_output_format,
@@ -115,6 +116,23 @@ class OutputTest(unittest.TestCase):
         )
 
         self.assertEqual(stream.getvalue(), "=SUM(A1:A2),@user\n")
+
+    def test_delimited_formula_guard_covers_tab_and_carriage_return_before_sanitizing(self) -> None:
+        values = ("\t=SUM(A1:A2)", "\r@user")
+
+        with mock.patch("base_cli.output._table_cell", side_effect=lambda value: value):
+            guarded = [_delimited_value(value) for value in values]
+
+        self.assertEqual(guarded, ["'\t=SUM(A1:A2)", "'\r@user"])
+
+        stream = io.StringIO()
+        render_records(
+            ({"name": values[0], "path": values[1]},),
+            requested_format="csv",
+            columns=COLUMNS,
+            stream=stream,
+        )
+        self.assertEqual(next(csv.reader(io.StringIO(stream.getvalue()))), ["' =SUM(A1:A2)", "' @user"])
 
     def test_tsv_consumes_one_pass_iterable_without_materializing(self) -> None:
         consumed = False

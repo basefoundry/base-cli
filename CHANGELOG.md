@@ -20,6 +20,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Align the Typer support floor with the tested matrix and cover representative
   minimum/maximum Typer and Click version pairings.
+- Prefix formula-leading CSV/TSV cells with an apostrophe by default to protect
+  spreadsheet consumers; pass `formula_guard=False` only for an audited raw
+  value contract.
 
 ### Fixed
 

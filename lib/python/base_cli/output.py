@@ -23,6 +23,7 @@ NDJSON_SCHEMA_VERSION = 1
 _ANSI_ESCAPE_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
 _DEFAULT_TERMINAL_WIDTH = 120
 _DEFAULT_MAX_CELL_WIDTH = 80
+_FORMULA_TRIGGER_CHARS = frozenset("=+-@\t\r")
 
 
 class OutputFormatError(ValueError):
@@ -133,7 +134,10 @@ def render_records(
     columns. Terminal cells use Unicode display-cell widths and are bounded by
     ``terminal_width`` and ``max_cell_width`` with deterministic ellipsis
     truncation. ``rich=True`` opts terminal text into the optional Rich
-    renderer and otherwise falls back to the built-in table.
+    renderer and otherwise falls back to the built-in table. ``formula_guard``
+    controls the default apostrophe prefix for formula-leading CSV/TSV cells;
+    disabling it is an explicit security decision for consumers that need raw
+    values.
     """
 
     target = stream if stream is not None else sys.stdout
@@ -194,8 +198,10 @@ def render_document(
 
     Structured formats preserve the complete document.  Delimited output uses
     the selected record list (or the document itself) and never emits report
-    prose, headers, or footers.  A terminal ``text`` request returns ``text``
-    without writing so the caller can keep its established human report.
+    prose, headers, or footers. ``formula_guard`` has the same CSV/TSV security
+    behavior as ``render_records``. A terminal ``text`` request returns
+    ``text`` without writing so the caller can keep its established human
+    report.
     """
 
     target = stream if stream is not None else sys.stdout
@@ -284,8 +290,9 @@ def _delimited_value(value: Any, *, formula_guard: bool = True) -> str:
     record across physical lines.
     """
 
-    cell = _table_cell(_cell_value(value))
-    if formula_guard and cell[:1] in {"=", "+", "-", "@"}:
+    raw_cell = _cell_value(value)
+    cell = _table_cell(raw_cell)
+    if formula_guard and raw_cell[:1] in _FORMULA_TRIGGER_CHARS:
         return f"'{cell}"
     return cell
 
