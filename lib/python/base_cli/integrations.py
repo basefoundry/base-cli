@@ -130,6 +130,7 @@ def finish_telemetry(
     outcome: Any,
     *,
     ended_monotonic_ns: int | None = None,
+    exception: BaseException | None = None,
 ) -> None:
     """Finish a lifecycle span without allowing exporters to affect teardown."""
 
@@ -148,6 +149,9 @@ def finish_telemetry(
         }
         for key, value in attributes.items():
             _safe_span_call(session.span, "set_attribute", key, value)
+        if exception is not None:
+            _safe_span_call(session.span, "record_exception", exception)
+        _set_span_status(session.span, outcome)
         _safe_span_call(
             session.span,
             "add_event",
@@ -171,6 +175,19 @@ def _start_attributes(context: Any) -> dict[str, Any]:
         "base_cli.environment": str(getattr(context, "environment", "")),
         "base_cli.dry_run": bool(getattr(context, "dry_run", False)),
     }
+
+
+def _set_span_status(span: Any, outcome: Any) -> None:
+    """Set an OpenTelemetry status while remaining compatible with test spans."""
+
+    is_success = str(getattr(outcome, "status", "error")) == "ok"
+    try:
+        from opentelemetry.trace import Status, StatusCode
+
+        status: Any = Status(StatusCode.OK if is_success else StatusCode.ERROR)
+    except Exception:  # pragma: no cover - optional dependency boundary
+        status = "ok" if is_success else "error"
+    _safe_span_call(span, "set_status", status)
 
 
 def _safe_span_call(span: Any, method: str, *args: Any, **kwargs: Any) -> None:

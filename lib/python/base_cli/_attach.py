@@ -71,6 +71,7 @@ class _AttachedLifecycleResource:
         self.context: Context[Any, Any, Any] | None = None
         self.invocation: _AttachedInvocation | None = None
         self.telemetry_session: TelemetrySession | None = None
+        self.exception: BaseException | None = None
         self.context_token: Any = None
         self.invocation_token: Any = None
         self.original_click_exit: Callable[..., Any] | None = None
@@ -164,6 +165,7 @@ class _AttachedLifecycleResource:
             state.attached_completion = True
 
     def record_exception(self, exc: BaseException) -> None:
+        self.exception = exc
         state = _INVOCATION_STATE.get()
         if state is not None and state.owner_app is self.attachment.app:
             state.attached_completion = False
@@ -239,6 +241,7 @@ class _AttachedLifecycleResource:
             context,
             self.outcome,
             ended_monotonic_ns=ended_monotonic_ns,
+            exception=self.exception,
         )
         try:
             context.cleanup()
