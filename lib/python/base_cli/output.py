@@ -371,7 +371,12 @@ def _terminal_width(stream: TextIO) -> int:
             return _DEFAULT_TERMINAL_WIDTH
 
 
-def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
+def _fit_table_width(
+    widths: list[int],
+    terminal_width: int,
+    *,
+    _work_counter: list[int] | None = None,
+) -> list[int]:
     if not widths:
         return widths
     available = max(1, terminal_width - 2 * (len(widths) - 1))
@@ -379,6 +384,15 @@ def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
         return widths
     result = list(widths)
     remaining = sum(result) - available
+
+    def record_work(units: int) -> None:
+        if _work_counter is not None:
+            _work_counter[0] += units
+
+    # ``order`` is a stable snapshot of the columns sorted by current width.
+    # ``position`` marks the first column not in the active width level, while
+    # ``active_count`` tracks how many columns share that level. Mutating only
+    # the active prefix keeps ties deterministic as widths are reduced.
     order = sorted(range(len(result)), key=lambda index: (-result[index], index))
     position = 0
     level = result[order[0]]
@@ -387,6 +401,8 @@ def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
         active_count += 1
         position += 1
     while remaining > 0 and active_count:
+        # When every remaining column is active, floor the next level at one;
+        # there is no legal width below one even if the arithmetic target is 0.
         next_level = result[order[position]] if position < len(order) else 1
         next_level = max(1, next_level)
         capacity = (level - next_level) * active_count
@@ -397,10 +413,12 @@ def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
             for rank in range(active_count):
                 index = order[rank]
                 result[index] -= quotient + (rank < remainder)
+            record_work(active_count)
             remaining = 0
             break
         for rank in range(active_count):
             result[order[rank]] = next_level
+        record_work(active_count)
         remaining -= capacity
         level = next_level
         while position < len(order) and result[order[position]] == level:

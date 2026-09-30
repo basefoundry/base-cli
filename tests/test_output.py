@@ -143,12 +143,14 @@ class OutputTest(unittest.TestCase):
 
     def test_table_width_fitting_handles_large_widths_without_per_unit_loop(self) -> None:
         widths = [10_000_000, 9_000_000, 8_000_000, 7_000_000]
+        work = [0]
 
-        fitted = _fit_table_width(widths, terminal_width=120)
+        fitted = _fit_table_width(widths, terminal_width=120, _work_counter=work)
 
         self.assertEqual(sum(fitted), 114)
         self.assertGreaterEqual(min(fitted), 1)
         self.assertEqual(fitted, [28, 28, 29, 29])
+        self.assertLessEqual(work[0], len(widths) * 3)
 
     def test_terminal_width_and_cell_width_validate_inputs(self) -> None:
         with self.assertRaisesRegex(ValueError, "terminal_width"):
