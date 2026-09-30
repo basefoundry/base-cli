@@ -120,31 +120,35 @@ def redact_json_value(
 
     The private traversal arguments let recursive calls reject cycles and
     pathological nesting before Python's recursion limit or an unbounded
-    serializer can be reached. A fresh branch-local set is used for each
-    child so shared, acyclic values are not mistaken for cycles.
+    serializer can be reached. The active-path set is mutated with
+    backtracking so shared, acyclic values are not mistaken for cycles and
+    recursive traversal does not copy the full ancestor set at every node.
     """
 
     if _key is not None and _is_sensitive_key(_key):
         return REDACTED
     if isinstance(value, (Mapping, list, tuple)):
         if _depth >= MAX_JSON_REDACTION_DEPTH:
-            return REDACTED
+            return "[TRUNCATED]"
         seen = set() if _seen is None else _seen
         identity = id(value)
         if identity in seen:
-            return REDACTED
-        branch_seen = seen | {identity}
-        if isinstance(value, Mapping):
-            return {
-                str(key): redact_json_value(
-                    item,
-                    _key=str(key),
-                    _depth=_depth + 1,
-                    _seen=branch_seen,
-                )
-                for key, item in value.items()
-            }
-        return [redact_json_value(item, _depth=_depth + 1, _seen=branch_seen) for item in value]
+            return "[TRUNCATED]"
+        seen.add(identity)
+        try:
+            if isinstance(value, Mapping):
+                return {
+                    str(key): redact_json_value(
+                        item,
+                        _key=str(key),
+                        _depth=_depth + 1,
+                        _seen=seen,
+                    )
+                    for key, item in value.items()
+                }
+            return [redact_json_value(item, _depth=_depth + 1, _seen=seen) for item in value]
+        finally:
+            seen.remove(identity)
     if isinstance(value, str):
         return _safe_text(value)
     return value
