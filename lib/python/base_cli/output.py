@@ -121,6 +121,7 @@ def render_records(
     terminal_width: int | None = None,
     max_cell_width: int | None = _DEFAULT_MAX_CELL_WIDTH,
     rich: bool = False,
+    formula_guard: bool = True,
 ) -> str:
     """Render records according to the shared public output contract.
 
@@ -144,7 +145,7 @@ def render_records(
         delimiter = "," if resolved == "csv" else "\t"
         writer = csv.writer(target, delimiter=delimiter, lineterminator="\n")
         for row in record_list:
-            writer.writerow([_delimited_value(row.get(key)) for _header, key in columns])
+            writer.writerow([_delimited_value(row.get(key), formula_guard=formula_guard) for _header, key in columns])
         return resolved
 
     if resolved == "ndjson":
@@ -187,6 +188,7 @@ def render_document(
     records_key: str | None = None,
     columns: Sequence[tuple[str, str]] | None = None,
     stream: TextIO | None = None,
+    formula_guard: bool = True,
 ) -> str:
     """Render a structured report or leave terminal text to its existing renderer.
 
@@ -233,6 +235,7 @@ def render_document(
         requested_format=resolved,
         columns=selected_columns,
         stream=target,
+        formula_guard=formula_guard,
     )
     return resolved
 
@@ -272,7 +275,7 @@ def _validate_delimited_records(
                 dumps_strict_json(value, separators=(",", ":"))
 
 
-def _delimited_value(value: Any) -> str:
+def _delimited_value(value: Any, *, formula_guard: bool = True) -> str:
     """Return a safe scalar for redirected CSV/TSV output.
 
     Delimited output is commonly piped into another process. Keep the normal
@@ -281,7 +284,10 @@ def _delimited_value(value: Any) -> str:
     record across physical lines.
     """
 
-    return _table_cell(_cell_value(value))
+    cell = _table_cell(_cell_value(value))
+    if formula_guard and cell[:1] in {"=", "+", "-", "@"}:
+        return f"'{cell}"
+    return cell
 
 
 def _write_table(

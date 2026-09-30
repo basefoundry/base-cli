@@ -91,6 +91,31 @@ class OutputTest(unittest.TestCase):
                     )
                 self.assertEqual(stream.getvalue(), "")
 
+    def test_delimited_emitters_guard_spreadsheet_formulas_by_default(self) -> None:
+        records = ({"name": "=SUM(A1:A2)", "path": "+cmd"}, {"name": "-10", "path": "@user"})
+
+        for requested_format, expected in (
+            ("csv", "'=SUM(A1:A2),'+cmd\n'-10,'@user\n"),
+            ("tsv", "'=SUM(A1:A2)\t'+cmd\n'-10\t'@user\n"),
+        ):
+            with self.subTest(format=requested_format):
+                stream = io.StringIO()
+                render_records(records, requested_format=requested_format, columns=COLUMNS, stream=stream)
+                self.assertEqual(stream.getvalue(), expected)
+
+    def test_delimited_formula_guard_can_be_disabled_explicitly(self) -> None:
+        stream = io.StringIO()
+
+        render_records(
+            ({"name": "=SUM(A1:A2)", "path": "@user"},),
+            requested_format="csv",
+            columns=COLUMNS,
+            stream=stream,
+            formula_guard=False,
+        )
+
+        self.assertEqual(stream.getvalue(), "=SUM(A1:A2),@user\n")
+
     def test_tsv_consumes_one_pass_iterable_without_materializing(self) -> None:
         consumed = False
 

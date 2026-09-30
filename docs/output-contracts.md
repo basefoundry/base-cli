@@ -16,6 +16,10 @@ Delimited output is intentionally automation-friendly:
 - no column header or footer is emitted;
 - values use the standard `csv` quoting rules, while ANSI escape sequences and
   other control characters are replaced with spaces.
+- cells beginning with `=`, `+`, `-`, or `@` receive a leading apostrophe by
+  default so spreadsheet programs treat them as text rather than formulas;
+  pass `formula_guard=False` only when a downstream consumer explicitly needs
+  the original leading character.
 
 `ndjson` is the bounded machine-output format for large or long-running
 results. It consumes the input iterable once and writes one flushed JSON object
