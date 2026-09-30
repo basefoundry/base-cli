@@ -41,7 +41,6 @@ __all__ = [
     "JSON_OUTPUT_SCHEMA",
     "JsonLogFormatter",
     "MAX_JSON_LOG_MESSAGE_LENGTH",
-    "MAX_JSON_REDACTION_DEPTH",
     "error_envelope",
     "success_envelope",
     "dumps_envelope",
