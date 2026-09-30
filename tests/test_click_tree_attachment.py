@@ -12,6 +12,7 @@ from typing import Any
 from unittest import mock
 
 import base_cli
+from base_cli import _lifecycle_install
 from base_cli._runtime import RuntimeDirectoryError
 from base_cli.testing import invoke
 
@@ -63,6 +64,30 @@ class _CountingApp(base_cli.App):
 
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
 class ClickTreeAttachmentTests(unittest.TestCase):
+    def test_lifecycle_metadata_is_keyed_by_context_identity(self) -> None:
+        class FakeContext:
+            def __init__(self) -> None:
+                self.meta: dict[object, Any] = {}
+
+            def get_parameter_source(self, name: str) -> None:
+                del name
+                return None
+
+        first = FakeContext()
+        second = FakeContext()
+        parameter = type("Parameter", (), {"name": "environment"})()
+
+        _lifecycle_install._capture_lifecycle_option(first, parameter, "first", key="environment")
+        _lifecycle_install._capture_lifecycle_option(second, parameter, "second", key="environment")
+
+        captures = first.meta[next(key for key in first.meta if key is not None)]
+        self.assertIn(first, captures)
+        self.assertNotIn(id(first), captures)
+        self.assertEqual(captures[first]["environment"].value, "first")
+        second_captures = second.meta[next(key for key in second.meta if key is not None)]
+        self.assertIn(second, second_captures)
+        self.assertEqual(second_captures[second]["environment"].value, "second")
+
     def test_prebuilt_single_command_preserves_click_contract_and_lifecycle(self) -> None:
         import click
 
