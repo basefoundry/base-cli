@@ -88,6 +88,81 @@ class ClickTreeAttachmentTests(unittest.TestCase):
         self.assertIn(second, second_captures)
         self.assertEqual(second_captures[second]["environment"].value, "second")
 
+    def test_chained_click_contexts_keep_lifecycle_values_through_teardown(self) -> None:
+        import click
+
+        observed: list[tuple[str, str | None, int]] = []
+        closed: list[str] = []
+
+        def capture_environment(click_context: Any, parameter: Any, value: Any) -> Any:
+            return _lifecycle_install._capture_lifecycle_option(
+                click_context,
+                parameter,
+                value,
+                key="environment",
+            )
+
+        @click.group(name="pipeline", chain=True)
+        def pipeline() -> None:
+            pass
+
+        @pipeline.command(name="first")
+        @click.option("--environment", callback=capture_environment)
+        def first(environment: str | None) -> None:
+            del environment
+            click_context = click.get_current_context()
+            captures = click_context.meta[_lifecycle_install._LIFECYCLE_CAPTURE_META_KEY]
+            observed.append(
+                (
+                    "first",
+                    captures[click_context]["environment"].value,
+                    len(captures),
+                )
+            )
+            click_context.call_on_close(lambda: closed.append("first"))
+
+        @pipeline.command(name="second")
+        @click.option("--environment", callback=capture_environment)
+        def second(environment: str | None) -> None:
+            del environment
+            click_context = click.get_current_context()
+            captures = click_context.meta[_lifecycle_install._LIFECYCLE_CAPTURE_META_KEY]
+            observed.append(
+                (
+                    "second",
+                    captures[click_context]["environment"].value,
+                    len(captures),
+                )
+            )
+            self.assertEqual(closed, ["first"])
+            click_context.call_on_close(lambda: closed.append("second"))
+
+        app = base_cli.App(name="pipeline", log_to_file=False)
+        app.attach(pipeline)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(
+                app,
+                [
+                    "first",
+                    "--environment",
+                    "first-env",
+                    "second",
+                    "--environment",
+                    "second-env",
+                ],
+                home=Path(tmpdir),
+            )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            [(name, value) for name, value, _capture_count in observed],
+            [("first", "first-env"), ("second", "second-env")],
+        )
+        self.assertGreaterEqual(observed[0][2], 2)
+        self.assertEqual(observed[0][2], observed[1][2])
+        self.assertEqual(closed, ["first", "second"])
+
     def test_prebuilt_single_command_preserves_click_contract_and_lifecycle(self) -> None:
         import click
 

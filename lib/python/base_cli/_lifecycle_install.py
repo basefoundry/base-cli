@@ -540,6 +540,10 @@ def _resolve_lifecycle_values(
         _LIFECYCLE_RESOLUTION_META_KEY,
         {},
     )
+    # These maps live in Click's invocation-shared metadata and retain one
+    # context-keyed entry per context until the root invocation closes. That
+    # bounded, per-invocation retention is deliberate: it prevents id reuse
+    # without retaining state across invocations.
     parent = getattr(click_context, "parent", None)
     parent_resolution = resolution_map.get(parent) if parent is not None else None
     raw = dict(parent_resolution.raw) if isinstance(parent_resolution, _LifecycleResolution) else {}
