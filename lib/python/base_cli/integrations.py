@@ -149,7 +149,7 @@ def finish_telemetry(
         }
         for key, value in attributes.items():
             _safe_span_call(session.span, "set_attribute", key, value)
-        if exception is not None:
+        if exception is not None and str(getattr(outcome, "status", "error")) != "ok":
             _safe_span_call(session.span, "record_exception", exception)
         _set_span_status(session.span, outcome)
         _safe_span_call(

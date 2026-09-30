@@ -126,6 +126,8 @@ class IntegrationTests(unittest.TestCase):
             ["base_cli.run.started", "base_cli.run.finished"],
         )
         self.assertIn("base_cli.duration_ms", tracer.span.attributes)
+        self.assertEqual(tracer.span.exceptions, [])
+        self.assertIsNotNone(tracer.span.status)
 
     def test_telemetry_marks_failures_and_records_exception(self) -> None:
         tracer = _Tracer()
