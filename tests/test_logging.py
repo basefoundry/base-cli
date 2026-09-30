@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import unittest
+import warnings
 from pathlib import Path
 from unittest import mock
 
@@ -121,6 +122,24 @@ class ConfigureLoggerTests(unittest.TestCase):
             logger.info("hello utc")
 
         self.assertRegex(stream.getvalue(), r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC INFO")
+
+    def test_configure_logger_honors_namespaced_log_utc_and_precedence(self) -> None:
+        stream = io.StringIO()
+
+        with mock.patch.dict(os.environ, {"BASE_CLI_LOG_UTC": "1", "LOG_UTC": "0"}):
+            logger = base_cli.configure_logger("namespaced-utc-stream", None, debug=False, stream=stream)
+            logger.info("hello utc")
+
+        self.assertRegex(stream.getvalue(), r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC INFO")
+
+    def test_legacy_log_utc_emits_deprecation_warning(self) -> None:
+        with mock.patch.dict(os.environ, {"LOG_UTC": "1"}, clear=True):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always", base_cli.BaseCliDeprecationWarning)
+                CliFormatter()
+
+        self.assertEqual(len(caught), 1)
+        self.assertIn("BASE_CLI_LOG_UTC", str(caught[0].message))
 
     def test_configure_logger_colors_python_user_stream_when_requested(self) -> None:
         stream = self._TtyStream()

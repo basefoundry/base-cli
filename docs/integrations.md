@@ -52,3 +52,10 @@ outcome, exit code, and duration. Raw argv, configuration values, filesystem
 paths, and secrets are never attached. A missing API package, invalid provider,
 or failing exporter is logged at debug level and treated as a no-op; it cannot
 change the command's exit status or cleanup behavior.
+
+## Log timestamp environment variable
+
+Set `BASE_CLI_LOG_UTC=1` to make the default text formatter use UTC
+timestamps. The namespaced variable takes precedence over the legacy setting.
+`LOG_UTC` remains recognized during the 0.5 compatibility window, but emits a
+`BaseCliDeprecationWarning` and is scheduled for removal in 0.6.
