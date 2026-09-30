@@ -7,7 +7,8 @@ from typing import Any
 
 REDACTED = "[REDACTED]"
 SECRET_KEY_PATTERN = (
-    r"(?<![A-Za-z0-9])(?:token|password|passwd|pwd|passphrase|secret|credential|"
+    r"(?<![A-Za-z0-9])(?:access[-_]?token|refresh[-_]?token|id[-_]?token|"
+    r"client[-_]?secret|auth[-_]?token|token|password|passwd|pwd|passphrase|secret|credential|"
     r"private[-_]?key|access[-_]?key|api[-_]?key|authorization|bearer|session|"
     r"cookie|signature|otp|salt|sas|pem)(?![A-Za-z0-9])"
 )

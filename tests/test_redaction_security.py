@@ -93,6 +93,11 @@ class LegacySetRedactionTests(unittest.TestCase):
             ("--credential", "credential-value"),
             ("--private-key", "private-key-value"),
             ("--access_key", "access-key-value"),
+            ("--accessToken", "access-token-value"),
+            ("--refreshToken", "refresh-token-value"),
+            ("--idToken", "id-token-value"),
+            ("--clientSecret", "client-secret-value"),
+            ("--authToken", "auth-token-value"),
             ("--bearer", "bearer-value"),
             ("--session-cookie", "cookie-value"),
             ("--signature", "signature-value"),
@@ -109,6 +114,8 @@ class LegacySetRedactionTests(unittest.TestCase):
 
     def test_bare_key_is_not_treated_as_a_secret_name(self) -> None:
         self.assertEqual(redact_argv(["tool", "--key", "visible"], set()), ["tool", "--key", "visible"])
+        self.assertEqual(redact_argv(["tool", "--key-file", "visible"], set()), ["tool", "--key-file", "visible"])
+        self.assertEqual(redact_argv(["tool", "--public-key", "visible"], set()), ["tool", "--public-key", "visible"])
 
     def test_embedded_secret_segments_are_redacted_without_registration(self) -> None:
         cases = (
@@ -163,6 +170,10 @@ class LegacySetRedactionTests(unittest.TestCase):
             (
                 ["tool", "PASSWORD=abc,def&LABEL=visible"],
                 ["tool", f"PASSWORD={REDACTED}&LABEL=visible"],
+            ),
+            (
+                ["tool", "accessToken=camel-case-secret"],
+                ["tool", f"accessToken={REDACTED}"],
             ),
         )
         for argv, expected in cases:
