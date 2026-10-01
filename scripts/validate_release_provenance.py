@@ -83,6 +83,18 @@ def _git_failure(*args: str) -> str:
     return f"git {' '.join(args)} failed; release provenance cannot be verified"
 
 
+def _git_checked(git_errors: list[str], *args: str, allowed_codes: tuple[int, ...] = ()) -> tuple[int, str]:
+    code, output = _git(*args)
+    if code != 0 and code not in allowed_codes:
+        git_errors.append(_git_failure(*args))
+    return code, output
+
+
+def _git_required(git_errors: list[str], *args: str) -> str:
+    code, output = _git_checked(git_errors, *args)
+    return output if code == 0 else ""
+
+
 def _read_event_flags(event_path: Path) -> tuple[bool, bool, list[str]]:
     try:
         payload = json.loads(event_path.read_text(encoding="utf-8"))
@@ -108,24 +120,20 @@ def main() -> None:
     git_errors: list[str] = []
     if args.ref_type == "tag":
         tag_ref = f"refs/tags/{args.tag}"
-        tag_type_code, tag_type_output = _git("cat-file", "-t", tag_ref)
-        if tag_type_code == 0:
-            tag_type = tag_type_output
-        else:
-            git_errors.append(_git_failure("cat-file", "-t", tag_ref))
-
-        resolved_code, resolved_output = _git("rev-parse", "--verify", f"{tag_ref}^{{}}")
-        if resolved_code == 0:
-            resolved_tag_commit = resolved_output
-        else:
-            git_errors.append(_git_failure("rev-parse", "--verify", f"{tag_ref}^{{}}"))
+        tag_type = _git_required(git_errors, "cat-file", "-t", tag_ref)
+        resolved_tag_commit = _git_required(git_errors, "rev-parse", "--verify", f"{tag_ref}^{{}}")
 
         if resolved_tag_commit:
-            ancestor_code, _ = _git("merge-base", "--is-ancestor", resolved_tag_commit, args.main_ref)
+            ancestor_code, _ = _git_checked(
+                git_errors,
+                "merge-base",
+                "--is-ancestor",
+                resolved_tag_commit,
+                args.main_ref,
+                allowed_codes=(1,),
+            )
             if ancestor_code == 0:
                 main_reachable = True
-            elif ancestor_code != 1:
-                git_errors.append(_git_failure("merge-base", "--is-ancestor", resolved_tag_commit, args.main_ref))
 
     forced = False
     deleted = False
@@ -137,9 +145,8 @@ def main() -> None:
         else:
             forced, deleted, event_errors = _read_event_flags(event_path)
 
-    shallow_code, shallow_output = _git("rev-parse", "--is-shallow-repository")
-    if shallow_code != 0:
-        git_errors.append(_git_failure("rev-parse", "--is-shallow-repository"))
+    shallow_output = _git_required(git_errors, "rev-parse", "--is-shallow-repository")
+    if not shallow_output:
         repository_shallow = True
     elif shallow_output not in {"true", "false"}:
         git_errors.append("git rev-parse returned an unknown shallow-repository state")
