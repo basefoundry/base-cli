@@ -22,7 +22,6 @@ VALID_PUBLISH_TARGETS = {"", "testpypi", "pypi"}
 
 def validate_release_provenance(
     *,
-    event_name: str,
     ref_type: str,
     tag: str,
     publish_target: str,
@@ -97,15 +96,16 @@ def _git_required(git_errors: list[str], *args: str) -> str:
 
 def _read_event_flags(event_path: Path) -> tuple[bool, bool, list[str]]:
     try:
-        payload = json.loads(event_path.read_text(encoding="utf-8"))
+        payload: object = json.loads(event_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         return False, False, [f"could not read the GitHub event payload: {exc}"]
+    if not isinstance(payload, dict):
+        return False, False, ["GitHub event payload must be a JSON object"]
     return bool(payload.get("forced")), bool(payload.get("deleted")), []
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--event-name", default=os.environ.get("GITHUB_EVENT_NAME", ""))
     parser.add_argument("--event-path", default=os.environ.get("GITHUB_EVENT_PATH"))
     parser.add_argument("--ref-type", default=os.environ.get("GITHUB_REF_TYPE", ""))
     parser.add_argument("--tag", default=os.environ.get("GITHUB_REF_NAME", ""))
@@ -158,7 +158,6 @@ def main() -> None:
         event_errors
         + git_errors
         + validate_release_provenance(
-            event_name=args.event_name,
             ref_type=args.ref_type,
             tag=args.tag,
             publish_target=args.publish_target,
