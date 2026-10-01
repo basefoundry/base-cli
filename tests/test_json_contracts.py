@@ -11,7 +11,7 @@ from unittest import mock
 
 import base_cli
 from base_cli._run import JsonCaptureLimitError, _BoundedJsonCapture, _json_requested
-from base_cli.json_contracts import MAX_JSON_LOG_MESSAGE_LENGTH
+from base_cli.json_contracts import MAX_JSON_LOG_MESSAGE_LENGTH, MAX_JSON_REDACTION_DEPTH
 
 
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
@@ -57,6 +57,38 @@ class JsonContractTests(unittest.TestCase):
         envelope = base_cli.success_envelope(run_id=None, details=invalid)
         with self.assertRaises(ValueError):
             base_cli.dumps_envelope(envelope)
+
+    def test_json_redaction_bounds_deep_nesting(self) -> None:
+        value: dict[str, object] = {}
+        root = value
+        for _ in range(MAX_JSON_REDACTION_DEPTH + 5):
+            child: dict[str, object] = {}
+            root["nested"] = child
+            root = child
+
+        redacted = base_cli.redact_json_value(value)
+        current: object = redacted
+        for _ in range(MAX_JSON_REDACTION_DEPTH):
+            self.assertIsInstance(current, dict)
+            current = current["nested"]  # type: ignore[index]
+        self.assertEqual(current, "[TRUNCATED]")
+        json.dumps(redacted)
+
+    def test_json_redaction_replaces_cycles(self) -> None:
+        value: dict[str, object] = {}
+        value["self"] = value
+
+        redacted = base_cli.redact_json_value(value)
+
+        self.assertEqual(redacted, {"self": "[TRUNCATED]"})
+        json.dumps(redacted)
+
+    def test_json_redaction_allows_shared_acyclic_values_on_each_branch(self) -> None:
+        shared = {"value": "visible"}
+
+        redacted = base_cli.redact_json_value({"first": shared, "second": shared})
+
+        self.assertEqual(redacted, {"first": shared, "second": shared})
 
     def test_inline_secret_redaction_keeps_delimiters_inside_values(self) -> None:
         for value in ("abc,def", "abc;def"):
