@@ -9,6 +9,11 @@ import re
 import sys
 from pathlib import Path
 
+try:
+    from .release_metadata_helpers import validate_tag_prefix
+except ImportError:  # pragma: no cover - direct script execution
+    from release_metadata_helpers import validate_tag_prefix
+
 RELEASE_HEADING = re.compile(r"^## \[(?P<version>\d+\.\d+\.\d+)\] - (?P<date>\d{4}-\d{2}-\d{2})$")
 BULLET = re.compile(r"^\s*[-*+]\s+\S")
 
@@ -16,8 +21,9 @@ BULLET = re.compile(r"^\s*[-*+]\s+\S")
 def validate_release_ref(version_path: Path, changelog_path: Path, tag: str) -> list[str]:
     """Return violations for a release ``tag`` and its source files."""
     errors: list[str] = []
-    if not tag.startswith("v") or tag == "v":
-        return [f"release tag must be a v-prefixed version, got {tag!r}"]
+    tag_error = validate_tag_prefix(tag)
+    if tag_error is not None:
+        return [tag_error]
     version = tag[1:]
     declared = version_path.read_text(encoding="utf-8").strip()
     if declared != version:
