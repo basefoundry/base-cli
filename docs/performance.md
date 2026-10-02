@@ -165,7 +165,7 @@ files, reporting microseconds/record and records/second.
 | Profile | Concurrent / serial p95 cap | Log p95 microseconds/record cap |
 | --- | ---: | ---: |
 | unix | 6 | 40 |
-| macos | 6 | 40 |
+| macos | 6 | 60 |
 | windows | 10 | 150 |
 | wsl | 10 | 100 |
 
@@ -179,3 +179,20 @@ Development-host calibration (macOS, Python 3.14.6, 31 serial/log samples and
 36 concurrent samples): concurrent/serial p95 ratio 2.42; ephemeral logging p95
 6.20 microseconds/record; persistent logging p95 14.15 microseconds/record.
 These are local measurements; hosted per-profile results are retained separately.
+
+The [first hosted stress run](https://github.com/basefoundry/base-cli/actions/runs/37054920383)
+recorded the following 31-sample logging and 36-sample concurrency results:
+
+| Profile | Concurrent / serial p95 | Ephemeral log p95 (us/record) | Persistent log p95 (us/record) |
+| --- | ---: | ---: | ---: |
+| macos (3-core arm64, Python 3.13) | 4.49 | 16.01 | 46.42 |
+| windows | 2.99 | 20.14 | 49.03 |
+| wsl | 4.25 | 11.44 | 22.90 |
+
+The initial macOS 40 us/record p95 estimate rejected a run whose persistent median
+was 25.82 us/record. Its hosted cap is therefore calibrated to 60 us/record; the
+other logging and concurrency caps are unchanged. This remains below the original
+107 us/record development-host regression, while retaining room for hosted tails.
+The corresponding `base-cli-benchmark-{profile}-37054920383` artifacts contain
+machine metadata and all measured summaries. Unix calibration remains subject to
+its hosted check before merge.
