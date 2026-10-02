@@ -219,9 +219,8 @@ def _open_log_lock(path: Path) -> BinaryIO:
     path.parent.mkdir(parents=True, exist_ok=True)
     stream = path.open("a+b")
     try:
-        if stream.seek(0, os.SEEK_END) == 0:
-            stream.write(b"0")
-            stream.flush()
+        # Byte-range locks may extend beyond EOF. Writing a sentinel before
+        # acquiring the lock races a Windows writer already holding byte zero.
         restrict_file(path)
         return stream
     except BaseException:
