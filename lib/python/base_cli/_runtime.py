@@ -295,6 +295,8 @@ def _open_absolute_directory(path: Path) -> int:
 
 
 def _directory_open_flags() -> int:
+    if not hasattr(os, "O_DIRECTORY") or not hasattr(os, "O_NOFOLLOW"):
+        raise OSError("safe descriptor-relative directory operations are unavailable")
     return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
 
 
@@ -404,6 +406,9 @@ def prune_run_bundles(
 
     runs_root = Path(runs_root)
     if not runs_root.exists() or runs_root.is_symlink():
+        return
+    if not _supports_fd_relative_bundle_removal() and os.name != "nt":
+        log.warning("Run bundle retention unavailable on this platform: safe directory removal is unsupported.")
         return
     protected = {_safe_resolved_path(path) for path in protected_run_roots}
     if current_run_root is not None:
@@ -831,9 +836,25 @@ def _bundle_size(path: Path) -> int:
     return total
 
 
+def _supports_fd_relative_bundle_removal() -> bool:
+    return (
+        hasattr(os, "O_DIRECTORY")
+        and hasattr(os, "O_NOFOLLOW")
+        and {os.open, os.stat, os.unlink, os.rmdir}.issubset(os.supports_dir_fd)
+        and os.scandir in os.supports_fd
+    )
+
+
 def _remove_run_bundle(runs_root: Path, path: Path) -> None:
     """Remove one direct child using descriptor-relative, no-follow operations."""
 
+    if not _supports_fd_relative_bundle_removal():
+        if os.name != "nt":
+            raise OSError("safe bundle removal is unsupported on this platform")
+        from ._windows_retention import remove_bundle
+
+        remove_bundle(runs_root, path)
+        return
     root_fd = _open_directory_nofollow(runs_root)
     try:
         candidate = Path(path).name
