@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import click
-import base_cli
+from typing import Any
 
+import base_cli
+import click
 
 app = base_cli.App(
     name="cinder-consumer",
@@ -27,7 +28,7 @@ app = base_cli.App(
     default="json",
     show_default=True,
 )
-def reconcile(ctx: base_cli.Context, target: str, output_format: str) -> None:
+def reconcile(ctx: base_cli.Context[Any, Any, Any], target: str, output_format: str) -> None:
     """Publish the result of one idempotent reconciliation step."""
 
     action = "would-reconcile" if ctx.dry_run else "reconciled"

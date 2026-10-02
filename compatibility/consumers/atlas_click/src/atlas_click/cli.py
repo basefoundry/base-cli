@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import click
 import base_cli
+import click
 
 
 @click.group(name="atlas-consumer", help="Inventory resources managed by Atlas.")
