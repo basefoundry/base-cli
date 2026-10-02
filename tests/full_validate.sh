@@ -49,7 +49,8 @@ run_typing() {
 
 run_style() {
   require_commands ruff
-  ruff format --check .
+  # Markdown examples are validated by the dedicated documentation gate.
+  ruff format --check --exclude "*.md" .
   ruff check .
 }
 
