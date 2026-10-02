@@ -446,6 +446,8 @@ def prune_run_bundles(
                 now=clock,
                 size_scan_cursor=size_scan_cursor,
             )
+    except BlockingIOError:
+        log.debug("Skipping run bundle retention: another invocation holds the maintenance lock.")
     except (OSError, RuntimeError) as exc:
         # Retention is maintenance.  An unavailable lock or a transient
         # filesystem failure must not turn an otherwise valid invocation into
@@ -466,15 +468,15 @@ def refresh_run_bundle_index(
     if not runs_root.exists() or runs_root.is_symlink():
         return
     try:
-        bundles, _size_scan_cursor = _discover_run_bundles(
-            runs_root,
-            protected=set(),
-            max_age_seconds=None,
-            now=time.time(),
-            measure_sizes=False,
-            size_budget=0,
-        )
         with _retention_lock(runs_root):
+            bundles, _size_scan_cursor = _discover_run_bundles(
+                runs_root,
+                protected=set(),
+                max_age_seconds=None,
+                now=time.time(),
+                measure_sizes=False,
+                size_budget=0,
+            )
             _write_run_index(runs_root, bundles, log, current_run_root=current_run_root)
     except (OSError, RuntimeError) as exc:
         log.debug("Could not refresh run bundle index under '%s': %s", runs_root, exc)
@@ -922,12 +924,15 @@ def _retention_lock(runs_root: Path) -> Iterator[None]:
             pass
         restrict_file(lock_path)
     stream = lock_path.open("a+b")
+    locked = False
     try:
         _lock_retention_stream(stream)
+        locked = True
         yield
     finally:
         try:
-            _unlock_retention_stream(stream)
+            if locked:
+                _unlock_retention_stream(stream)
         finally:
             stream.close()
 
@@ -935,10 +940,15 @@ def _retention_lock(runs_root: Path) -> Iterator[None]:
 def _lock_retention_stream(stream: object) -> None:
     fd = stream.fileno()  # type: ignore[attr-defined]
     if _fcntl is not None:
-        _fcntl.flock(fd, _fcntl.LOCK_EX)
+        _fcntl.flock(fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
     elif _msvcrt is not None:  # pragma: no cover - Windows
         stream.seek(0)
-        _msvcrt.locking(fd, _msvcrt.LK_LOCK, 1)
+        try:
+            _msvcrt.locking(fd, _msvcrt.LK_NBLCK, 1)
+        except OSError as exc:
+            if exc.errno in {11, 13, 36}:
+                raise BlockingIOError("retention lock is busy") from exc
+            raise
 
 
 def _unlock_retention_stream(stream: object) -> None:
