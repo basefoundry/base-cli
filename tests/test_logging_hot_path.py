@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from unittest.mock import patch
+
+import base_cli
+import base_cli.logging as module
+from base_cli.testing import invoke
+
+
+def test_sidecar_is_opened_once_and_closed(tmp_path: Path) -> None:
+    handler = module.SecureLogFileHandler(tmp_path / "run.log")
+    record = logging.LogRecord("test", logging.INFO, __file__, 1, "message", (), None)
+    with patch.object(module, "_open_log_lock", wraps=module._open_log_lock) as opened:
+        handler.emit(record)
+        handler.emit(record)
+        assert opened.call_count == 1
+    stream = handler._lock_stream
+    handler.close()
+    assert stream.closed
+
+
+def test_logging_lock_failures_do_not_fail_command(tmp_path: Path) -> None:
+    app = base_cli.App(name="logging-io-failure")
+
+    @app.command()
+    def main(ctx: base_cli.Context) -> None:
+        for failure in (PermissionError("unwritable log directory"), OSError("volume full")):
+            with patch.object(module, "_lock_log_stream", side_effect=failure):
+                ctx.log.info("still completes")
+        ctx.log.info("recovers")
+
+    result = invoke(app, [], home=tmp_path)
+    assert result.exit_code == 0
+    assert "Logging error" in result.stderr
+
+
+def test_formatter_repeated_paths_do_not_resolve_again(tmp_path: Path) -> None:
+    app = base_cli.App(name="cached-log-source")
+
+    @app.command()
+    def main(ctx: base_cli.Context) -> None:
+        ctx.log.info("warm cache")
+        with patch.object(Path, "resolve", side_effect=AssertionError("unexpected resolution")):
+            ctx.log.info("cached source")
+
+    assert invoke(app, [], home=tmp_path).exit_code == 0
+
+
+def test_timestamp_cache_preserves_seconds_and_timezone_format() -> None:
+    for use_utc in (False, True):
+        formatter = module.CliFormatter(use_utc=use_utc)
+        reference = logging.Formatter(datefmt=formatter.datefmt)
+        reference.converter = formatter.converter
+        record = logging.LogRecord("test", logging.INFO, __file__, 1, "message", (), None)
+        for created in (1000.1, 1000.9, 1001.0, 1002.3):
+            record.created = created
+            assert formatter.formatTime(record, formatter.datefmt) == reference.formatTime(record, formatter.datefmt)
+
+
+def test_opening_lock_does_not_write_an_unlocked_sentinel(tmp_path: Path) -> None:
+    path = tmp_path / "append.lock"
+    with module._open_log_lock(path) as stream:
+        module._lock_log_stream(stream)
+        try:
+            assert path.stat().st_size == 0
+        finally:
+            module._unlock_log_stream(stream)
