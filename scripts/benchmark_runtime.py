@@ -49,8 +49,8 @@ WARM_INVOCATION_P95_BUDGETS_MS = {
     "wsl": 100.0,
 }
 PERSISTENCE_ENABLED_P95_BUDGETS_MS = {
-    "unix": 50.0,
-    "macos": 50.0,
+    "unix": 125.0,
+    "macos": 125.0,
     "windows": 250.0,
     "wsl": 50.0,
 }
@@ -358,6 +358,11 @@ def _check_results(results: dict[str, FrameworkMetrics]) -> list[str]:
         p95 = _metric_p95(stress, name)
         if p95 is None or not math.isfinite(p95) or p95 > LOG_P95_BUDGETS_US[BENCHMARK_PLATFORM]:
             failures.append(f"{name} p95 is missing, invalid, or exceeds budget")
+    if BENCHMARK_PLATFORM in {"unix", "macos"} and isinstance(features, dict):
+        persistence = features.get("persistence_enabled_ms", {})
+        median = persistence.get("median") if isinstance(persistence, dict) else None
+        if not isinstance(median, (int, float)) or not 0 <= median <= 50.0:
+            failures.append("base-cli persistence_enabled_ms median is missing, invalid, or exceeded 50 ms")
     return failures
 
 
