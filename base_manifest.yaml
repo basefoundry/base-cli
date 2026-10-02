@@ -10,3 +10,8 @@ python:
 
 test:
   command: ./tests/full_validate.sh
+  uv_extras:
+    - dev
+    - typer
+    - quality
+    - benchmark

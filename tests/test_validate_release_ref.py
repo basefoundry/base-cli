@@ -52,6 +52,10 @@ class ReleaseReferenceValidationTests(unittest.TestCase):
         errors = self.validate("1.2.3\n", changelog, "v1.2.3")
         self.assertTrue(any("missing a dated release section" in error for error in errors))
 
+    def test_rejects_non_version_tag(self) -> None:
+        errors = self.validate("1.2.3\n", VALID_CHANGELOG, "1.2.3")
+        self.assertEqual(errors, ["release tag must be a v-prefixed version, got '1.2.3'"])
+
 
 if __name__ == "__main__":
     unittest.main()

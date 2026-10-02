@@ -82,6 +82,10 @@ credential-bearing URLs are redacted recursively. The heuristic covers
 forms such as `accessToken` and `clientSecret`. A generic `key` name, including
 `key-file` and `public-key`, is not treated as secret by itself; explicit
 `sensitive=True` remains the authoritative control for domain-specific names.
+Traversal is bounded to 100 container levels; cyclic or more deeply nested
+values are replaced with `[TRUNCATED]`, distinct from the `[REDACTED]` marker
+used for secrets, so public helpers cannot recurse indefinitely while preparing
+a contract.
 
 Golden payloads for each public contract live in
 [`tests/fixtures/contracts`](https://github.com/basefoundry/base-cli/tree/main/tests/fixtures/contracts).
