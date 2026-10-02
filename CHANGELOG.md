@@ -24,6 +24,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Enforce native Windows run-bundle retention with pinned directory handles; unsupported platforms fail closed once per pass (#378).
 - Preserve consumer-owned logging handlers, explicit levels, and parent routing across CLI invocations (#387).
 - Validate nested configuration mappings before merge/provenance traversal,
   reject recursive or excessively deep values with source-aware errors, and

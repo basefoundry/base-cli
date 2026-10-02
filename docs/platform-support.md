@@ -79,3 +79,14 @@ contract, which covers an in-use destination reported as `winerror` 5; other
 access-denied and permanent permission/path errors fail immediately. Transient
 retries are bounded by a one-second elapsed deadline; the destination remains
 untouched if that deadline is exhausted.
+
+### Run-bundle retention
+
+POSIX retention uses descriptor-relative no-follow directory operations. Native
+Windows uses directory handles that deny rename/delete and conflicting writes,
+pins every ancestor while descending, and refuses reparse points (including
+junctions), volume crossings, and changed directory identities. Active leases
+and metadata preservation checks still apply before removal. Sharing violations
+leave the bundle for a later pass. Other platforms without safe primitives skip
+retention with one actionable warning per pass; they never use pathname recursion.
+The native runtime matrix verifies that repeated invocations enforce `max_bundles`.
