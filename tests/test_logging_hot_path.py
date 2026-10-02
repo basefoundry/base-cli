@@ -46,3 +46,14 @@ def test_formatter_repeated_paths_do_not_resolve_again(tmp_path: Path) -> None:
             ctx.log.info("cached source")
 
     assert invoke(app, [], home=tmp_path).exit_code == 0
+
+
+def test_timestamp_cache_preserves_seconds_and_timezone_format() -> None:
+    for use_utc in (False, True):
+        formatter = module.CliFormatter(use_utc=use_utc)
+        reference = logging.Formatter(datefmt=formatter.datefmt)
+        reference.converter = formatter.converter
+        record = logging.LogRecord("test", logging.INFO, __file__, 1, "message", (), None)
+        for created in (1000.1, 1000.9, 1001.0, 1002.3):
+            record.created = created
+            assert formatter.formatTime(record, formatter.datefmt) == reference.formatTime(record, formatter.datefmt)
