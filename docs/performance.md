@@ -86,7 +86,7 @@ and [macOS validation-only run](https://github.com/basefoundry/base-cli/actions/
 A sustained slowdown over 50 ms still fails; p95 over 125 ms also fails.
 Windows, WSL, parser, import, and non-persistence limits are unchanged.
 
-Each report is versioned as `base-cli.benchmark` schema version 1 and contains
+Each report is versioned as `base-cli.benchmark` schema version 2 and contains
 the package version, source revision, UTC timestamp, platform profile, Python
 version/ABI, OS release, architecture, CPU count, sample count, medians, p95,
 maximum, median absolute deviation, and parser/lifecycle comparison values.
@@ -151,3 +151,48 @@ default policy uses the byte-policy recursive-walk bounds described above. A
 consumer that needs only count/age retention can explicitly omit the byte cap.
 The concurrent benchmark in #391 measures twelve processes against one warmed
 cache and gates the p95-to-serial ratio.
+
+### Benchmark report v2: contention and logging
+
+`base-cli.benchmark` schema version 2 adds `results.base-cli.stress` and
+`stress_budgets` with explicit units. Twelve synchronized subprocesses share a
+cache warmed past the default 20-bundle cap. Three batches report 36 invocation
+samples, serial/concurrent p95 milliseconds, and their p95 ratio; process import
+and the start barrier are outside the invocation timer. Logging measures 3,000
+INFO records per sample through a real lifecycle, both with and without persistent
+files, reporting microseconds/record and records/second.
+
+| Profile | Concurrent / serial p95 cap | Log p95 microseconds/record cap |
+| --- | ---: | ---: |
+| unix | 6 | 40 |
+| macos | 6 | 60 |
+| windows | 10 | 150 |
+| wsl | 10 | 100 |
+
+These initial hosted caps allow scheduling/filesystem variation while detecting
+material regressions. `--check` rejects missing, nonfinite, and over-budget stress
+metrics. Reports retain the same CI artifact name and 90-day retention with the
+v2 schema marker; consumers must branch on that marker. Local and first hosted
+measurements are retained with this PR before further tightening of the caps.
+
+Development-host calibration (macOS, Python 3.14.6, 31 serial/log samples and
+36 concurrent samples): concurrent/serial p95 ratio 2.42; ephemeral logging p95
+6.20 microseconds/record; persistent logging p95 14.15 microseconds/record.
+These are local measurements; hosted per-profile results are retained separately.
+
+The [first hosted stress run](https://github.com/basefoundry/base-cli/actions/runs/37054920383)
+recorded the following 31-sample logging and 36-sample concurrency results:
+
+| Profile | Concurrent / serial p95 | Ephemeral log p95 (us/record) | Persistent log p95 (us/record) |
+| --- | ---: | ---: | ---: |
+| macos (3-core arm64, Python 3.13) | 4.49 | 16.01 | 46.42 |
+| windows | 2.99 | 20.14 | 49.03 |
+| wsl | 4.25 | 11.44 | 22.90 |
+
+The initial macOS 40 us/record p95 estimate rejected a run whose persistent median
+was 25.82 us/record. Its hosted cap is therefore calibrated to 60 us/record; the
+other logging and concurrency caps are unchanged. This remains below the original
+107 us/record development-host regression, while retaining room for hosted tails.
+The corresponding `base-cli-benchmark-{profile}-37054920383` artifacts contain
+machine metadata and all measured summaries. Unix calibration remains subject to
+its hosted check before merge.
