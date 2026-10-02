@@ -23,6 +23,6 @@ The published 0.4.3 tag and distributions remain immutable.
 - Click 8.5 is supported within the declared Click window. Typer consumers must
   use the documented compatible Click/Typer pairs.
 
-Review the dated [changelog](../CHANGELOG.md) and the [platform boundary](platform-support.md)
+Review the dated [changelog](https://github.com/basefoundry/base-cli/blob/main/CHANGELOG.md) and the [platform boundary](platform-support.md)
 when upgrading. Test the installed wheel in a clean environment, including your
 JSON consumers, config permissions, and host logging integration.
