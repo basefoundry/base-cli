@@ -204,3 +204,11 @@ rerun the workflow before creating a tag. If TestPyPI succeeds but a production
 publish fails, inspect the workflow logs and rerun the same approved tag only
 after confirming that neither artifact nor metadata needs correction. A version
 that was published successfully must be incremented for the next release.
+
+## 0.5.0 preparation
+
+Use the [0.5.0 checklist](release-0.5.0-checklist.md) and
+[0.4.x migration notes](migration-0.5.md). The changelog validator permits the
+newest section matching `VERSION` to precede its tag while preparing a release
+PR; all earlier published sections remain checked against their tags. Once the
+current tag exists, its section is immutable too.
