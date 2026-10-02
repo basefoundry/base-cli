@@ -1366,9 +1366,9 @@ base_cli.register_record_schema(...)
 
 ### `redact_json_value`
 **Kind:** function  
-**Signature:** `redact_json_value(value: 'Any', *, _key: 'str | None' = None) -> 'Any'`
+**Signature:** `redact_json_value(value: 'Any', *, _key: 'str | None' = None, _depth: 'int' = 0, _seen: 'set[int] | None' = None) -> 'Any'`
 
-**Behavior:** Recursively redact secret-looking JSON keys and text values.
+**Behavior:** Recursively redact JSON values with bounded depth and cycle handling.
 
 **Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
 

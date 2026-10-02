@@ -6,6 +6,14 @@ import hashlib
 from pathlib import Path
 
 
+def validate_tag_prefix(tag: str) -> str | None:
+    """Return a validation error when *tag* is not a version tag."""
+
+    if not tag.startswith("v") or tag == "v":
+        return f"release tag must be a v-prefixed version, got {tag!r}"
+    return None
+
+
 def sha256_file(path: Path) -> str:
     """Return the SHA-256 digest of *path* in lowercase hexadecimal form."""
 
