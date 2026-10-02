@@ -147,3 +147,17 @@ Each line is a JSON object with `schema_version`, `schema`, `timestamp` (UTC),
 bounds default-log retention to the most recent 20 run bundles (or the
 explicit `RetentionPolicy` setting). The legacy `max_log_files` option remains
 available for compatibility. JSON logs never use terminal color codes.
+
+### Child processes and native stdout
+
+JSON mode captures Python stdout, `os.write(1, ...)`, `sys.__stdout__`, and
+subprocesses inheriting descriptor 1. The descriptor is restored before emitting
+the single envelope. Use `subprocess.run([...], check=True)` or explicitly wait
+for each `Popen` child before returning. A child retaining stdout after return
+produces a capture error after a bounded wait. Native libraries must flush their
+own stdio buffers before returning; writes after the invocation boundary cannot
+be captured. Invalid UTF-8 bytes are represented with Unicode replacement characters.
+
+The 8 MiB JSON capture limit applies to native/child output as well. Exceeding it
+produces an error envelope rather than a success with silently truncated output.
+NDJSON and human output keep their streaming behavior.
