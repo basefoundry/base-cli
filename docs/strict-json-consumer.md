@@ -77,3 +77,17 @@ The schemas and fixtures are the source of truth. Do not add a new parser or
 redefine the wire contract in an adopter guide; link the exact contract version
 and record the `base-cli` release used for validation. Never place secrets or
 private paths in fixtures or public failure reports.
+
+### Child processes and native stdout
+
+JSON mode captures Python stdout, `os.write(1, ...)`, `sys.__stdout__`, and
+subprocesses inheriting descriptor 1. The descriptor is restored before emitting
+the single envelope. Use `subprocess.run([...], check=True)` or explicitly wait
+for each `Popen` child before returning. A child retaining stdout after return
+produces a capture error after a bounded wait. Native libraries must flush their
+own stdio buffers before returning; writes after the invocation boundary cannot
+be captured. Invalid UTF-8 bytes are represented with Unicode replacement characters.
+
+The 8 MiB JSON capture limit applies to native/child output as well. Exceeding it
+produces an error envelope rather than a success with silently truncated output.
+NDJSON and human output keep their streaming behavior.
