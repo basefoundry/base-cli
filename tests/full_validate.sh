@@ -43,12 +43,14 @@ run_typing() {
   require_commands python mypy
   python -m mypy --strict examples/typed_consumer.py
   python -m mypy --strict lib/python/base_cli
+  # Discover all Python sources so new top-level directories cannot escape checks.
+  python scripts/validate_consumer_typing.py
 }
 
 run_style() {
   require_commands ruff
-  ruff format --check lib/python/base_cli scripts examples tests
-  ruff check lib/python/base_cli scripts examples tests
+  ruff format --check .
+  ruff check .
 }
 
 run_contracts() {

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import base_cli
 import click
 
@@ -35,7 +37,7 @@ app = base_cli.App(
 )
 @base_cli.option("--api-token", hidden=True, help="Optional secret for a real adapter.")
 def run(
-    ctx: base_cli.Context,
+    ctx: base_cli.Context[Any, Any, Any],
     target: str,
     output_format: str,
     api_token: str | None,
