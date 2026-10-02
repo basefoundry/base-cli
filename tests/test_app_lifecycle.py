@@ -15,6 +15,8 @@ from base_cli.testing import invoke
 
 
 class _BrokenHandler(logging.Handler):
+    _base_cli_owned = True
+
     def emit(self, record: logging.LogRecord) -> None:
         del record
 
@@ -205,6 +207,8 @@ class AppLifecycleTests(unittest.TestCase):
             logger = logging.Logger("isolated-handler-removal")
             logger.addHandler(logging.NullHandler())
             logger.addHandler(logging.NullHandler())
+            for handler in logger.handlers:
+                handler._base_cli_owned = True
             logger.removeHandler = mock.Mock(side_effect=KeyboardInterrupt())
             context = base_cli.Context(
                 cli_name="handler-removal-interrupt",
