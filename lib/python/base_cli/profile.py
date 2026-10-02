@@ -10,6 +10,7 @@ from .config import (
     BatteriesIncludedConfigLoader,
     ConfigSnapshot,
     load_yaml_file,
+    validate_discovered_config_path,
 )
 from .context import Context
 from .history import display_command as _generic_history_display_command
@@ -203,6 +204,9 @@ class CliProfile:
         environment_dir_name: str = "environments",
         discover_project: ProjectDiscovery | None = None,
         resolve_runtime: RuntimeResolver | None = None,
+        trust_discovered_config: bool = True,
+        max_project_ancestor_depth: int = 32,
+        project_boundary_marker: str | None = ".git",
     ) -> CliProfile:
         """Create an opt-in profile with conventional layered YAML config.
 
@@ -211,6 +215,18 @@ class CliProfile:
         The generic profile remains convention-free; this method is the explicit
         adoption point for applications that want these conventions.
         """
+        if (
+            not isinstance(max_project_ancestor_depth, int)
+            or isinstance(max_project_ancestor_depth, bool)
+            or max_project_ancestor_depth < 0
+        ):
+            raise ValueError("max_project_ancestor_depth must be a nonnegative integer")
+        if project_boundary_marker is not None and (
+            not project_boundary_marker
+            or Path(project_boundary_marker).name != project_boundary_marker
+            or project_boundary_marker in {".", ".."}
+        ):
+            raise ValueError("project_boundary_marker must be a simple filename")
         normalized_name = normalize_cli_name(cli_name)
         if not normalized_name:
             raise ValueError("cli_name must contain a non-empty command name")
@@ -221,8 +237,14 @@ class CliProfile:
             user_config_name=user_config_name,
             project_config_name=project_config_name,
             environment_dir_name=environment_dir_name,
+            trust_project_config=trust_discovered_config,
         )
-        project_discovery = discover_project or _conventional_project_discovery(project_config_name)
+        project_discovery = discover_project or _conventional_project_discovery(
+            project_config_name,
+            trust=trust_discovered_config,
+            max_depth=max_project_ancestor_depth,
+            boundary_marker=project_boundary_marker,
+        )
 
         def load_user_config() -> object | None:
             values = load_yaml_file(loader.user_config_path)
@@ -261,17 +283,26 @@ def _discover_no_project(_cwd: Path) -> ProjectInfo | None:
     return None
 
 
-def _conventional_project_discovery(config_name: str) -> ProjectDiscovery:
+def _conventional_project_discovery(
+    config_name: str, *, trust: bool = True, max_depth: int = 32, boundary_marker: str | None = ".git"
+) -> ProjectDiscovery:
     def discover(cwd: Path) -> ProjectInfo | None:
         current = cwd.expanduser().resolve()
-        for directory in (current, *current.parents):
+        device = current.stat().st_dev
+        visited: list[Path] = []
+        for depth, directory in enumerate((current, *current.parents)):
+            if depth > max_depth or directory.stat().st_dev != device:
+                break
+            visited.append(directory)
             candidate = directory / config_name
             if candidate.is_file():
-                return ProjectInfo(
-                    root=directory,
-                    manifest=candidate,
-                    name=directory.name,
-                )
+                if trust:
+                    for component in visited:
+                        validate_discovered_config_path(component)
+                    validate_discovered_config_path(candidate)
+                return ProjectInfo(root=directory, manifest=candidate, name=directory.name)
+            if boundary_marker is not None and (directory / boundary_marker).exists():
+                break
         return None
 
     return discover
