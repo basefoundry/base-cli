@@ -63,7 +63,7 @@ scheduler outlier block a change.
 | Cold no-op invocation, including startup and dispatch | 2,000 ms | 2,000 ms | 4,000 ms | 4,000 ms |
 | Base-cli lifecycle increment over Click warm dispatch | 5 ms | 5 ms | 15 ms | 15 ms |
 | Warm invocation and non-persistence feature scenarios | 50 ms | 50 ms | 100 ms | 100 ms |
-| File-persistence-enabled scenario | 50 ms | 50 ms | 250 ms | 50 ms |
+| File-persistence-enabled scenario | 125 ms | 125 ms | 250 ms | 50 ms |
 
 An initial 31-sample local calibration on macOS (Python 3.14.6, Apple Silicon)
 measured approximately 101 ms for base-cli cold import, 0.56 ms for warm
@@ -75,6 +75,16 @@ a high median absolute deviation (26 ms), so persistence has its own Windows
 budget instead of weakening other warm-scenario gates. These measurements are
 CI calibration evidence, not adoption claims or release comparisons; review
 subsequent retained artifacts before tightening platform budgets.
+
+October 2026 hosted recalibration separates sustained persistence cost from
+filesystem tails on Unix/macOS: median must remain at most **50 ms** and p95
+at most **125 ms**. The previous 50 ms p95 cap repeatedly rejected otherwise
+unchanged runtime code, including the validation-only PR. Observed pairs were
+14.66/118.04 ms (Unix median/p95) and 24.93/61.93 and 26.12/87.37 ms (macOS).
+Evidence: [Unix run](https://github.com/basefoundry/base-cli/actions/runs/37048785893)
+and [macOS validation-only run](https://github.com/basefoundry/base-cli/actions/runs/37052368353).
+A sustained slowdown over 50 ms still fails; p95 over 125 ms also fails.
+Windows, WSL, parser, import, and non-persistence limits are unchanged.
 
 Each report is versioned as `base-cli.benchmark` schema version 2 and contains
 the package version, source revision, UTC timestamp, platform profile, Python
