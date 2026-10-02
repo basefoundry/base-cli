@@ -57,3 +57,13 @@ def test_timestamp_cache_preserves_seconds_and_timezone_format() -> None:
         for created in (1000.1, 1000.9, 1001.0, 1002.3):
             record.created = created
             assert formatter.formatTime(record, formatter.datefmt) == reference.formatTime(record, formatter.datefmt)
+
+
+def test_opening_lock_does_not_write_an_unlocked_sentinel(tmp_path: Path) -> None:
+    path = tmp_path / "append.lock"
+    with module._open_log_lock(path) as stream:
+        module._lock_log_stream(stream)
+        try:
+            assert path.stat().st_size == 0
+        finally:
+            module._unlock_log_stream(stream)
