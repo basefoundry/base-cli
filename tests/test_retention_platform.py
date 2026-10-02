@@ -4,9 +4,8 @@ import os
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import pytest
-
 import base_cli
+import pytest
 from base_cli import _runtime as runtime
 from base_cli.testing import invoke
 

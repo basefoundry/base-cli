@@ -27,7 +27,7 @@ def _pin_directory(path: Path, volume: int | None = None) -> Iterator[os.stat_re
     # https://learn.microsoft.com/windows/win32/api/fileapi/nf-fileapi-createfilew
     from ctypes import wintypes
 
-    kernel = getattr(ctypes, "WinDLL")("kernel32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
     create = kernel.CreateFileW
     create.argtypes = [
         wintypes.LPCWSTR,
@@ -45,7 +45,7 @@ def _pin_directory(path: Path, volume: int | None = None) -> Iterator[os.stat_re
     before = _check_directory(path, volume)
     handle = create(str(path), 0x80, 0x1, None, 3, 0x02200000, None)
     if handle == ctypes.c_void_p(-1).value:
-        raise OSError(getattr(ctypes, "get_last_error")(), f"cannot pin retention directory '{path}'")
+        raise OSError(ctypes.get_last_error(), f"cannot pin retention directory '{path}'")  # type: ignore[attr-defined]
     try:
         current = _check_directory(path, volume)
         if (before.st_dev, before.st_ino) != (current.st_dev, current.st_ino):
