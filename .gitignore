@@ -6,4 +6,7 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+# pytest-cov writes the primary database and per-process databases here.
+.coverage
+.coverage.*
 coverage.json
