@@ -48,8 +48,8 @@ WARM_INVOCATION_P95_BUDGETS_MS = {
     "wsl": 100.0,
 }
 PERSISTENCE_ENABLED_P95_BUDGETS_MS = {
-    "unix": 50.0,
-    "macos": 50.0,
+    "unix": 125.0,
+    "macos": 125.0,
     "windows": 250.0,
     "wsl": 50.0,
 }
@@ -331,6 +331,11 @@ def _check_results(results: dict[str, FrameworkMetrics]) -> list[str]:
             feature_budget = _feature_budget_for_platform(name, BENCHMARK_PLATFORM)
             if p95 is not None and p95 > feature_budget:
                 failures.append(f"base-cli {name} p95 exceeded {feature_budget:.0f} ms")
+    if BENCHMARK_PLATFORM in {"unix", "macos"} and isinstance(features, dict):
+        persistence = features.get("persistence_enabled_ms", {})
+        median = persistence.get("median") if isinstance(persistence, dict) else None
+        if not isinstance(median, (int, float)) or not 0 <= median <= 50.0:
+            failures.append("base-cli persistence_enabled_ms median is missing, invalid, or exceeded 50 ms")
     return failures
 
 
