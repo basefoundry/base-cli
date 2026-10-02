@@ -7,6 +7,7 @@ import argparse
 import datetime as dt
 import importlib.util
 import json
+import math
 import os
 import platform
 import statistics
@@ -56,7 +57,9 @@ PERSISTENCE_ENABLED_P95_BUDGETS_MS = {
 DEFAULT_ITERATIONS = 31
 FRAMEWORKS = ("base-cli", "click", "typer", "cyclopts")
 RESULT_SCHEMA = "base-cli.benchmark"
-RESULT_SCHEMA_VERSION = 1
+RESULT_SCHEMA_VERSION = 2
+CONCURRENCY_RATIO_BUDGETS = {"unix": 6.0, "macos": 6.0, "windows": 10.0, "wsl": 10.0}
+LOG_P95_BUDGETS_US = {"unix": 40.0, "macos": 40.0, "windows": 150.0, "wsl": 100.0}
 
 
 class Summary(TypedDict):
@@ -128,6 +131,7 @@ def main() -> int:
             _measure_production_invocations(args.iterations)
         )
         results["base-cli"]["features"] = cast(Any, _measure_base_cli_features(args.iterations))
+        results["base-cli"]["stress"] = _measure_stress(args.iterations)
 
     report = {
         "schema": RESULT_SCHEMA,
@@ -142,10 +146,21 @@ def main() -> int:
         "results": results,
         "comparisons": _comparisons(results),
         "budgets_ms": _budgets_for_platform(BENCHMARK_PLATFORM),
+        "stress_budgets": {
+            "concurrent_to_serial_p95_ratio": CONCURRENCY_RATIO_BUDGETS[BENCHMARK_PLATFORM],
+            "log_p95_us_per_record": LOG_P95_BUDGETS_US[BENCHMARK_PLATFORM],
+        },
     }
 
     failures = _check_results(results) if args.check else []
     _write_github_summary(report)
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+            summary.write(
+                "\n### Concurrent retention and logging\n\n```json\n"
+                + json.dumps(results["base-cli"].get("stress", {}), indent=2)
+                + "\n```\n"
+            )
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
@@ -331,6 +346,18 @@ def _check_results(results: dict[str, FrameworkMetrics]) -> list[str]:
             feature_budget = _feature_budget_for_platform(name, BENCHMARK_PLATFORM)
             if p95 is not None and p95 > feature_budget:
                 failures.append(f"base-cli {name} p95 exceeded {feature_budget:.0f} ms")
+    stress = base.get("stress", {})
+    ratio = stress.get("concurrent_to_serial_p95_ratio")
+    if (
+        not isinstance(ratio, (int, float))
+        or not math.isfinite(ratio)
+        or ratio > CONCURRENCY_RATIO_BUDGETS[BENCHMARK_PLATFORM]
+    ):
+        failures.append("concurrent-to-serial p95 ratio is missing, invalid, or exceeds budget")
+    for name in ("logging_persistent_us_per_record", "logging_ephemeral_us_per_record"):
+        p95 = _metric_p95(stress, name)
+        if p95 is None or not math.isfinite(p95) or p95 > LOG_P95_BUDGETS_US[BENCHMARK_PLATFORM]:
+            failures.append(f"{name} p95 is missing, invalid, or exceeds budget")
     return failures
 
 
@@ -695,6 +722,108 @@ def _measure_base_cli_features(iterations: int) -> dict[str, Summary]:
                 samples.append(elapsed)
         results[metric_name] = _summary(samples)
     return results
+
+
+def _measure_stress(iterations: int) -> dict[str, Any]:
+    from contextlib import redirect_stderr
+
+    import base_cli
+    from base_cli.testing import invoke
+
+    worker_code = r"""
+import os, sys, time
+from pathlib import Path
+import base_cli
+app = base_cli.App(name="benchmark-shared-retention")
+@app.command()
+def main(ctx):
+    pass
+_ = app.click_command
+if sys.argv[1] == "warm":
+    for _ in range(22):
+        assert base_cli.run_app(app, []) == 0
+    raise SystemExit(0)
+if sys.argv[1] == "parallel":
+    print("ready", flush=True)
+    deadline = time.monotonic() + 30
+    while not Path(sys.argv[2]).exists():
+        if time.monotonic() > deadline:
+            raise RuntimeError("benchmark start barrier timed out")
+        time.sleep(0.001)
+started = time.perf_counter_ns()
+status = base_cli.run_app(app, [])
+assert status == 0
+print((time.perf_counter_ns() - started) / 1_000_000, flush=True)
+"""
+    workers = 12
+    with tempfile.TemporaryDirectory(prefix="base-cli-stress-") as temporary:
+        root = Path(temporary)
+        env = {**os.environ, "BASE_CLI_CACHE_DIR": str(root / "cache")}
+        command = [sys.executable, "-c", worker_code]
+        subprocess.run([*command, "warm"], env=env, check=True, capture_output=True, timeout=60)
+        serial = []
+        for _ in range(iterations):
+            result = subprocess.run(
+                [*command, "serial"], env=env, check=True, capture_output=True, text=True, timeout=30
+            )
+            serial.append(float(result.stdout.strip()))
+        concurrent = []
+        for batch in range(3):
+            barrier = root / f"start-{batch}"
+            processes = [
+                subprocess.Popen(
+                    [*command, "parallel", str(barrier)],
+                    env=env,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for _ in range(workers)
+            ]
+            try:
+                for process in processes:
+                    assert process.stdout is not None
+                    if process.stdout.readline().strip() != "ready":
+                        raise RuntimeError("concurrent benchmark worker failed before barrier")
+                barrier.touch()
+                for process in processes:
+                    stdout, stderr = process.communicate(timeout=30)
+                    if process.returncode:
+                        raise RuntimeError(f"concurrent benchmark failed: {stderr}")
+                    concurrent.append(float(stdout.strip()))
+            finally:
+                for process in processes:
+                    if process.poll() is None:
+                        process.kill()
+                    process.communicate()
+        result_metrics: dict[str, Any] = {
+            "workers": workers,
+            "concurrent_samples": len(concurrent),
+            "serial_ms": _summary(serial),
+            "concurrent_ms": _summary(concurrent),
+            "concurrent_to_serial_p95_ratio": _summary(concurrent)["p95"] / _summary(serial)["p95"],
+            "logging_records_per_sample": 3000,
+        }
+        for persistent, label in ((False, "ephemeral"), (True, "persistent")):
+            samples = []
+            app = base_cli.App(name=f"benchmark-log-{label}", log_to_file=persistent)
+
+            @app.command()
+            def log_records(ctx: Any, _samples: list[float] = samples) -> None:
+                ctx.log.info("warm source cache")
+                started = time.perf_counter_ns()
+                for index in range(3000):
+                    ctx.log.info("record %s", index)
+                _samples.append((time.perf_counter_ns() - started) / 3000 / 1000)
+
+            with open(os.devnull, "w", encoding="utf-8") as quiet, redirect_stderr(quiet):
+                for _ in range(iterations):
+                    result = invoke(app, [], home=root / label)
+                    if result.exit_code:
+                        raise RuntimeError(f"logging benchmark failed: {result.output}")
+            result_metrics[f"logging_{label}_us_per_record"] = _summary(samples)
+            result_metrics[f"logging_{label}_records_per_second"] = _summary([1_000_000 / sample for sample in samples])
+        return result_metrics
 
 
 def _measure_runner(iterations: int, callback: Callable[[], Any]) -> list[float]:

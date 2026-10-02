@@ -147,6 +147,26 @@ class BenchmarkSummaryTests(unittest.TestCase):
         self.assertIn("base-cli lifecycle increment over Click warm p95", summary)
         self.assertIn("Base CLI feature scenarios", summary)
 
+    def test_stress_regressions_fail_every_platform_profile(self) -> None:
+        for profile in ("unix", "macos", "windows", "wsl"):
+            for metric in (
+                "concurrent_to_serial_p95_ratio",
+                "logging_persistent_us_per_record",
+                "logging_ephemeral_us_per_record",
+            ):
+                with self.subTest(profile=profile, metric=metric):
+                    metrics = self._complete_results()
+                    stress = metrics["base-cli"]["stress"]
+                    stress[metric] = 1000.0 if metric.endswith("ratio") else self._summary(1000.0)
+                    with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", profile):
+                        failures = benchmark_runtime._check_results(metrics)
+                    self.assertTrue(any("exceeds budget" in failure for failure in failures))
+
+    def test_stress_missing_and_nonfinite_samples_fail(self) -> None:
+        metrics = self._complete_results()
+        metrics["base-cli"]["stress"] = {"concurrent_to_serial_p95_ratio": float("nan")}
+        self.assertEqual(sum("missing, invalid" in failure for failure in benchmark_runtime._check_results(metrics)), 3)
+
     @staticmethod
     def _summary(p95: float) -> dict[str, float]:
         return {
@@ -175,6 +195,11 @@ class BenchmarkSummaryTests(unittest.TestCase):
             {
                 "lifecycle_warm_invocation_ms": cls._summary(lifecycle_p95),
                 "production_warm_invocation_ms": cls._summary(4.0),
+                "stress": {
+                    "concurrent_to_serial_p95_ratio": 2.0,
+                    "logging_persistent_us_per_record": cls._summary(10.0),
+                    "logging_ephemeral_us_per_record": cls._summary(5.0),
+                },
                 "features": {
                     "lifecycle_noop_ms": cls._summary(1.0),
                     "json_success_ms": cls._summary(1.0),
