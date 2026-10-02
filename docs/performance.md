@@ -119,3 +119,11 @@ extension discovery caches, and run-bundle retention. Ctrl+C is tested through
 both the lifecycle boundary and a real POSIX subprocess signal. Windows keeps
 the portable lifecycle and persistence checks while skipping only assertions
 that require POSIX signal or descriptor semantics.
+
+### Logging hot path
+
+Secure log handlers keep their private sidecar descriptor open until cleanup,
+with an advisory lock around each append and a fresh descriptor after fork.
+Human formatters cache up to 256 source paths for the current invocation and
+project binding. Repeated paths require no filesystem resolution. Sidecar I/O
+errors are routed through `logging.Handler.handleError` and do not fail commands.

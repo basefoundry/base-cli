@@ -166,6 +166,8 @@ def secure_log_file_permissions(log_file: Path) -> None:
 class SecureLogFileHandler(logging.FileHandler):
     def __init__(self, filename: str | os.PathLike[str], *args: object, **kwargs: object) -> None:
         self._lock_path = Path(filename).with_name(f".{Path(filename).name}.lock")
+        self._lock_stream: BinaryIO | None = None
+        self._lock_pid = os.getpid()
         super().__init__(filename, *args, **kwargs)  # type: ignore[arg-type]
 
     def _open(self) -> TextIOWrapper:
@@ -183,13 +185,34 @@ class SecureLogFileHandler(logging.FileHandler):
             raise
 
     def emit(self, record: logging.LogRecord) -> None:
-        lock_stream = _open_log_lock(self._lock_path)
         try:
-            _lock_log_stream(lock_stream)
-            super().emit(record)
+            # An inherited flock descriptor would share ownership with the parent.
+            if self._lock_pid != os.getpid():
+                if self._lock_stream is not None:
+                    self._lock_stream.close()
+                self._lock_stream = None
+                self._lock_pid = os.getpid()
+            if self._lock_stream is None:
+                self._lock_stream = _open_log_lock(self._lock_path)
+            _lock_log_stream(self._lock_stream)
+            try:
+                super().emit(record)
+            finally:
+                _unlock_log_stream(self._lock_stream)
+        except Exception:
+            self.handleError(record)
+
+    def close(self) -> None:
+        self.acquire()
+        try:
+            stream, self._lock_stream = self._lock_stream, None
+            try:
+                if stream is not None:
+                    stream.close()
+            finally:
+                super().close()
         finally:
-            _unlock_log_stream(lock_stream)
-            lock_stream.close()
+            self.release()
 
 
 def _open_log_lock(path: Path) -> BinaryIO:
@@ -237,13 +260,16 @@ class CliFormatter(logging.Formatter):
     def __init__(self, *, use_utc: bool | None = None, use_color: bool = False) -> None:
         self.use_utc = use_utc if use_utc is not None else os.environ.get("LOG_UTC") == "1"
         self.use_color = use_color
+        self._source_key: tuple[object, ...] | None = None
+        self._source_roots: tuple[Path, ...] = ()
+        self._source_cache: dict[str, str] = {}
         datefmt = "%Y-%m-%d %H:%M:%S UTC" if self.use_utc else "%Y-%m-%d %H:%M:%S %z"
         super().__init__(datefmt=datefmt)
         self.converter = time.gmtime if self.use_utc else time.localtime
 
     def format(self, record: logging.LogRecord) -> str:
         timestamp = self.formatTime(record, self.datefmt)
-        source = _source_path(record)
+        source = self._source_path(record)
         level = _level_name(record)
         line = f"{timestamp} {level:<7} {source}:{record.lineno} {record.getMessage()}"
         if record.exc_info:
@@ -256,6 +282,35 @@ class CliFormatter(logging.Formatter):
             return line
         color = _LEVEL_COLORS.get(record.levelno)
         return f"{color}{line}{_COLOR_RESET}" if color else line
+
+    def _source_path(self, record: logging.LogRecord) -> str:
+        try:
+            context = get_current_context()
+        except RuntimeError:
+            key: tuple[object, ...] = (None, current_working_dir())
+            roots: tuple[Path, ...] = (current_working_dir(),)
+        else:
+            key = (context.run_id, context.application_home, context.project_root)
+            roots = tuple(p for p in (context.application_home, context.project_root) if p is not None)
+        if key != self._source_key:
+            self._source_roots = tuple(p.resolve() for p in (*roots, current_working_dir()))
+            self._source_key = key
+            self._source_cache.clear()
+        cached = self._source_cache.get(record.pathname)
+        if cached is not None:
+            return cached
+        path = Path(record.pathname).resolve()
+        source = str(path)
+        for root in self._source_roots:
+            try:
+                source = str(path.relative_to(root))
+                break
+            except ValueError:
+                continue
+        if len(self._source_cache) >= 256:
+            self._source_cache.clear()
+        self._source_cache[record.pathname] = source
+        return source
 
 
 def _level_name(record: logging.LogRecord) -> str:
