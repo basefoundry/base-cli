@@ -263,6 +263,8 @@ class CliFormatter(logging.Formatter):
         self._source_key: tuple[object, ...] | None = None
         self._source_roots: tuple[Path, ...] = ()
         self._source_cache: dict[str, str] = {}
+        self._time_key: tuple[object, ...] | None = None
+        self._time_text = ""
         datefmt = "%Y-%m-%d %H:%M:%S UTC" if self.use_utc else "%Y-%m-%d %H:%M:%S %z"
         super().__init__(datefmt=datefmt)
         self.converter = time.gmtime if self.use_utc else time.localtime
@@ -282,6 +284,17 @@ class CliFormatter(logging.Formatter):
             return line
         color = _LEVEL_COLORS.get(record.levelno)
         return f"{color}{line}{_COLOR_RESET}" if color else line
+
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        if datefmt is None:
+            return super().formatTime(record, datefmt)
+        # Human timestamps have second precision. Repeated calls to localtime
+        # and strftime otherwise re-read timezone state on some platforms.
+        key = (record.created // 1, datefmt, self.converter, os.environ.get("TZ"), time.tzname)
+        if key != self._time_key:
+            self._time_text = super().formatTime(record, datefmt)
+            self._time_key = key
+        return self._time_text
 
     def _source_path(self, record: logging.LogRecord) -> str:
         try:
