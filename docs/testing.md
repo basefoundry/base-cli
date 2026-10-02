@@ -7,6 +7,13 @@ documentation/schema/contract validation, benchmark budgets, and security.
 Bandit and pip-audit are required; a missing tool is an error rather than a
 skipped check.
 
+The repository is managed locally through uv, so `uv.lock` is checked into the
+repository. Validate that it still matches `pyproject.toml` with:
+
+```bash
+uv lock --check
+```
+
 Run it from a clean checkout after installing the development, quality, and
 benchmark extras (the latter installs every declared framework comparator):
 
