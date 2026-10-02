@@ -23,6 +23,7 @@ JSON_LOG_SCHEMA = "base-cli.log"
 JSON_OUTPUT_SCHEMA = "base-cli.output"
 JSON_ERROR_SCHEMA = "base-cli.error"
 MAX_JSON_LOG_MESSAGE_LENGTH = 8192
+MAX_JSON_REDACTION_DEPTH = 100
 
 _SENSITIVE_ASSIGNMENT_BOUNDARY = (
     r"(?=(?:[&,;]\s*(?=[A-Za-z][A-Za-z0-9_-]*\s*[=:])"
@@ -108,17 +109,46 @@ def dumps_strict_json(value: Any, **kwargs: Any) -> str:
     return json.dumps(value, **kwargs)
 
 
-def redact_json_value(value: Any, *, _key: str | None = None) -> Any:
-    """Recursively redact secret-looking JSON keys and text values."""
+def redact_json_value(
+    value: Any,
+    *,
+    _key: str | None = None,
+    _depth: int = 0,
+    _seen: set[int] | None = None,
+) -> Any:
+    """Recursively redact JSON values with bounded depth and cycle handling.
+
+    The private traversal arguments let recursive calls reject cycles and
+    pathological nesting before Python's recursion limit or an unbounded
+    serializer can be reached. The active-path set is mutated with
+    backtracking so shared, acyclic values are not mistaken for cycles and
+    recursive traversal does not copy the full ancestor set at every node.
+    """
 
     if _key is not None and _is_sensitive_key(_key):
         return REDACTED
-    if isinstance(value, Mapping):
-        return {str(key): redact_json_value(item, _key=str(key)) for key, item in value.items()}
-    if isinstance(value, list):
-        return [redact_json_value(item) for item in value]
-    if isinstance(value, tuple):
-        return [redact_json_value(item) for item in value]
+    if isinstance(value, (Mapping, list, tuple)):
+        if _depth >= MAX_JSON_REDACTION_DEPTH:
+            return "[TRUNCATED]"
+        seen = set() if _seen is None else _seen
+        identity = id(value)
+        if identity in seen:
+            return "[TRUNCATED]"
+        seen.add(identity)
+        try:
+            if isinstance(value, Mapping):
+                return {
+                    str(key): redact_json_value(
+                        item,
+                        _key=str(key),
+                        _depth=_depth + 1,
+                        _seen=seen,
+                    )
+                    for key, item in value.items()
+                }
+            return [redact_json_value(item, _depth=_depth + 1, _seen=seen) for item in value]
+        finally:
+            seen.remove(identity)
     if isinstance(value, str):
         return _safe_text(value)
     return value
