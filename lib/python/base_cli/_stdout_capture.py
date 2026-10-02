@@ -58,7 +58,7 @@ def capture_stdout(sink: TextIO, limit: int, limit_error: type[Exception]) -> It
         os.dup2(write_fd, 1)
         os.close(write_fd)
         write_fd = -1
-        writer = os.fdopen(os.dup(1), "w", encoding="utf-8", errors="strict", buffering=1)
+        writer = os.fdopen(os.dup(1), "w", encoding="utf-8", errors="strict", buffering=1, newline="")
         with redirect_stdout(writer):
             try:
                 yield
