@@ -12,6 +12,7 @@ required_files=(
   LICENSE
   mkdocs.yml
   base_manifest.yaml
+  uv.lock
   .github/workflows/issue-branch-policy.yml
   .github/workflows/project-intake.yml
   .github/workflows/tests.yml
