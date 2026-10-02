@@ -55,12 +55,15 @@ def configure_logger(
     json_logs: bool = False,
     run_id: str | None = None,
     log_level: str | None = None,
+    propagate: bool | None = None,
 ) -> logging.Logger:
     """Configure user-facing and persistent handlers for a CLI logger.
 
     ``log_level`` optionally selects the user-stream threshold from DEBUG,
     INFO, WARNING, ERROR, or CRITICAL. The persistent file handler remains at
     DEBUG. When omitted, the existing ``debug`` and ``quiet`` policy applies.
+    Consumer handlers and configured levels are preserved. ``propagate=None``
+    preserves consumer routing; unconfigured loggers default to no propagation.
     """
     normalized_log_level = log_level.lower() if log_level is not None else None
     if normalized_log_level is not None and normalized_log_level not in _CONFIGURED_LOG_LEVELS:
@@ -72,11 +75,28 @@ def configure_logger(
         else _CONFIGURED_LOG_LEVELS[normalized_log_level]
     )
     logger = logging.getLogger(f"base_cli.{cli_name}")
-    logger.setLevel(logging.DEBUG)
-    logger.propagate = False
+    foreign_handlers = any(not getattr(handler, "_base_cli_owned", False) for handler in logger.handlers)
+    parent = logger.parent
+    parent_configured = False
+    while parent is not None and parent is not logging.root:
+        parent_configured |= bool(parent.handlers) or parent.level != logging.NOTSET
+        parent = parent.parent
+    configured = (
+        foreign_handlers
+        or parent_configured
+        or (logger.level != logging.NOTSET and logger.level != getattr(logger, "_base_cli_level", None))
+    )
+    if not configured:
+        logger.setLevel(logging.DEBUG)
+        logger._base_cli_level = logging.DEBUG  # type: ignore[attr-defined]
+    if propagate is not None:
+        logger.propagate = propagate
+    elif not configured:
+        logger.propagate = False
     for handler in list(logger.handlers):
-        handler.close()
-        logger.removeHandler(handler)
+        if getattr(handler, "_base_cli_owned", False):
+            handler.close()
+            logger.removeHandler(handler)
 
     user_stream = stream if stream is not None else sys.stderr
     user_handler = logging.StreamHandler(user_stream)
@@ -89,6 +109,7 @@ def configure_logger(
             run_id=run_id,
         )
     )
+    user_handler._base_cli_owned = True  # type: ignore[attr-defined]
     logger.addHandler(user_handler)
 
     if log_file is not None:
@@ -102,6 +123,7 @@ def configure_logger(
                 run_id=run_id,
             )
         )
+        file_handler._base_cli_owned = True  # type: ignore[attr-defined]
         logger.addHandler(file_handler)
     return logger
 
