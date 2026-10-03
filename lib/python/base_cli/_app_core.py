@@ -1038,6 +1038,7 @@ class App:
             recorder: RunRecorder | None = None
             telemetry_session: TelemetrySession | None = None
             outcome = outcome_from_exit_code(ExitCode.SUCCESS)
+            exception: BaseException | None = None
             invocation_argv: list[str] = []
             redaction_plan = self._redaction_plan
             if redaction_plan is None:
@@ -1074,6 +1075,7 @@ class App:
                 outcome = outcome_from_exit_code(exit_code)
                 return result
             except BaseException as exc:
+                exception = exc
                 if context is not None:
                     outcome = outcome_from_exception(click, exc)
                     _record_lifecycle_diagnostic(context, outcome)
@@ -1111,6 +1113,7 @@ class App:
                             context,
                             outcome,
                             ended_monotonic_ns=ended_monotonic_ns,
+                            exception=exception,
                         )
                         _finish_run_recorder(
                             recorder,
