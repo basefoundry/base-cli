@@ -24,6 +24,10 @@ and versions are tracked in the repo-root `VERSION` file.
   spreadsheet consumers; pass `formula_guard=False` only for an audited raw
   value contract.
 
+- Add the namespaced `BASE_CLI_LOG_UTC` environment variable and deprecate
+  `LOG_UTC` with a migration warning; the legacy alias is scheduled for removal
+  no earlier than 0.7.
+
 ### Fixed
 
 - Validate nested configuration mappings before merge/provenance traversal,
