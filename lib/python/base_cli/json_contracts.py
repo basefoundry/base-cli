@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from logging import LogRecord
 from typing import Any
 
-from .redaction import REDACTED, redact_text_value
+from .redaction import REDACTED, SECRET_KEY_PATTERN, is_secret_key, redact_text_value
 
 JSON_CONTRACT_VERSION = 1
 JSON_LOG_SCHEMA = "base-cli.log"
@@ -30,7 +30,7 @@ _SENSITIVE_ASSIGNMENT_BOUNDARY = (
     r"|\s+[A-Za-z][A-Za-z0-9_-]*\s*[=:])|\s|$)"
 )
 _SENSITIVE_ASSIGNMENT = re.compile(
-    r"(?i)(\b(?:token|password|secret|api[-_]?key|authorization)\b\s*[:=]\s*)"
+    rf"(?i)({SECRET_KEY_PATTERN}\s*[:=]\s*)"
     rf"(\S+?){_SENSITIVE_ASSIGNMENT_BOUNDARY}"
 )
 
@@ -191,4 +191,4 @@ def _safe_text(value: str) -> str:
 
 
 def _is_sensitive_key(value: str) -> bool:
-    return re.search(r"(?i)(token|password|secret|api[-_]?key|authorization)", value) is not None
+    return is_secret_key(value)

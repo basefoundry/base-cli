@@ -6,7 +6,13 @@ from dataclasses import dataclass
 from typing import Any
 
 REDACTED = "[REDACTED]"
-SECRET_KEY_RE = re.compile(r"(token|password|secret|api[-_]?key|authorization)", re.IGNORECASE)
+SECRET_KEY_PATTERN = (
+    r"(?<![A-Za-z0-9])(?:access[-_]?token|refresh[-_]?token|id[-_]?token|"
+    r"client[-_]?secret|auth[-_]?token|token|password|passwd|pwd|passphrase|secret|credential|"
+    r"private[-_]?key|access[-_]?key|api[-_]?key|authorization|bearer|session|"
+    r"cookie|signature|otp|salt|sas|pem)(?![A-Za-z0-9])"
+)
+SECRET_KEY_RE = re.compile(SECRET_KEY_PATTERN, re.IGNORECASE)
 URL_CREDENTIALS_RE = re.compile(r"(?P<prefix>[a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]+@")
 # Punctuation is part of a value unless it is immediately followed by another
 # assignment segment. This prevents ``PASSWORD=abc,def`` from exposing ``def``
