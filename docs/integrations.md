@@ -59,3 +59,10 @@ successful `SystemExit(0)` and Click exit-control flow are not recorded as
 exceptions. Interrupts and other non-success outcomes are therefore visible as
 errors while retaining the existing `base_cli.outcome` attribute for detailed
 dashboard filtering.
+
+## Log timestamp environment variable
+
+Set `BASE_CLI_LOG_UTC=1` to make the default text formatter use UTC
+timestamps. The namespaced variable takes precedence over the legacy setting.
+`LOG_UTC` remains recognized during the 0.5 compatibility window, but emits a
+`BaseCliDeprecationWarning` and is scheduled for removal no earlier than 0.7.
