@@ -311,12 +311,14 @@ def _write_table(
 
     table_rows = [[_table_cell(_cell_value(record.get(key))) for _header, key in columns] for record in records]
     headers = [_table_cell(header) for header, _key in columns]
+    header_widths = [_display_width(header) for header in headers]
+    row_widths = [[_display_width(value) for value in row] for row in table_rows]
     widths = [
-        max(_display_width(header), selected_minimums[index] if index < len(selected_minimums) else 0)
-        for index, header in enumerate(headers)
+        max(header_widths[index], selected_minimums[index] if index < len(selected_minimums) else 0)
+        for index, _header in enumerate(headers)
     ]
-    for row in table_rows:
-        widths = [max(width, _display_width(value)) for width, value in zip(widths, row, strict=False)]
+    for measured_row in row_widths:
+        widths = [max(width, measured) for width, measured in zip(widths, measured_row, strict=False)]
 
     if max_cell_width is not None:
         if max_cell_width < 1:
@@ -327,8 +329,17 @@ def _write_table(
         raise ValueError("terminal_width must be greater than 0 when set")
     available_width = terminal_width if terminal_width is not None else _terminal_width(stream)
     widths = _fit_table_width(widths, available_width)
-    bounded_headers = [_truncate(header, width) for header, width in zip(headers, widths, strict=False)]
-    bounded_rows = [[_truncate(value, width) for value, width in zip(row, widths, strict=False)] for row in table_rows]
+    bounded_headers = [
+        _truncate(header, width, measured_width=header_widths[index])
+        for index, (header, width) in enumerate(zip(headers, widths, strict=False))
+    ]
+    bounded_rows = [
+        [
+            _truncate(value, width, measured_width=row_widths[row_index][column_index])
+            for column_index, (value, width) in enumerate(zip(row, widths, strict=False))
+        ]
+        for row_index, row in enumerate(table_rows)
+    ]
 
     if rich and try_render_rich_table(
         stream,
@@ -360,18 +371,59 @@ def _terminal_width(stream: TextIO) -> int:
             return _DEFAULT_TERMINAL_WIDTH
 
 
-def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
+def _fit_table_width(
+    widths: list[int],
+    terminal_width: int,
+    *,
+    _work_counter: list[int] | None = None,
+) -> list[int]:
     if not widths:
         return widths
     available = max(1, terminal_width - 2 * (len(widths) - 1))
     if sum(widths) <= available:
         return widths
     result = list(widths)
-    while sum(result) > available:
-        index = max(range(len(result)), key=result.__getitem__)
-        if result[index] <= 1:
+    remaining = sum(result) - available
+
+    def record_work(units: int) -> None:
+        if _work_counter is not None:
+            _work_counter[0] += units
+
+    # ``order`` is a stable snapshot of the columns sorted by current width.
+    # ``position`` marks the first column not in the active width level, while
+    # ``active_count`` tracks how many columns share that level. Mutating only
+    # the active prefix keeps ties deterministic as widths are reduced.
+    order = sorted(range(len(result)), key=lambda index: (-result[index], index))
+    position = 0
+    level = result[order[0]]
+    active_count = 0
+    while position < len(order) and result[order[position]] == level:
+        active_count += 1
+        position += 1
+    while remaining > 0 and active_count:
+        # When every remaining column is active, floor the next level at one;
+        # there is no legal width below one even if the arithmetic target is 0.
+        next_level = result[order[position]] if position < len(order) else 1
+        next_level = max(1, next_level)
+        capacity = (level - next_level) * active_count
+        if capacity <= 0:
             break
-        result[index] -= 1
+        if remaining <= capacity:
+            quotient, remainder = divmod(remaining, active_count)
+            for rank in range(active_count):
+                index = order[rank]
+                result[index] -= quotient + (rank < remainder)
+            record_work(active_count)
+            remaining = 0
+            break
+        for rank in range(active_count):
+            result[order[rank]] = next_level
+        record_work(active_count)
+        remaining -= capacity
+        level = next_level
+        while position < len(order) and result[order[position]] == level:
+            active_count += 1
+            position += 1
     return result
 
 
@@ -394,8 +446,8 @@ def _display_width(value: str) -> int:
     return width
 
 
-def _truncate(value: str, width: int) -> str:
-    if _display_width(value) <= width:
+def _truncate(value: str, width: int, *, measured_width: int | None = None) -> str:
+    if (measured_width if measured_width is not None else _display_width(value)) <= width:
         return value
     if width <= 1:
         return "…"[:width]
