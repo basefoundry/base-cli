@@ -5,6 +5,7 @@ import os
 import platform
 import sys
 import time
+import warnings
 from io import TextIOWrapper
 from pathlib import Path
 from typing import BinaryIO, TextIO, cast
@@ -21,6 +22,7 @@ except ImportError:  # pragma: no cover - msvcrt is unavailable outside Windows.
 
 from ._private_files import restrict_file
 from .context import get_current_context
+from .deprecations import BaseCliDeprecationWarning
 from .history import compact_home_text
 from .json_contracts import JsonLogFormatter
 from .paths import current_working_dir
@@ -257,7 +259,22 @@ def _secure_log_file_open_flags(mode: str) -> int:
 
 class CliFormatter(logging.Formatter):
     def __init__(self, *, use_utc: bool | None = None, use_color: bool = False) -> None:
-        self.use_utc = use_utc if use_utc is not None else os.environ.get("LOG_UTC") == "1"
+        if use_utc is not None:
+            resolved_use_utc = use_utc
+        else:
+            configured_use_utc = os.environ.get("BASE_CLI_LOG_UTC")
+            legacy_use_utc = os.environ.get("LOG_UTC")
+            if legacy_use_utc:
+                warnings.warn(
+                    "LOG_UTC is deprecated since 0.5 and will be removed in 0.7; use BASE_CLI_LOG_UTC instead.",
+                    BaseCliDeprecationWarning,
+                    stacklevel=2,
+                )
+            if configured_use_utc is not None:
+                resolved_use_utc = configured_use_utc == "1"
+            else:
+                resolved_use_utc = legacy_use_utc == "1"
+        self.use_utc = resolved_use_utc
         self.use_color = use_color
         self._source_key: tuple[object, ...] | None = None
         self._source_roots: tuple[Path, ...] = ()
