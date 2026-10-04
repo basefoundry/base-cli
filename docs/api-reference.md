@@ -1318,7 +1318,7 @@ base_cli.option(...)
 
 ### `render_document`
 **Kind:** function  
-**Signature:** `render_document(document: 'Mapping[str, Any]', *, requested_format: 'str | None', records_key: 'str | None' = None, columns: 'Sequence[tuple[str, str]] | None' = None, stream: 'TextIO | None' = None) -> 'str'`
+**Signature:** `render_document(document: 'Mapping[str, Any]', *, requested_format: 'str | None', records_key: 'str | None' = None, columns: 'Sequence[tuple[str, str]] | None' = None, stream: 'TextIO | None' = None, formula_guard: 'bool' = True) -> 'str'`
 
 **Behavior:** Render a structured report or leave terminal text to its existing renderer.
 
@@ -1334,7 +1334,7 @@ base_cli.render_document(...)
 
 ### `render_records`
 **Kind:** function  
-**Signature:** `render_records(records: 'Iterable[Mapping[str, Any]]', *, requested_format: 'str | None', columns: 'Sequence[tuple[str, str]]', stream: 'TextIO | None' = None, footer: 'str | None' = None, minimum_widths: 'Sequence[int] | None' = None, terminal_width: 'int | None' = None, max_cell_width: 'int | None' = 80, rich: 'bool' = False) -> 'str'`
+**Signature:** `render_records(records: 'Iterable[Mapping[str, Any]]', *, requested_format: 'str | None', columns: 'Sequence[tuple[str, str]]', stream: 'TextIO | None' = None, footer: 'str | None' = None, minimum_widths: 'Sequence[int] | None' = None, terminal_width: 'int | None' = None, max_cell_width: 'int | None' = 80, rich: 'bool' = False, formula_guard: 'bool' = True) -> 'str'`
 
 **Behavior:** Render records according to the shared public output contract.
 
