@@ -22,6 +22,13 @@ and versions are tracked in the repo-root `VERSION` file.
 - Reuse secure log lock descriptors and cache source paths per invocation; logging I/O failures stay inside logging (#381).
 - Align the Typer support floor with the tested matrix and cover representative
   minimum/maximum Typer and Click version pairings.
+- Prefix formula-leading CSV/TSV cells with an apostrophe by default to protect
+  spreadsheet consumers; pass `formula_guard=False` only for an audited raw
+  value contract.
+
+- Add the namespaced `BASE_CLI_LOG_UTC` environment variable and deprecate
+  `LOG_UTC` with a migration warning; the legacy alias is scheduled for removal
+  no earlier than 0.7.
 
 ### Fixed
 
