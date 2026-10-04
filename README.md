@@ -570,6 +570,11 @@ Every `base_cli.App` command gets these options:
 - `--json`: opt-in machine output, when `LifecycleOptions.json` is enabled;
   emits the versioned envelopes described in [`docs/json-contracts.md`](https://basefoundry.github.io/base-cli/json-contracts/).
 
+Set `BASE_CLI_LOG_UTC=1` when the default text formatter should use UTC
+timestamps. The older `LOG_UTC` name remains a temporary compatibility alias
+and emits a deprecation warning; new deployments should use the namespaced
+variable.
+
 `LifecycleOptions()` preserves this default set. Its `debug`, `quiet`,
 `environment`, `config`, `keep_temp`, `log_file`, and `version` fields are
 enabled by default; `dry_run` and `json` are opt-in. Set one field to `None` to
