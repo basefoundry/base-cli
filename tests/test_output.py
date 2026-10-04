@@ -12,6 +12,7 @@ from base_cli.output import (
     NDJSON_SCHEMA_VERSION,
     NdjsonWriter,
     OutputFormatError,
+    _delimited_value,
     _fit_table_width,
     render_document,
     render_records,
@@ -91,6 +92,48 @@ class OutputTest(unittest.TestCase):
                         records, requested_format=requested_format, columns=(("NAME", "name"),), stream=stream
                     )
                 self.assertEqual(stream.getvalue(), "")
+
+    def test_delimited_emitters_guard_spreadsheet_formulas_by_default(self) -> None:
+        records = ({"name": "=SUM(A1:A2)", "path": "+cmd"}, {"name": "-10", "path": "@user"})
+
+        for requested_format, expected in (
+            ("csv", "'=SUM(A1:A2),'+cmd\n'-10,'@user\n"),
+            ("tsv", "'=SUM(A1:A2)\t'+cmd\n'-10\t'@user\n"),
+        ):
+            with self.subTest(format=requested_format):
+                stream = io.StringIO()
+                render_records(records, requested_format=requested_format, columns=COLUMNS, stream=stream)
+                self.assertEqual(stream.getvalue(), expected)
+
+    def test_delimited_formula_guard_can_be_disabled_explicitly(self) -> None:
+        stream = io.StringIO()
+
+        render_records(
+            ({"name": "=SUM(A1:A2)", "path": "@user"},),
+            requested_format="csv",
+            columns=COLUMNS,
+            stream=stream,
+            formula_guard=False,
+        )
+
+        self.assertEqual(stream.getvalue(), "=SUM(A1:A2),@user\n")
+
+    def test_delimited_formula_guard_covers_tab_and_carriage_return_before_sanitizing(self) -> None:
+        values = ("\t=SUM(A1:A2)", "\r@user")
+
+        with mock.patch("base_cli.output._table_cell", side_effect=lambda value: value):
+            guarded = [_delimited_value(value) for value in values]
+
+        self.assertEqual(guarded, ["'\t=SUM(A1:A2)", "'\r@user"])
+
+        stream = io.StringIO()
+        render_records(
+            ({"name": values[0], "path": values[1]},),
+            requested_format="csv",
+            columns=COLUMNS,
+            stream=stream,
+        )
+        self.assertEqual(next(csv.reader(io.StringIO(stream.getvalue()))), ["' =SUM(A1:A2)", "' @user"])
 
     def test_tsv_consumes_one_pass_iterable_without_materializing(self) -> None:
         consumed = False
