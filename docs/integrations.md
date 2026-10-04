@@ -67,3 +67,10 @@ terminal output. `configure_logger(..., propagate=True)` explicitly enables host
 routing; `False` disables it, and the default `None` preserves consumer routing.
 Use a consumer handler or configure the `base_cli` parent before invoking an App
 when embedding it in a host with centralized logging.
+
+## Log timestamp environment variable
+
+Set `BASE_CLI_LOG_UTC=1` to make the default text formatter use UTC
+timestamps. The namespaced variable takes precedence over the legacy setting.
+`LOG_UTC` remains recognized during the 0.5 compatibility window, but emits a
+`BaseCliDeprecationWarning` and is scheduled for removal no earlier than 0.7.
