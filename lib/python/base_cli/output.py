@@ -23,6 +23,7 @@ NDJSON_SCHEMA_VERSION = 1
 _ANSI_ESCAPE_RE = re.compile(r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))")
 _DEFAULT_TERMINAL_WIDTH = 120
 _DEFAULT_MAX_CELL_WIDTH = 80
+_FORMULA_TRIGGER_CHARS = frozenset("=+-@\t\r")
 
 
 class OutputFormatError(ValueError):
@@ -121,6 +122,7 @@ def render_records(
     terminal_width: int | None = None,
     max_cell_width: int | None = _DEFAULT_MAX_CELL_WIDTH,
     rich: bool = False,
+    formula_guard: bool = True,
 ) -> str:
     """Render records according to the shared public output contract.
 
@@ -132,7 +134,10 @@ def render_records(
     columns. Terminal cells use Unicode display-cell widths and are bounded by
     ``terminal_width`` and ``max_cell_width`` with deterministic ellipsis
     truncation. ``rich=True`` opts terminal text into the optional Rich
-    renderer and otherwise falls back to the built-in table.
+    renderer and otherwise falls back to the built-in table. ``formula_guard``
+    controls the default apostrophe prefix for formula-leading CSV/TSV cells;
+    disabling it is an explicit security decision for consumers that need raw
+    values.
     """
 
     target = stream if stream is not None else sys.stdout
@@ -144,7 +149,7 @@ def render_records(
         delimiter = "," if resolved == "csv" else "\t"
         writer = csv.writer(target, delimiter=delimiter, lineterminator="\n")
         for row in record_list:
-            writer.writerow([_delimited_value(row.get(key)) for _header, key in columns])
+            writer.writerow([_delimited_value(row.get(key), formula_guard=formula_guard) for _header, key in columns])
         return resolved
 
     if resolved == "ndjson":
@@ -187,13 +192,16 @@ def render_document(
     records_key: str | None = None,
     columns: Sequence[tuple[str, str]] | None = None,
     stream: TextIO | None = None,
+    formula_guard: bool = True,
 ) -> str:
     """Render a structured report or leave terminal text to its existing renderer.
 
     Structured formats preserve the complete document.  Delimited output uses
     the selected record list (or the document itself) and never emits report
-    prose, headers, or footers.  A terminal ``text`` request returns ``text``
-    without writing so the caller can keep its established human report.
+    prose, headers, or footers. ``formula_guard`` has the same CSV/TSV security
+    behavior as ``render_records``. A terminal ``text`` request returns
+    ``text`` without writing so the caller can keep its established human
+    report.
     """
 
     target = stream if stream is not None else sys.stdout
@@ -233,6 +241,7 @@ def render_document(
         requested_format=resolved,
         columns=selected_columns,
         stream=target,
+        formula_guard=formula_guard,
     )
     return resolved
 
@@ -272,7 +281,7 @@ def _validate_delimited_records(
                 dumps_strict_json(value, separators=(",", ":"))
 
 
-def _delimited_value(value: Any) -> str:
+def _delimited_value(value: Any, *, formula_guard: bool = True) -> str:
     """Return a safe scalar for redirected CSV/TSV output.
 
     Delimited output is commonly piped into another process. Keep the normal
@@ -281,7 +290,11 @@ def _delimited_value(value: Any) -> str:
     record across physical lines.
     """
 
-    return _table_cell(_cell_value(value))
+    raw_cell = _cell_value(value)
+    cell = _table_cell(raw_cell)
+    if formula_guard and raw_cell[:1] in _FORMULA_TRIGGER_CHARS:
+        return f"'{cell}"
+    return cell
 
 
 def _write_table(
@@ -311,12 +324,14 @@ def _write_table(
 
     table_rows = [[_table_cell(_cell_value(record.get(key))) for _header, key in columns] for record in records]
     headers = [_table_cell(header) for header, _key in columns]
+    header_widths = [_display_width(header) for header in headers]
+    row_widths = [[_display_width(value) for value in row] for row in table_rows]
     widths = [
-        max(_display_width(header), selected_minimums[index] if index < len(selected_minimums) else 0)
-        for index, header in enumerate(headers)
+        max(header_widths[index], selected_minimums[index] if index < len(selected_minimums) else 0)
+        for index, _header in enumerate(headers)
     ]
-    for row in table_rows:
-        widths = [max(width, _display_width(value)) for width, value in zip(widths, row, strict=False)]
+    for measured_row in row_widths:
+        widths = [max(width, measured) for width, measured in zip(widths, measured_row, strict=False)]
 
     if max_cell_width is not None:
         if max_cell_width < 1:
@@ -327,8 +342,17 @@ def _write_table(
         raise ValueError("terminal_width must be greater than 0 when set")
     available_width = terminal_width if terminal_width is not None else _terminal_width(stream)
     widths = _fit_table_width(widths, available_width)
-    bounded_headers = [_truncate(header, width) for header, width in zip(headers, widths, strict=False)]
-    bounded_rows = [[_truncate(value, width) for value, width in zip(row, widths, strict=False)] for row in table_rows]
+    bounded_headers = [
+        _truncate(header, width, measured_width=header_widths[index])
+        for index, (header, width) in enumerate(zip(headers, widths, strict=False))
+    ]
+    bounded_rows = [
+        [
+            _truncate(value, width, measured_width=row_widths[row_index][column_index])
+            for column_index, (value, width) in enumerate(zip(row, widths, strict=False))
+        ]
+        for row_index, row in enumerate(table_rows)
+    ]
 
     if rich and try_render_rich_table(
         stream,
@@ -360,18 +384,59 @@ def _terminal_width(stream: TextIO) -> int:
             return _DEFAULT_TERMINAL_WIDTH
 
 
-def _fit_table_width(widths: list[int], terminal_width: int) -> list[int]:
+def _fit_table_width(
+    widths: list[int],
+    terminal_width: int,
+    *,
+    _work_counter: list[int] | None = None,
+) -> list[int]:
     if not widths:
         return widths
     available = max(1, terminal_width - 2 * (len(widths) - 1))
     if sum(widths) <= available:
         return widths
     result = list(widths)
-    while sum(result) > available:
-        index = max(range(len(result)), key=result.__getitem__)
-        if result[index] <= 1:
+    remaining = sum(result) - available
+
+    def record_work(units: int) -> None:
+        if _work_counter is not None:
+            _work_counter[0] += units
+
+    # ``order`` is a stable snapshot of the columns sorted by current width.
+    # ``position`` marks the first column not in the active width level, while
+    # ``active_count`` tracks how many columns share that level. Mutating only
+    # the active prefix keeps ties deterministic as widths are reduced.
+    order = sorted(range(len(result)), key=lambda index: (-result[index], index))
+    position = 0
+    level = result[order[0]]
+    active_count = 0
+    while position < len(order) and result[order[position]] == level:
+        active_count += 1
+        position += 1
+    while remaining > 0 and active_count:
+        # When every remaining column is active, floor the next level at one;
+        # there is no legal width below one even if the arithmetic target is 0.
+        next_level = result[order[position]] if position < len(order) else 1
+        next_level = max(1, next_level)
+        capacity = (level - next_level) * active_count
+        if capacity <= 0:
             break
-        result[index] -= 1
+        if remaining <= capacity:
+            quotient, remainder = divmod(remaining, active_count)
+            for rank in range(active_count):
+                index = order[rank]
+                result[index] -= quotient + (rank < remainder)
+            record_work(active_count)
+            remaining = 0
+            break
+        for rank in range(active_count):
+            result[order[rank]] = next_level
+        record_work(active_count)
+        remaining -= capacity
+        level = next_level
+        while position < len(order) and result[order[position]] == level:
+            active_count += 1
+            position += 1
     return result
 
 
@@ -394,8 +459,8 @@ def _display_width(value: str) -> int:
     return width
 
 
-def _truncate(value: str, width: int) -> str:
-    if _display_width(value) <= width:
+def _truncate(value: str, width: int, *, measured_width: int | None = None) -> str:
+    if (measured_width if measured_width is not None else _display_width(value)) <= width:
         return value
     if width <= 1:
         return "…"[:width]
