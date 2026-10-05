@@ -24,6 +24,8 @@ def main() -> int:
     sources = [name for name in files if Path(name).parts[0] not in excluded]
     if not sources:
         raise RuntimeError("No consumer Python sources found")
+    print("Consumer typing sources:")
+    print("\n".join(f"- {source}" for source in sources))
     return subprocess.run(
         [sys.executable, "-m", "mypy", "--strict", "--explicit-package-bases", *sources],
         cwd=root,

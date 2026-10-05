@@ -196,7 +196,7 @@ class BatteriesIncludedConfigLoader:
         user_config_name: str = "config.yaml",
         project_config_name: str = ".base-cli.yaml",
         environment_dir_name: str = "environments",
-        trust_project_config: bool = False,
+        verify_project_config: bool = False,
     ) -> None:
         if _SAFE_FILENAME.fullmatch(user_config_name) is None:
             raise ValueError("user_config_name must be a simple filename")
@@ -219,7 +219,7 @@ class BatteriesIncludedConfigLoader:
         self.user_config_name = user_config_name
         self.project_config_name = project_config_name
         self.environment_dir_name = environment_dir_name
-        self.trust_project_config = trust_project_config
+        self.verify_project_config = verify_project_config
 
     @property
     def user_config_path(self) -> Path:
@@ -250,7 +250,7 @@ class BatteriesIncludedConfigLoader:
     ) -> ConfigSnapshot:
         user_values = load_yaml_file(self.user_config_path)
         project_path = self.project_config_path(project_root)
-        if self.trust_project_config and project_path is not None and project_path.exists():
+        if self.verify_project_config and project_path is not None and project_path.exists():
             validate_discovered_config_path(project_path, project_root)
         project_values = load_yaml_file(project_path) if project_path is not None else {}
         explicit_values = load_yaml_file(explicit_path, required=True) if explicit_path is not None else {}
@@ -268,7 +268,7 @@ class BatteriesIncludedConfigLoader:
             selected_environment,
         )
         user_environment = load_yaml_file(user_environment_path)
-        if self.trust_project_config and project_environment_path is not None and project_environment_path.exists():
+        if self.verify_project_config and project_environment_path is not None and project_environment_path.exists():
             validate_discovered_config_path(project_environment_path, project_root)
         project_environment = load_yaml_file(project_environment_path) if project_environment_path is not None else {}
 
@@ -315,10 +315,11 @@ def validate_discovered_config_path(path: Path, root: Path | None = None) -> Non
             raise ConfigurationError(
                 f"Refusing discovered configuration through symlink or reparse point '{candidate}'."
             )
-        if os.name != "nt" and (current.st_mode & 0o022 or current.st_uid not in {0, os.getuid()}):
+        if os.name != "nt" and (current.st_mode & 0o002 or current.st_uid not in {0, os.getuid()}):
             raise ConfigurationError(
                 f"Untrusted discovered configuration path '{candidate}': require user/root ownership "
-                "and no group/other write permission. Fix permissions or explicitly set trust_discovered_config=False."
+                "and no other-write permission. Fix permissions or see the "
+                "local configuration trust policy for an explicit shared-workspace opt-out."
             )
 
 

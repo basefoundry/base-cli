@@ -44,7 +44,7 @@ Discovery checks the current directory and at most 32 ancestors, stops at `.git`
 (including worktree marker files), and never crosses a filesystem boundary.
 `max_project_ancestor_depth=0` restricts discovery to the current directory;
 `project_boundary_marker` changes the marker or accepts `None` to disable markers.
-`trust_discovered_config=False` explicitly opts out of permission/reparse checks
+`verify_discovered_config=False` explicitly opts out of permission/reparse checks
 for knowingly shared workspaces. It does not disable depth/filesystem limits.
 Custom discovery callbacks own discovery boundaries; their project files still
 receive the loader's trust checks. `CliProfile.generic()` remains unchanged.
