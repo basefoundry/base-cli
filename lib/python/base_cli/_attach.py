@@ -71,6 +71,7 @@ class _AttachedLifecycleResource:
         self.context: Context[Any, Any, Any] | None = None
         self.invocation: _AttachedInvocation | None = None
         self.telemetry_session: TelemetrySession | None = None
+        self.exception: BaseException | None = None
         self.context_token: Any = None
         self.invocation_token: Any = None
         self.original_click_exit: Callable[..., Any] | None = None
@@ -164,11 +165,16 @@ class _AttachedLifecycleResource:
             state.attached_completion = True
 
     def record_exception(self, exc: BaseException) -> None:
+        outcome = outcome_from_exception(self.click, exc)
+        # Click represents a successful ``Context.exit(0)`` as an exception so
+        # it can unwind the context stack. It is control flow, not a failed
+        # command, and must not be exported as a span exception.
+        self.exception = None if str(outcome.status) == "ok" else exc
         state = _INVOCATION_STATE.get()
         if state is not None and state.owner_app is self.attachment.app:
             state.attached_completion = False
         if self.context is not None:
-            self.outcome = outcome_from_exception(self.click, exc)
+            self.outcome = outcome
             _record_lifecycle_diagnostic(self.context, self.outcome)
 
     def __exit__(
@@ -239,6 +245,7 @@ class _AttachedLifecycleResource:
             context,
             self.outcome,
             ended_monotonic_ns=ended_monotonic_ns,
+            exception=self.exception,
         )
         try:
             context.cleanup()
