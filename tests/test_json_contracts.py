@@ -52,6 +52,22 @@ class JsonContractTests(unittest.TestCase):
         self.assertEqual(failure["message"], "authorization=[REDACTED]")
         self.assertEqual(json.loads(base_cli.dumps_envelope(failure)), failure)
 
+    def test_json_redaction_uses_extended_secret_key_heuristics(self) -> None:
+        envelope = base_cli.success_envelope(
+            run_id=None,
+            details={
+                "private_key": "private",
+                "session_cookie": "cookie",
+                "accessToken": "camel-case-secret",
+                "label": "visible",
+            },
+        )
+
+        self.assertEqual(envelope["details"]["private_key"], "[REDACTED]")
+        self.assertEqual(envelope["details"]["session_cookie"], "[REDACTED]")
+        self.assertEqual(envelope["details"]["accessToken"], "[REDACTED]")
+        self.assertEqual(envelope["details"]["label"], "visible")
+
     def test_json_contract_emitters_reject_nested_non_finite_values(self) -> None:
         invalid = {"nested": [{"value": float("inf")}]}
         envelope = base_cli.success_envelope(run_id=None, details=invalid)

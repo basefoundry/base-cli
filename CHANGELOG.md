@@ -18,6 +18,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Reuse secure log lock descriptors and cache source paths per invocation; logging I/O failures stay inside logging (#381).
 - Align the Typer support floor with the tested matrix and cover representative
   minimum/maximum Typer and Click version pairings.
 - Prefix formula-leading CSV/TSV cells with an apostrophe by default to protect
