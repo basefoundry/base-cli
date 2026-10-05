@@ -129,6 +129,8 @@ def _validate_published_sections(
     """Ensure every released section remains identical to its version tag."""
 
     errors: list[str] = []
+    version_file = path.parent / "VERSION"
+    candidate = version_file.read_text(encoding="utf-8").strip() if version_file.is_file() else None
     for version in versions:
         if version == "Unreleased":
             continue
@@ -140,11 +142,28 @@ def _validate_published_sections(
                 capture_output=True,
                 text=True,
             )
-        except (OSError, subprocess.CalledProcessError) as exc:
+        except subprocess.CalledProcessError as exc:
+            # A release PR necessarily precedes its protected-main tag. Only
+            # the newest section matching VERSION may be an untagged candidate;
+            # every earlier release remains bound to its immutable tag.
+            if version == candidate and len(versions) > 1 and version == versions[1]:
+                exists = subprocess.run(
+                    ["git", "-C", str(path.parent), "rev-parse", "--verify", f"refs/tags/{tag}"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if exists.returncode == 1 or exists.returncode == 128:
+                    continue
             detail = getattr(exc, "stderr", None) or str(exc)
             errors.append(
                 f"cannot verify [{version}] against tag {tag}: {detail.strip()}; "
                 "fetch the release tags before validating"
+            )
+            continue
+        except OSError as exc:
+            errors.append(
+                f"cannot verify [{version}] against tag {tag}: {exc}; fetch the release tags before validating"
             )
             continue
         tagged_lines = completed.stdout.splitlines()

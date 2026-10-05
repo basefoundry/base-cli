@@ -45,6 +45,7 @@ nav:
       - Dependency support: dependency-support.md
       - Optional output dependencies: optional-output-dependencies.md
       - Migration guide: migrations.md
+      - Migrating to 0.5.0: migration-0.5.md
       - Click migration: migration-click.md
       - Typer migration: migration-typer.md
       - Cement migration: migration-cement.md
@@ -66,3 +67,4 @@ nav:
       - Runtime threat model: security-threat-model.md
       - Security release review: security-review.md
       - Releasing base-cli: releasing.md
+      - 0.5.0 release checklist: release-0.5.0-checklist.md
