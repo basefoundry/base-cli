@@ -28,6 +28,18 @@ SECRET_KEY_STEMS = frozenset(
     }
 )
 SECRET_KEY_COMPOUNDS = frozenset({("access", "key"), ("api", "key"), ("private", "key")})
+SECRET_KEY_SUBSTRINGS = frozenset(
+    {
+        "apikey",
+        "authorization",
+        "credential",
+        "passwd",
+        "password",
+        "passphrase",
+        "secret",
+        "token",
+    }
+)
 _KEY_NAME_RE = re.compile(KEY_NAME_PATTERN)
 _CAMEL_TOKEN_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z]|[0-9]|$)|[A-Z]?[a-z]+|[0-9]+")
 URL_CREDENTIALS_RE = re.compile(r"(?P<prefix>[a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]+@")
@@ -184,6 +196,9 @@ def redact_argv(argv: list[str], sensitive_options: set[str]) -> list[str]:
 
 def is_secret_key(value: str) -> bool:
     for identifier in _KEY_NAME_RE.findall(value):
+        compact = identifier.replace("-", "").replace("_", "").casefold()
+        if any(stem in compact for stem in SECRET_KEY_SUBSTRINGS):
+            return True
         tokens = tuple(
             token.casefold() for part in re.split(r"[-_]", identifier) for token in _CAMEL_TOKEN_RE.findall(part)
         )

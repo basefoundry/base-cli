@@ -139,6 +139,14 @@ class LegacySetRedactionTests(unittest.TestCase):
             "bearerToken",
             "oauthToken",
             "secretKey",
+            "apikey",
+            "APIKEY",
+            "accesstoken",
+            "ACCESSTOKEN",
+            "clientsecret",
+            "csrftoken",
+            "PGPASSWORD",
+            "x-apikey",
         )
         for name in names:
             with self.subTest(name=name):
