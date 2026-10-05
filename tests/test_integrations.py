@@ -17,6 +17,8 @@ class _Span:
         self.attributes: dict[str, object] = {}
         self.events: list[tuple[str, dict[str, object]]] = []
         self.ended = False
+        self.status: object | None = None
+        self.exceptions: list[BaseException] = []
 
     def set_attribute(self, key: str, value: object) -> None:
         self.attributes[key] = value
@@ -26,6 +28,12 @@ class _Span:
 
     def end(self) -> None:
         self.ended = True
+
+    def set_status(self, status: object) -> None:
+        self.status = status
+
+    def record_exception(self, exception: BaseException) -> None:
+        self.exceptions.append(exception)
 
 
 class _Tracer:
@@ -118,6 +126,28 @@ class IntegrationTests(unittest.TestCase):
             ["base_cli.run.started", "base_cli.run.finished"],
         )
         self.assertIn("base_cli.duration_ms", tracer.span.attributes)
+        self.assertEqual(tracer.span.exceptions, [])
+        self.assertIsNotNone(tracer.span.status)
+
+    def test_telemetry_marks_failures_and_records_exception(self) -> None:
+        tracer = _Tracer()
+        app = base_cli.App(
+            name="telemetry-error",
+            log_to_file=False,
+            telemetry=base_cli.TelemetryOptions(tracer=tracer),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            del ctx
+            raise RuntimeError("boom")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(app, [], home=Path(tmpdir))
+
+        self.assertNotEqual(result.exit_code, 0)
+        self.assertEqual(len(tracer.span.exceptions), 1)
+        self.assertIsNotNone(tracer.span.status)
 
     def test_missing_or_broken_telemetry_never_changes_completion(self) -> None:
         app = base_cli.App(
