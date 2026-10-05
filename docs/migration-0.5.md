@@ -4,18 +4,22 @@
 strengthening configuration, output, logging, retention, and release contracts.
 The published 0.4.3 tag and distributions remain immutable.
 
-- Convenience-profile project configuration now validates POSIX ownership and
+- Convenience-profile project configuration now verifies POSIX ownership and
   permissions, refuses symlink/reparse paths, and stops discovery at `.git`, a
   filesystem boundary, or the configured ancestor limit. Repair permissions or
-  make the shared-workspace opt-out explicit; see [local configuration](local-config.md).
+  set `verify_discovered_config=False` explicitly for a knowingly shared
+  workspace; see [local configuration](local-config.md).
 - YAML inputs are bounded before alias construction. Split unusually large
   configuration files and remove recursive or excessive alias graphs.
 - JSON mode captures descriptor and inherited child stdout. Wait for children
   and flush native stdio before returning. Output over 8 MiB produces an error;
-  use NDJSON for larger streams. See [JSON contracts](json-contracts.md).
-- Consumer logging handlers and configured levels survive CLI cleanup. A host
-  level may filter persistent DEBUG messages; configure the host logger at DEBUG
-  when those are required. See [integrations](integrations.md).
+  a detached child produces `capture_incomplete` with the partial captured
+  output; use NDJSON for larger streams. See [JSON contracts](json-contracts.md).
+- Consumer logging handlers and configured levels survive CLI cleanup. Foreign
+  handlers and parent routing are preserved while `--debug` and `--quiet` still
+  control the Base-owned stream. A host level may filter persistent DEBUG
+  messages; configure the host logger at DEBUG when those are required. See
+  [integrations](integrations.md).
 - Native Windows enforces bundle retention through pinned directory handles;
   contended maintenance passes skip without blocking command execution.
 - Repeated source paths and human log timestamps are cached; log-sidecar I/O

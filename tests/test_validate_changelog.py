@@ -104,6 +104,17 @@ class ChangelogValidationTests(unittest.TestCase):
                 errors = validate_changelog.validate_changelog(path, verify_tags=True)
         self.assertTrue(any("fetch the release tags" in error for error in errors))
 
+    def test_reports_missing_git_without_retrying_with_an_uncaught_oserror(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "CHANGELOG.md"
+            path.write_text(VALID_CHANGELOG, encoding="utf-8")
+            with mock.patch(
+                "scripts.validate_changelog.subprocess.run",
+                side_effect=OSError("git is not installed"),
+            ):
+                errors = validate_changelog.validate_changelog(path, verify_tags=True)
+        self.assertTrue(any("git is not installed" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

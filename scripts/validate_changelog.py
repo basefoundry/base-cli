@@ -142,7 +142,7 @@ def _validate_published_sections(
                 capture_output=True,
                 text=True,
             )
-        except (OSError, subprocess.CalledProcessError) as exc:
+        except subprocess.CalledProcessError as exc:
             # A release PR necessarily precedes its protected-main tag. Only
             # the newest section matching VERSION may be an untagged candidate;
             # every earlier release remains bound to its immutable tag.
@@ -158,6 +158,12 @@ def _validate_published_sections(
             detail = getattr(exc, "stderr", None) or str(exc)
             errors.append(
                 f"cannot verify [{version}] against tag {tag}: {detail.strip()}; "
+                "fetch the release tags before validating"
+            )
+            continue
+        except OSError as exc:
+            errors.append(
+                f"cannot verify [{version}] against tag {tag}: {exc}; "
                 "fetch the release tags before validating"
             )
             continue
