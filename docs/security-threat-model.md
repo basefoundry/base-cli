@@ -128,3 +128,13 @@ Before shipping a CLI built on the framework, the consumer should:
    behavior; and
 6. run the release/security checklist in [`security-review.md`](security-review.md)
    for every release and whenever a trust boundary changes.
+
+## Repository-controlled configuration
+
+The convenience profile's implicit configuration can affect environment, logging,
+and retained diagnostics. POSIX owner/mode checks, reparse/symlink refusal, project
+boundaries, and bounded YAML parsing protect against accidental adoption of
+ancestor configuration. See [local configuration](local-config.md) for the explicit
+shared-workspace opt-out and Windows ACL limitation. These checks are not a
+sandbox for a hostile process running as the same account; custom consumer
+configuration and discovery policies remain the consumer's responsibility.

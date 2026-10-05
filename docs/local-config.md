@@ -29,3 +29,27 @@ directory below the platform's default config root (for example,
 `~/.config/tool` on Linux). Consumers with an existing configuration-root
 policy should pass `user_config_dir` explicitly; the identity is then metadata
 only.
+
+## Trust of discovered project configuration
+
+`CliProfile.batteries_included()` validates implicit project configuration before
+loading it. On POSIX, the file and directories between the working directory and
+the discovered project must be owned by the invoking user or root and must not
+be writable by group/other. Symlinks and Windows reparse points are refused,
+including project environment files. Refusals raise `ConfigurationError` naming
+the path. Windows ACL ownership/write permissions are not evaluated; applications
+using shared Windows workspaces must provide their own discovery/trust policy.
+
+Discovery checks the current directory and at most 32 ancestors, stops at `.git`
+(including worktree marker files), and never crosses a filesystem boundary.
+`max_project_ancestor_depth=0` restricts discovery to the current directory;
+`project_boundary_marker` changes the marker or accepts `None` to disable markers.
+`verify_discovered_config=False` explicitly opts out of permission/reparse checks
+for knowingly shared workspaces. It does not disable depth/filesystem limits.
+Custom discovery callbacks own discovery boundaries; their project files still
+receive the loader's trust checks. `CliProfile.generic()` remains unchanged.
+
+All YAML files are limited to 1 MiB of UTF-8 input, 64 container levels, and
+100,000 visited values (including alias expansion); recursive aliases are refused.
+Explicit `--config` is an intentional file choice and bypasses discovery trust,
+but still uses these parsing bounds.

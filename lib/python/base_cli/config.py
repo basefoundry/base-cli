@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import stat
 from collections.abc import Mapping
@@ -26,6 +27,7 @@ _FRAMEWORK_KEYS = frozenset({"environment", "log_level", "keep_temp"})
 _LOG_LEVELS = frozenset({"debug", "info", "warning", "error", "critical"})
 _SAFE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z")
 _SAFE_FILENAME = re.compile(r"(?:[A-Za-z0-9][A-Za-z0-9_.-]*|\.[A-Za-z0-9][A-Za-z0-9_.-]*)\Z")
+_CONFIG_MAX_BYTES = 1_048_576
 _CONFIG_MAX_DEPTH = 64
 _CONFIG_MAX_NODES = 100_000
 
@@ -194,6 +196,7 @@ class BatteriesIncludedConfigLoader:
         user_config_name: str = "config.yaml",
         project_config_name: str = ".base-cli.yaml",
         environment_dir_name: str = "environments",
+        verify_project_config: bool = False,
     ) -> None:
         if _SAFE_FILENAME.fullmatch(user_config_name) is None:
             raise ValueError("user_config_name must be a simple filename")
@@ -216,6 +219,7 @@ class BatteriesIncludedConfigLoader:
         self.user_config_name = user_config_name
         self.project_config_name = project_config_name
         self.environment_dir_name = environment_dir_name
+        self.verify_project_config = verify_project_config
 
     @property
     def user_config_path(self) -> Path:
@@ -246,6 +250,8 @@ class BatteriesIncludedConfigLoader:
     ) -> ConfigSnapshot:
         user_values = load_yaml_file(self.user_config_path)
         project_path = self.project_config_path(project_root)
+        if self.verify_project_config and project_path is not None and project_path.exists():
+            validate_discovered_config_path(project_path, project_root)
         project_values = load_yaml_file(project_path) if project_path is not None else {}
         explicit_values = load_yaml_file(explicit_path, required=True) if explicit_path is not None else {}
 
@@ -262,6 +268,8 @@ class BatteriesIncludedConfigLoader:
             selected_environment,
         )
         user_environment = load_yaml_file(user_environment_path)
+        if self.verify_project_config and project_environment_path is not None and project_environment_path.exists():
+            validate_discovered_config_path(project_environment_path, project_root)
         project_environment = load_yaml_file(project_environment_path) if project_environment_path is not None else {}
 
         merged: dict[str, Any] = {}
@@ -284,6 +292,35 @@ class BatteriesIncludedConfigLoader:
             framework=framework,
             provenance=MappingProxyType(dict(provenance)),
         )
+
+
+def validate_discovered_config_path(path: Path, root: Path | None = None) -> None:
+    """Refuse implicit configuration controlled through unsafe path components."""
+    paths = [path]
+    if root is not None:
+        parent = path.parent
+        while True:
+            paths.append(parent)
+            if parent == root:
+                break
+            if parent == parent.parent:
+                raise ConfigurationError(f"Discovered config '{path}' is outside project root '{root}'.")
+            parent = parent.parent
+    for candidate in paths:
+        try:
+            current = candidate.lstat()
+        except OSError as exc:
+            raise ConfigurationError(f"Cannot validate discovered configuration path '{candidate}': {exc}") from exc
+        if stat.S_ISLNK(current.st_mode) or getattr(current, "st_file_attributes", 0) & 0x400:
+            raise ConfigurationError(
+                f"Refusing discovered configuration through symlink or reparse point '{candidate}'."
+            )
+        if os.name != "nt" and (current.st_mode & 0o002 or current.st_uid not in {0, os.getuid()}):
+            raise ConfigurationError(
+                f"Untrusted discovered configuration path '{candidate}': require user/root ownership "
+                "and no other-write permission. Fix permissions or see the "
+                "local configuration trust policy for an explicit shared-workspace opt-out."
+            )
 
 
 def load_yaml_file(path: Path, *, required: bool = False) -> dict[str, Any]:
@@ -311,7 +348,11 @@ def load_yaml_file(path: Path, *, required: bool = False) -> dict[str, Any]:
         raise ConfigurationError(str(exc)) from exc
 
     try:
-        contents = path.read_text(encoding="utf-8")
+        with path.open("rb") as stream:
+            raw = stream.read(_CONFIG_MAX_BYTES + 1)
+        if len(raw) > _CONFIG_MAX_BYTES:
+            raise ConfigurationError(f"Config file '{path}' exceeds the maximum size of {_CONFIG_MAX_BYTES} bytes.")
+        contents = raw.decode("utf-8")
     except FileNotFoundError as exc:
         if required:
             raise ConfigurationError(f"Config file '{path}' does not exist.") from exc
@@ -321,7 +362,40 @@ def load_yaml_file(path: Path, *, required: bool = False) -> dict[str, Any]:
     except UnicodeDecodeError as exc:
         raise ConfigurationError(f"Unable to read config file '{path}': {exc}") from exc
     try:
-        data = yaml.safe_load(contents)
+        loader = yaml.SafeLoader(contents)
+        try:
+            node = loader.get_single_node()
+            # Inspect the composed graph before constructors expand YAML merge
+            # aliases. Count repeated edges, not just distinct node identities.
+            stack = [(False, node, 0, "")] if node is not None else []
+            active: set[int] = set()
+            nodes = 0
+            while stack:
+                exiting, current, depth, location = stack.pop()
+                if exiting:
+                    active.remove(id(current))
+                    continue
+                nodes += 1
+                if id(current) in active:
+                    raise ConfigurationError(f"Config file '{path}' contains a recursive value at '{location}'.")
+                if nodes > _CONFIG_MAX_NODES:
+                    raise ConfigurationError(f"Config file '{path}' exceeds YAML expansion limits.")
+                if depth > _CONFIG_MAX_DEPTH:
+                    raise ConfigurationError(
+                        f"Config file '{path}' exceeds the maximum nesting depth of {_CONFIG_MAX_DEPTH}."
+                    )
+                if isinstance(current, (yaml.MappingNode, yaml.SequenceNode)):
+                    active.add(id(current))
+                    stack.append((True, current, depth, location))
+                    if isinstance(current, yaml.MappingNode):
+                        for key, child in current.value:
+                            child_path = f"{location}.{key.value}" if location else str(key.value)
+                            stack.append((False, child, depth + 1, child_path))
+                    else:
+                        stack.extend((False, child, depth + 1, location) for child in current.value)
+            data = loader.construct_document(node) if node is not None else None
+        finally:
+            loader.dispose()
     except RecursionError as exc:
         raise ConfigurationError(
             f"Config file '{path}' exceeds the maximum nesting depth of {_CONFIG_MAX_DEPTH}."

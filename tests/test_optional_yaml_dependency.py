@@ -72,7 +72,7 @@ class OptionalYamlDependencyTests(unittest.TestCase):
             path = Path(tmpdir) / "config.yaml"
             path.write_text("answer: 42\n", encoding="utf-8")
             yaml = mock.Mock()
-            yaml.safe_load.side_effect = RecursionError("parser recursion")
+            yaml.SafeLoader.return_value.get_single_node.side_effect = RecursionError("parser recursion")
             yaml.YAMLError = type("YAMLError", (Exception,), {})
             with mock.patch("base_cli.config.require_yaml", return_value=yaml):
                 with self.assertRaisesRegex(ConfigurationError, r"maximum nesting depth of 64"):
