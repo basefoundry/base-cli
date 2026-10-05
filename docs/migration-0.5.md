@@ -17,8 +17,9 @@ The published 0.4.3 tag and distributions remain immutable.
   output; use NDJSON for larger streams. See [JSON contracts](json-contracts.md).
 - Consumer logging handlers and configured levels survive CLI cleanup. Foreign
   handlers and parent routing are preserved while `--debug` and `--quiet` still
-  control the Base-owned stream. A host level may filter persistent DEBUG
-  messages; configure the host logger at DEBUG when those are required. See
+  control the Base-owned stream. An explicitly configured host logger level may
+  filter persistent DEBUG messages; a foreign handler without a level does not.
+  Configure the host logger at DEBUG when those records are required. See
   [integrations](integrations.md).
 - Native Windows enforces bundle retention through pinned directory handles;
   contended maintenance passes skip without blocking command execution.
