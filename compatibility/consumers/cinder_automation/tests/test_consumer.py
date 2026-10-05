@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import base_cli
-
 from cinder_automation.cli import app
 
 
