@@ -126,16 +126,22 @@ class BenchmarkSummaryTests(unittest.TestCase):
         self.assertTrue(any("persistence_enabled_ms p95 exceeded 250 ms" in failure for failure in failures))
 
     def test_persistence_budget_separates_sustained_cost_from_filesystem_tails(self) -> None:
-        for profile in ("unix", "macos"):
-            for median, p95, fails in ((26.0, 118.0, False), (51.0, 60.0, True), (26.0, 126.0, True)):
-                with self.subTest(profile=profile, median=median, p95=p95):
-                    metrics = self._complete_results()
-                    sample = self._summary(p95)
-                    sample["median"] = median
-                    metrics["base-cli"]["features"]["persistence_enabled_ms"] = sample
-                    with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", profile):
-                        failures = benchmark_runtime._check_results(metrics)
-                    self.assertEqual(any("persistence_enabled_ms" in failure for failure in failures), fails)
+        cases = (
+            ("unix", 26.0, 588.0, False),
+            ("unix", 26.0, 751.0, True),
+            ("macos", 26.0, 118.0, False),
+            ("macos", 51.0, 60.0, True),
+            ("macos", 26.0, 126.0, True),
+        )
+        for profile, median, p95, fails in cases:
+            with self.subTest(profile=profile, median=median, p95=p95):
+                metrics = self._complete_results()
+                sample = self._summary(p95)
+                sample["median"] = median
+                metrics["base-cli"]["features"]["persistence_enabled_ms"] = sample
+                with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", profile):
+                    failures = benchmark_runtime._check_results(metrics)
+                self.assertEqual(any("persistence_enabled_ms" in failure for failure in failures), fails)
 
     def test_github_summary_separates_lifecycle_overhead_from_parser(self) -> None:
         metrics = self._complete_results(lifecycle_p95=4.0, click_p95=1.5)

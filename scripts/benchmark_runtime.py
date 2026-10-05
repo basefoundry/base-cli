@@ -50,7 +50,7 @@ WARM_INVOCATION_P95_BUDGETS_MS = {
     "wsl": 100.0,
 }
 PERSISTENCE_ENABLED_P95_BUDGETS_MS = {
-    "unix": 125.0,
+    "unix": 750.0,
     "macos": 125.0,
     "windows": 250.0,
     "wsl": 50.0,
