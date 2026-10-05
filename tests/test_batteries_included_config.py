@@ -261,6 +261,8 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
                 beta = BatteriesIncludedConfigLoader("beta")
                 dotted = BatteriesIncludedConfigLoader("acme.tools")
                 deploy = BatteriesIncludedConfigLoader("acme.deploy")
+                mixed_case = BatteriesIncludedConfigLoader("MyTool")
+                hyphenated = BatteriesIncludedConfigLoader("Alpha-Tool")
 
         self.assertEqual(alpha.cli_name, "Alpha-Tool")
         self.assertNotEqual(alpha.user_config_dir, root / "Alpha-Tool")
@@ -268,6 +270,8 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
         self.assertNotEqual(alpha.user_config_dir, beta.user_config_dir)
         self.assertEqual(dotted.user_config_dir, root / "acme.tools")
         self.assertEqual(deploy.user_config_dir, root / "acme.deploy")
+        self.assertEqual(mixed_case.user_config_dir, root / "MyTool")
+        self.assertEqual(hyphenated.user_config_dir, root / "Alpha-Tool")
         self.assertNotEqual(dotted.user_config_dir, deploy.user_config_dir)
 
     def test_explicit_user_config_directory_remains_authoritative(self) -> None:

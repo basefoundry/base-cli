@@ -232,9 +232,7 @@ class CliProfile:
             raise ValueError("cli_name must contain a non-empty command name")
         root = (config_root or default_config_root()).expanduser()
         selected_user_dir = (
-            user_config_dir.expanduser()
-            if user_config_dir is not None
-            else root / config_namespace_component(cli_name)
+            user_config_dir.expanduser() if user_config_dir is not None else root / config_namespace_component(cli_name)
         )
         loader = BatteriesIncludedConfigLoader(
             user_config_dir=selected_user_dir,

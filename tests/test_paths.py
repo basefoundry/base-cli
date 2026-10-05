@@ -159,5 +159,7 @@ class CliIdentityPathTests(unittest.TestCase):
     def test_config_namespace_preserves_dotted_identity_and_rejects_collisions(self) -> None:
         self.assertEqual(config_namespace_component("acme.tools"), "acme.tools")
         self.assertEqual(config_namespace_component("acme.deploy"), "acme.deploy")
+        self.assertEqual(config_namespace_component("MyTool"), "MyTool")
+        self.assertEqual(config_namespace_component("Alpha-Tool"), "Alpha-Tool")
         self.assertNotEqual(config_namespace_component("Alpha Tool"), config_namespace_component("Alpha-Tool"))
         self.assertNotIn("/", config_namespace_component("../../outside"))
