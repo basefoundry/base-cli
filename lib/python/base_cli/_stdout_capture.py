@@ -8,8 +8,12 @@ import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager, redirect_stdout
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from typing import TextIO
+
+
+class StdoutCaptureIncompleteError(RuntimeError):
+    """Raised when a child keeps stdout open past the capture deadline."""
 
 
 @contextmanager
@@ -26,6 +30,7 @@ def capture_stdout(sink: TextIO, limit: int, limit_error: type[Exception]) -> It
     spool = tempfile.SpooledTemporaryFile(max_size=1_048_576, mode="w+b")
     abandoned = Event()
     errors: list[BaseException] = []
+    spool_lock = Lock()
     overflow = False
 
     def drain() -> None:
@@ -44,7 +49,8 @@ def capture_stdout(sink: TextIO, limit: int, limit_error: type[Exception]) -> It
                     if json_mode and total > limit:
                         overflow = True
                         continue
-                    spool.write(chunk)
+                    with spool_lock:
+                        spool.write(chunk)
         except BaseException as exc:
             errors.append(exc)
         finally:
@@ -81,9 +87,20 @@ def capture_stdout(sink: TextIO, limit: int, limit_error: type[Exception]) -> It
                 os.close(write_fd)
         worker.join(timeout=2)
         if worker.is_alive():
+            # Preserve everything drained before the timeout. The descriptor
+            # may remain open in a detached child, so this is an incomplete
+            # capture rather than a stdout-size overflow.
+            with spool_lock:
+                spool.seek(0)
+                decoder = codecs.getincrementaldecoder("utf-8")("replace")
+                while chunk := spool.read(65536):
+                    sink.write(decoder.decode(chunk))
+                sink.write(decoder.decode(b"", final=True))
+                sink.flush()
             abandoned.set()
-            raise limit_error(
-                "A child retained stdout after the command returned; wait for all child processes in JSON mode."
+            raise StdoutCaptureIncompleteError(
+                "A child retained stdout after the command returned; captured output is incomplete. "
+                "Wait for child processes or redirect detached children to DEVNULL."
             )
         try:
             if errors:
