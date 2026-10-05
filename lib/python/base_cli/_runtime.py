@@ -483,7 +483,9 @@ def refresh_run_bundle_index(
             )
             _write_run_index(runs_root, bundles, log, current_run_root=current_run_root)
     except BlockingIOError:
-        log.debug("Skipping run bundle index refresh under '%s': another invocation holds the maintenance lock.", runs_root)
+        log.debug(
+            "Skipping run bundle index refresh under '%s': another invocation holds the maintenance lock.", runs_root
+        )
     except (OSError, RuntimeError) as exc:
         log.debug("Could not refresh run bundle index under '%s': %s", runs_root, exc)
 
