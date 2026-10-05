@@ -358,7 +358,8 @@ def _run_app_invocation(
             return system_exit_code(exc)
         except JsonCaptureLimitError as exc:
             if state.json_output:
-                outcome = InvocationOutcome("capture_limit", "error", ExitCode.FAILURE)
+                code = "capture_incomplete" if getattr(exc, "capture_incomplete", False) else "capture_limit"
+                outcome = InvocationOutcome(code, "error", ExitCode.FAILURE)
                 _emit_json_error(state, outcome, str(exc), output_capture)
                 return outcome.exit_code
             raise

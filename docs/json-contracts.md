@@ -35,6 +35,12 @@ If a command exceeds the limit, base-cli emits one `base-cli.error` envelope
 with `code: "capture_limit"` and exit code `1`; it never silently truncates
 the captured text. Use the NDJSON contract for larger record sets.
 
+If a child retains the inherited stdout descriptor after the command returns,
+base-cli emits `code: "capture_incomplete"` and includes the output drained
+before the timeout in the error envelope. Detached children should use
+`subprocess.DEVNULL` for stdout/stderr (and may use `start_new_session=True`)
+when running under JSON mode.
+
 ## Output and errors
 
 Both envelopes use `schema_version: 1` and stable fields:
@@ -53,7 +59,7 @@ Both envelopes use `schema_version: 1` and stable fields:
 
 Failures use `schema: "base-cli.error"`, `type: "error"`, and a deterministic
 `code` derived from the lifecycle outcome (`usage_error`, `click_error`,
-`capture_limit`, `aborted`, `interrupted`, `unexpected_error`, and so on). `details` always
+`capture_limit`, `capture_incomplete`, `aborted`, `interrupted`, `unexpected_error`, and so on). `details` always
 contains the numeric `exit_code` and captured command stdout. A command's
 human output is represented as a JSON string, so it cannot introduce prose or
 ANSI escapes as a second stdout record.
