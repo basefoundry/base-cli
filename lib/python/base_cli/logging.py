@@ -83,18 +83,14 @@ def configure_logger(
     while parent is not None and parent is not logging.root:
         parent_configured |= bool(parent.handlers) or parent.level != logging.NOTSET
         parent = parent.parent
-    configured = (
-        foreign_handlers
-        or parent_configured
-        or (logger.level != logging.NOTSET and logger.level != getattr(logger, "_base_cli_level", None))
-    )
-    if not configured:
+    externally_routed = foreign_handlers or parent_configured
+    if logger.level == logging.NOTSET:
         logger.setLevel(logging.DEBUG)
         logger._base_cli_level = logging.DEBUG  # type: ignore[attr-defined]
     if propagate is not None:
         logger.propagate = propagate
-    elif not configured:
-        logger.propagate = False
+    else:
+        logger.propagate = externally_routed
     for handler in list(logger.handlers):
         if getattr(handler, "_base_cli_owned", False):
             handler.close()

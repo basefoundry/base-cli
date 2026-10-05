@@ -43,9 +43,21 @@ def test_default_logger_does_not_duplicate_through_root() -> None:
         assert stream.getvalue().count("one warning") == 1
     finally:
         logging.root.removeHandler(root_sink)
+
+
+def test_explicit_logger_level_does_not_enable_root_propagation() -> None:
+    logger = logging.getLogger("base_cli.explicit-level-only")
+    logger.setLevel(logging.INFO)
+    logger.propagate = True
+    try:
+        configured = base_cli.configure_logger("explicit-level-only", None, False, stream=io.StringIO())
+        assert configured.level == logging.INFO
+        assert configured.propagate is False
+    finally:
         for handler in list(logger.handlers):
             handler.close()
             logger.removeHandler(handler)
+        logger.setLevel(logging.NOTSET)
 
 
 def test_parent_consumer_configuration_is_preserved() -> None:
