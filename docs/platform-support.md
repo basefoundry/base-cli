@@ -30,9 +30,9 @@ no-follow directory operations. Linux, macOS, and WSL2 provide those
 primitives; the empty leaf is retained on every platform because portable
 POSIX has no identity-bound `rmdir`. Empty nested directories and ancestors are
 retained for the same reason. Linux additionally requires readable mount IDs
-and fails closed if they are unavailable. Native Windows currently uses the
-secure fallback: it retains both directories and files and emits a cleanup
-warning rather than perform race-prone pathname recursion.
+and fails closed if they are unavailable. Native Windows uses pinned directory
+handles and removes reparse-point children only as leaves; it never descends
+through a junction or symlink.
 
 The supported Python range is Python 3.10 through 3.14. Bug reports should
 include the operating system, distribution or WSL version when relevant,
@@ -79,3 +79,15 @@ contract, which covers an in-use destination reported as `winerror` 5; other
 access-denied and permanent permission/path errors fail immediately. Transient
 retries are bounded by a one-second elapsed deadline; the destination remains
 untouched if that deadline is exhausted.
+
+### Run-bundle retention
+
+POSIX retention uses descriptor-relative no-follow directory operations. Native
+Windows uses directory handles that deny rename/delete and conflicting writes,
+pins every ancestor while descending, removes reparse-point leaves (including
+junctions) without following them, and refuses volume crossings and changed
+directory identities. Active leases
+and metadata preservation checks still apply before removal. Sharing violations
+leave the bundle for a later pass. Other platforms without safe primitives skip
+retention with one actionable warning per pass; they never use pathname recursion.
+The native runtime matrix verifies that repeated invocations enforce `max_bundles`.
