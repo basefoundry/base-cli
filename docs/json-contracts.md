@@ -85,12 +85,21 @@ errors and diagnostics still use the normal stderr and exit-code boundary.
 
 The lower-level `success_envelope()`, `error_envelope()`, `dumps_envelope()`,
 and `redact_json_value()` helpers are public for commands that need to publish
-their own structured `details` records. Secret-looking keys (`token`,
-`password`, `secret`, `api_key`, and `authorization`) and credential-bearing
-URLs are redacted recursively. Traversal is bounded to 100 container levels;
-cyclic or more deeply nested values are replaced with `[TRUNCATED]`, distinct
-from the `[REDACTED]` marker used for secrets, so public helpers cannot recurse
-indefinitely while preparing a contract.
+their own structured `details` records. Secret-looking keys and
+credential-bearing URLs are redacted recursively. The heuristic covers
+`token`, `password`, `passwd`, `pwd`, `passphrase`, `secret`, `credential`,
+`private-key`, `access-key`, `api-key`, `authorization`, `bearer`, `session`,
+`cookie`, `signature`, `otp`, `salt`, `sas`, and `pem`, including camelCase
+forms such as `accessToken`, `sessionToken`, `dbPassword`, and `bearerToken`.
+The `private-key`, `access-key`, and `api-key` compounds are also recognized
+when written as `privateKey`, `accessKey`, or `apiKey`. A generic `key` name,
+including `key-file`, `sort-key`, and `public-key`, is not treated as secret by
+itself; explicit `sensitive=True` remains the authoritative control for
+domain-specific names.
+Traversal is bounded to 100 container levels; cyclic or more deeply nested
+values are replaced with `[TRUNCATED]`, distinct from the `[REDACTED]` marker
+used for secrets, so public helpers cannot recurse indefinitely while preparing
+a contract.
 
 Golden payloads for each public contract live in
 [`tests/fixtures/contracts`](https://github.com/basefoundry/base-cli/tree/main/tests/fixtures/contracts).
