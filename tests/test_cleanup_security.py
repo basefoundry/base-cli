@@ -30,7 +30,9 @@ class CleanupSecurityTests(unittest.TestCase):
     ) -> tuple[base_cli.Context, io.StringIO]:
         stream = io.StringIO()
         logger = logging.Logger(f"cleanup-security-{id(stream)}", level=logging.DEBUG)
-        logger.addHandler(logging.StreamHandler(stream))
+        handler = logging.StreamHandler(stream)
+        handler._base_cli_owned = True
+        logger.addHandler(handler)
         context = base_cli.Context(
             cli_name="cleanup-security",
             run_id=run_id,

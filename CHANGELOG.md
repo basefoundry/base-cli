@@ -30,6 +30,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Preserve consumer-owned logging handlers, explicit levels, and parent routing across CLI invocations (#387).
 - Validate nested configuration mappings before merge/provenance traversal,
   reject recursive or excessively deep values with source-aware errors, and
   continue to accept shared YAML aliases.
