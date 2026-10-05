@@ -162,20 +162,24 @@ cache warmed past the default 20-bundle cap. Three batches report 36 invocation
 samples, serial/concurrent p95 milliseconds, and their p95 ratio; process import
 and the start barrier are outside the invocation timer. Logging measures 3,000
 INFO records per sample through a real lifecycle, both with and without persistent
-files, reporting microseconds/record and records/second.
+files, reporting microseconds/record and records/second. Each run also measures
+plain stdlib `FileHandler` logging in the same process and gates the persistent
+logging p95 against that baseline, so runner filesystem noise is represented on
+both sides of the comparison.
 
-| Profile | Concurrent / serial p95 cap | Log p95 microseconds/record cap |
-| --- | ---: | ---: |
-| unix | 6 | 100 |
-| macos | 6 | 200 |
-| windows | 10 | 150 |
-| wsl | 10 | 100 |
+| Profile | Concurrent / serial p95 cap | Persistent log p95 cap (us/record) | Persistent / stdlib p95 ratio cap |
+| --- | ---: | ---: | ---: |
+| unix | 6 | 100 | 12 |
+| macos | 6 | 200 | 12 |
+| windows | 10 | 150 | 12 |
+| wsl | 10 | 100 | 12 |
 
 These initial hosted caps allow scheduling/filesystem variation while detecting
 material regressions. `--check` rejects missing, nonfinite, and over-budget stress
-metrics. Reports retain the same CI artifact name and 90-day retention with the
-v2 schema marker; consumers must branch on that marker. Local and first hosted
-measurements are retained with this PR before further tightening of the caps.
+metrics, including a persistent-to-stdlib p95 ratio above 12x. Reports retain the
+same CI artifact name and 90-day retention with the v2 schema marker; consumers
+must branch on that marker. Local and first hosted measurements are retained with
+this PR before further tightening of the caps.
 
 Development-host calibration (macOS, Python 3.14.6, 31 serial/log samples and
 36 concurrent samples): concurrent/serial p95 ratio 2.42; ephemeral logging p95

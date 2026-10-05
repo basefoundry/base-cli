@@ -165,6 +165,7 @@ class BenchmarkSummaryTests(unittest.TestCase):
                 "concurrent_to_serial_p95_ratio",
                 "logging_persistent_us_per_record",
                 "logging_ephemeral_us_per_record",
+                "persistent_to_stdlib_log_p95_ratio",
             ):
                 with self.subTest(profile=profile, metric=metric):
                     metrics = self._complete_results()
@@ -177,7 +178,7 @@ class BenchmarkSummaryTests(unittest.TestCase):
     def test_stress_missing_and_nonfinite_samples_fail(self) -> None:
         metrics = self._complete_results()
         metrics["base-cli"]["stress"] = {"concurrent_to_serial_p95_ratio": float("nan")}
-        self.assertEqual(sum("missing, invalid" in failure for failure in benchmark_runtime._check_results(metrics)), 3)
+        self.assertEqual(sum("missing, invalid" in failure for failure in benchmark_runtime._check_results(metrics)), 5)
 
     @staticmethod
     def _summary(p95: float) -> dict[str, float]:
@@ -211,6 +212,8 @@ class BenchmarkSummaryTests(unittest.TestCase):
                     "concurrent_to_serial_p95_ratio": 2.0,
                     "logging_persistent_us_per_record": cls._summary(10.0),
                     "logging_ephemeral_us_per_record": cls._summary(5.0),
+                    "logging_stdlib_us_per_record": cls._summary(3.0),
+                    "persistent_to_stdlib_log_p95_ratio": 10.0 / 3.0,
                 },
                 "features": {
                     "lifecycle_noop_ms": cls._summary(1.0),

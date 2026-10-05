@@ -7,6 +7,7 @@ import argparse
 import datetime as dt
 import importlib.util
 import json
+import logging
 import math
 import os
 import platform
@@ -60,6 +61,7 @@ RESULT_SCHEMA = "base-cli.benchmark"
 RESULT_SCHEMA_VERSION = 2
 CONCURRENCY_RATIO_BUDGETS = {"unix": 6.0, "macos": 6.0, "windows": 10.0, "wsl": 10.0}
 LOG_P95_BUDGETS_US = {"unix": 100.0, "macos": 200.0, "windows": 150.0, "wsl": 100.0}
+LOG_TO_STDLIB_P95_RATIO_BUDGETS = {"unix": 12.0, "macos": 12.0, "windows": 12.0, "wsl": 12.0}
 
 
 class Summary(TypedDict):
@@ -149,6 +151,7 @@ def main() -> int:
         "stress_budgets": {
             "concurrent_to_serial_p95_ratio": CONCURRENCY_RATIO_BUDGETS[BENCHMARK_PLATFORM],
             "log_p95_us_per_record": LOG_P95_BUDGETS_US[BENCHMARK_PLATFORM],
+            "persistent_to_stdlib_log_p95_ratio": LOG_TO_STDLIB_P95_RATIO_BUDGETS[BENCHMARK_PLATFORM],
         },
     }
 
@@ -358,6 +361,16 @@ def _check_results(results: dict[str, FrameworkMetrics]) -> list[str]:
         p95 = _metric_p95(stress, name)
         if p95 is None or not math.isfinite(p95) or p95 > LOG_P95_BUDGETS_US[BENCHMARK_PLATFORM]:
             failures.append(f"{name} p95 is missing, invalid, or exceeds budget")
+    stdlib_p95 = _metric_p95(stress, "logging_stdlib_us_per_record")
+    persistent_ratio = stress.get("persistent_to_stdlib_log_p95_ratio")
+    if stdlib_p95 is None or not math.isfinite(stdlib_p95) or stdlib_p95 <= 0:
+        failures.append("logging_stdlib_us_per_record p95 is missing, invalid, or non-positive")
+    if (
+        not isinstance(persistent_ratio, (int, float))
+        or not math.isfinite(persistent_ratio)
+        or persistent_ratio > LOG_TO_STDLIB_P95_RATIO_BUDGETS[BENCHMARK_PLATFORM]
+    ):
+        failures.append("persistent-to-stdlib logging p95 ratio is missing, invalid, or exceeds budget")
     if BENCHMARK_PLATFORM in {"unix", "macos"} and isinstance(features, dict):
         persistence = features.get("persistence_enabled_ms", {})
         median = persistence.get("median") if isinstance(persistence, dict) else None
@@ -814,6 +827,8 @@ print((time.perf_counter_ns() - started) / 1_000_000, flush=True)
             "concurrent_to_serial_p95_ratio": _summary(concurrent)["p95"] / _summary(serial)["p95"],
             "logging_records_per_sample": 3000,
         }
+        stdlib_samples = _measure_stdlib_logging(iterations, root)
+        result_metrics["logging_stdlib_us_per_record"] = _summary(stdlib_samples)
         for persistent, label in ((False, "ephemeral"), (True, "persistent")):
             samples = []
             app = base_cli.App(name=f"benchmark-log-{label}", log_to_file=persistent)
@@ -833,7 +848,36 @@ print((time.perf_counter_ns() - started) / 1_000_000, flush=True)
                         raise RuntimeError(f"logging benchmark failed: {result.output}")
             result_metrics[f"logging_{label}_us_per_record"] = _summary(samples)
             result_metrics[f"logging_{label}_records_per_second"] = _summary([1_000_000 / sample for sample in samples])
+        persistent_p95 = cast(Summary, result_metrics["logging_persistent_us_per_record"])["p95"]
+        stdlib_p95 = cast(Summary, result_metrics["logging_stdlib_us_per_record"])["p95"]
+        result_metrics["persistent_to_stdlib_log_p95_ratio"] = persistent_p95 / stdlib_p95
         return result_metrics
+
+
+def _measure_stdlib_logging(iterations: int, root: Path) -> list[float]:
+    """Measure plain stdlib file logging in the same process and run."""
+
+    log_dir = root / "stdlib"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    logger = logging.getLogger(f"base-cli-benchmark-stdlib-{id(root)}")
+    logger.handlers.clear()
+    logger.propagate = False
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler(log_dir / "run.log", encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+    samples: list[float] = []
+    try:
+        for _ in range(iterations):
+            started = time.perf_counter_ns()
+            for index in range(3000):
+                logger.info("record %s", index)
+            handler.flush()
+            samples.append((time.perf_counter_ns() - started) / 3000 / 1000)
+    finally:
+        logger.removeHandler(handler)
+        handler.close()
+    return samples
 
 
 def _measure_runner(iterations: int, callback: Callable[[], Any]) -> list[float]:
