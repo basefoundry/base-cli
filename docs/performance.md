@@ -166,7 +166,7 @@ files, reporting microseconds/record and records/second.
 
 | Profile | Concurrent / serial p95 cap | Log p95 microseconds/record cap |
 | --- | ---: | ---: |
-| unix | 6 | 80 |
+| unix | 6 | 100 |
 | macos | 6 | 200 |
 | windows | 10 | 150 |
 | wsl | 10 | 100 |
