@@ -61,3 +61,18 @@ def test_human_stdout_is_unchanged(tmp_path: Path) -> None:
     result = _run(tmp_path, "subprocess.run([sys.executable, '-c', 'print(42)'], check=True)", [])
     assert result.returncode == 0
     assert result.stdout == "42\n"
+
+
+def test_detached_child_reports_incomplete_capture_with_partial_stdout(tmp_path: Path) -> None:
+    result = _run(
+        tmp_path,
+        """child = subprocess.Popen([sys.executable, '-c', 'import time; print(\\"child\\", flush=True); time.sleep(5)'])
+print('parent', flush=True)
+""",
+        ["--json"],
+    )
+    assert result.returncode != 0
+    envelope = json.loads(result.stdout)
+    assert envelope["code"] == "capture_incomplete"
+    assert "parent" in envelope["details"]["stdout"]
+    assert "incomplete" in envelope["message"]
