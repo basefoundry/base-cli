@@ -1030,7 +1030,7 @@ base_cli.command(...)
 
 ### `configure_logger`
 **Kind:** function  
-**Signature:** `configure_logger(cli_name: 'str', log_file: 'Path | None', debug: 'bool', *, quiet: 'bool' = False, stream: 'TextIO | None' = None, formatter: 'logging.Formatter | None' = None, json_logs: 'bool' = False, run_id: 'str | None' = None, log_level: 'str | None' = None) -> 'logging.Logger'`
+**Signature:** `configure_logger(cli_name: 'str', log_file: 'Path | None', debug: 'bool', *, quiet: 'bool' = False, stream: 'TextIO | None' = None, formatter: 'logging.Formatter | None' = None, json_logs: 'bool' = False, run_id: 'str | None' = None, log_level: 'str | None' = None, propagate: 'bool | None' = None) -> 'logging.Logger'`
 
 **Behavior:** Configure user-facing and persistent handlers for a CLI logger.
 

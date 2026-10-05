@@ -55,3 +55,22 @@ The full gate writes a machine-readable result to
 `$BASE_CLI_VALIDATION_RESULT` (or `/tmp/base-cli-validation-result.json`). If
 Node.js is unavailable, the result is marked `partial`, the gate exits with
 status `2`, and it cannot be reported as an authoritative pass.
+
+Examples and compatibility consumers use the fully parameterized context type
+when strict mypy checks a callback directly:
+
+```python
+from typing import Any
+import base_cli
+
+def main(ctx: base_cli.Context[Any, Any, Any]) -> None:
+    ...
+```
+
+### Consumer source quality
+
+The style gate runs Ruff over the entire repository with its standard generated-file
+exclusions. The typing gate checks every Git-visible Python source outside `lib/`
+(checked separately), `scripts/` (validation tools), and `tests/` (test harnesses)
+with strict mypy. This includes example and compatibility consumer packages and
+new top-level source directories; untracked sources are included during development.

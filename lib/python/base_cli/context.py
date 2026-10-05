@@ -156,6 +156,8 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
         elif not preserve_temp_ownership:
             self._close_owned_temp_descriptor()
         for handler in list(self.log.handlers):
+            if not getattr(handler, "_base_cli_owned", False):
+                continue
             try:
                 handler.flush()
             except BaseException as exc:  # pylint: disable=broad-exception-caught

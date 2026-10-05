@@ -60,6 +60,21 @@ exceptions. Interrupts and other non-success outcomes are therefore visible as
 errors while retaining the existing `base_cli.outcome` attribute for detailed
 dashboard filtering.
 
+## Logger ownership
+
+The lifecycle uses `base_cli.<cli_name>` and owns only the handlers it creates.
+Consumer handlers remain attached and open after configuration and cleanup.
+An explicit consumer logger level, or configuration on the `base_cli` parent,
+is preserved, including `logging.config.dictConfig()` routing. Such levels may
+filter records before the lifecycle handlers see them. Configure the consumer
+logger at DEBUG if the persistent handler should receive every record.
+
+Unconfigured CLI loggers use DEBUG with propagation disabled to avoid duplicate
+terminal output. `configure_logger(..., propagate=True)` explicitly enables host
+routing; `False` disables it, and the default `None` preserves consumer routing.
+Use a consumer handler or configure the `base_cli` parent before invoking an App
+when embedding it in a host with centralized logging.
+
 ## Log timestamp environment variable
 
 Set `BASE_CLI_LOG_UTC=1` to make the default text formatter use UTC

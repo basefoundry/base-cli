@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import base_cli
 
 app = base_cli.App(
@@ -13,7 +15,7 @@ app = base_cli.App(
 
 @app.command()
 @base_cli.option("--name", required=True, help="Name to greet.")
-def greet(ctx: base_cli.Context, name: str) -> None:
+def greet(ctx: base_cli.Context[Any, Any, Any], name: str) -> None:
     """Print a deterministic greeting."""
 
     ctx.log.info("greeting requested for %s", name)
