@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
-import logging
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 from base_cli import _runtime as runtime
 
@@ -66,7 +66,7 @@ def test_concurrent_passes_converge_after_a_serial_pass(tmp_path: Path) -> None:
         bundle = tmp_path / f"run-{index:02d}"
         bundle.mkdir()
         (bundle / "run.json").write_text(
-            '{"run_id": "run-%02d", "status": "ok", "started_at": "2020-01-01T00:00:00Z"}' % index,
+            f'{{"run_id": "run-{index:02d}", "status": "ok", "started_at": "2020-01-01T00:00:00Z"}}',
             encoding="utf-8",
         )
     code = """
