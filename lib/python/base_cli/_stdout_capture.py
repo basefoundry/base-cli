@@ -12,6 +12,10 @@ from threading import Event, Lock, Thread
 from typing import TextIO
 
 
+class StdoutCaptureIncompleteError(RuntimeError):
+    """Raised when a child keeps stdout open past the capture deadline."""
+
+
 @contextmanager
 def capture_stdout(sink: TextIO, limit: int, limit_error: type[Exception]) -> Iterator[None]:
     """Drain fd 1 concurrently, restore it, then replay through the JSON limiter.
@@ -94,12 +98,10 @@ def capture_stdout(sink: TextIO, limit: int, limit_error: type[Exception]) -> It
                 sink.write(decoder.decode(b"", final=True))
                 sink.flush()
             abandoned.set()
-            error = limit_error(
+            raise StdoutCaptureIncompleteError(
                 "A child retained stdout after the command returned; captured output is incomplete. "
                 "Wait for child processes or redirect detached children to DEVNULL."
             )
-            setattr(error, "capture_incomplete", True)
-            raise error
         try:
             if errors:
                 raise OSError("Could not capture process stdout") from errors[0]
