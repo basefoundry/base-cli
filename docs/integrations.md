@@ -53,6 +53,13 @@ paths, and secrets are never attached. A missing API package, invalid provider,
 or failing exporter is logged at debug level and treated as a no-op; it cannot
 change the command's exit status or cleanup behavior.
 
+The span status is `OK` for a successful invocation and `ERROR` for every
+non-success outcome. Unexpected exceptions are recorded on failed spans;
+successful `SystemExit(0)` and Click exit-control flow are not recorded as
+exceptions. Interrupts and other non-success outcomes are therefore visible as
+errors while retaining the existing `base_cli.outcome` attribute for detailed
+dashboard filtering.
+
 ## Logger ownership
 
 The lifecycle uses `base_cli.<cli_name>` and owns only the handlers it creates.

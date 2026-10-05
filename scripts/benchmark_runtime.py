@@ -760,7 +760,11 @@ status = base_cli.run_app(app, [])
 assert status == 0
 print((time.perf_counter_ns() - started) / 1_000_000, flush=True)
 """
-    workers = 12
+    # Keep the workload large enough to contend, but do not turn a hosted
+    # runner's scheduler capacity into the benchmark signal. More batches
+    # preserve the 36-sample contract on smaller runners.
+    workers = min(12, max(2, os.cpu_count() or 2))
+    batches = max(3, (36 + workers - 1) // workers)
     with tempfile.TemporaryDirectory(prefix="base-cli-stress-") as temporary:
         root = Path(temporary)
         env = {**os.environ, "BASE_CLI_CACHE_DIR": str(root / "cache")}
@@ -773,7 +777,7 @@ print((time.perf_counter_ns() - started) / 1_000_000, flush=True)
             )
             serial.append(float(result.stdout.strip()))
         concurrent = []
-        for batch in range(3):
+        for batch in range(batches):
             barrier = root / f"start-{batch}"
             processes = [
                 subprocess.Popen(
@@ -803,6 +807,7 @@ print((time.perf_counter_ns() - started) / 1_000_000, flush=True)
                     process.communicate()
         result_metrics: dict[str, Any] = {
             "workers": workers,
+            "batches": batches,
             "concurrent_samples": len(concurrent),
             "serial_ms": _summary(serial),
             "concurrent_ms": _summary(concurrent),

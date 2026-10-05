@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import io
 import logging
+import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
 import base_cli
 import base_cli.logging as module
+import pytest
 from base_cli.testing import invoke
 
 
@@ -19,6 +23,57 @@ def test_sidecar_is_opened_once_and_closed(tmp_path: Path) -> None:
     stream = handler._lock_stream
     handler.close()
     assert stream.closed
+
+
+def test_shared_formatter_handles_concurrent_user_and_file_logging(tmp_path: Path) -> None:
+    user_stream = io.StringIO()
+    formatter = module.CliFormatter()
+    logger = base_cli.configure_logger(
+        "shared-formatter-race",
+        tmp_path / "run.log",
+        debug=True,
+        stream=user_stream,
+        formatter=formatter,
+        propagate=False,
+    )
+    try:
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            list(executor.map(logger.info, (f"message-{index}" for index in range(64))))
+        assert user_stream.getvalue().count("message-") == 64
+        assert (tmp_path / "run.log").read_text(encoding="utf-8").count("message-") == 64
+    finally:
+        for handler in list(logger.handlers):
+            handler.close()
+            logger.removeHandler(handler)
+
+
+def test_forked_handler_recovers_after_inherited_lock_close_failure(tmp_path: Path) -> None:
+    handler = module.SecureLogFileHandler(tmp_path / "run.log")
+    record = logging.LogRecord("test", logging.INFO, __file__, 1, "message", (), None)
+
+    class FailingStream:
+        def close(self) -> None:
+            raise OSError("already closed")
+
+    handler._lock_stream = FailingStream()  # type: ignore[assignment]
+    handler._lock_pid = os.getpid() - 1
+    try:
+        handler.emit(record)
+        assert handler._lock_pid == os.getpid()
+        assert handler._lock_stream is not None
+    finally:
+        handler.close()
+
+
+def test_recursion_errors_follow_stdlib_handler_contract(tmp_path: Path) -> None:
+    handler = module.SecureLogFileHandler(tmp_path / "run.log")
+    record = logging.LogRecord("test", logging.INFO, __file__, 1, "message", (), None)
+    try:
+        with patch.object(logging.FileHandler, "emit", side_effect=RecursionError("recursive")):
+            with pytest.raises(RecursionError, match="recursive"):
+                handler.emit(record)
+    finally:
+        handler.close()
 
 
 def test_logging_lock_failures_do_not_fail_command(tmp_path: Path) -> None:

@@ -149,8 +149,10 @@ leases under the lock.
 `RetentionPolicy.safe_defaults()` includes `max_total_bytes=512 MiB`, so the
 default policy uses the byte-policy recursive-walk bounds described above. A
 consumer that needs only count/age retention can explicitly omit the byte cap.
-The concurrent benchmark in #391 measures twelve processes against one warmed
-cache and gates the p95-to-serial ratio.
+The concurrent benchmark in #391 measures up to twelve processes against one
+warmed cache. It caps each batch at the runner's available CPU count and uses
+additional batches on smaller runners so the p95-to-serial ratio is less
+dominated by scheduler oversubscription.
 
 ### Benchmark report v2: contention and logging
 
@@ -194,5 +196,5 @@ was 25.82 us/record. Its hosted cap is therefore calibrated to 60 us/record; the
 other logging and concurrency caps are unchanged. This remains below the original
 107 us/record development-host regression, while retaining room for hosted tails.
 The corresponding `base-cli-benchmark-{profile}-37054920383` artifacts contain
-machine metadata and all measured summaries. Unix calibration remains subject to
-its hosted check before merge.
+machine metadata and all measured summaries. The Unix calibration is covered by
+the hosted evidence linked above.
