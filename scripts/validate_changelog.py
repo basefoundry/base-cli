@@ -163,8 +163,7 @@ def _validate_published_sections(
             continue
         except OSError as exc:
             errors.append(
-                f"cannot verify [{version}] against tag {tag}: {exc}; "
-                "fetch the release tags before validating"
+                f"cannot verify [{version}] against tag {tag}: {exc}; fetch the release tags before validating"
             )
             continue
         tagged_lines = completed.stdout.splitlines()
