@@ -126,16 +126,22 @@ class BenchmarkSummaryTests(unittest.TestCase):
         self.assertTrue(any("persistence_enabled_ms p95 exceeded 250 ms" in failure for failure in failures))
 
     def test_persistence_budget_separates_sustained_cost_from_filesystem_tails(self) -> None:
-        for profile in ("unix", "macos"):
-            for median, p95, fails in ((26.0, 118.0, False), (51.0, 60.0, True), (26.0, 126.0, True)):
-                with self.subTest(profile=profile, median=median, p95=p95):
-                    metrics = self._complete_results()
-                    sample = self._summary(p95)
-                    sample["median"] = median
-                    metrics["base-cli"]["features"]["persistence_enabled_ms"] = sample
-                    with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", profile):
-                        failures = benchmark_runtime._check_results(metrics)
-                    self.assertEqual(any("persistence_enabled_ms" in failure for failure in failures), fails)
+        cases = (
+            ("unix", 26.0, 588.0, False),
+            ("unix", 26.0, 751.0, True),
+            ("macos", 26.0, 118.0, False),
+            ("macos", 51.0, 60.0, True),
+            ("macos", 26.0, 126.0, True),
+        )
+        for profile, median, p95, fails in cases:
+            with self.subTest(profile=profile, median=median, p95=p95):
+                metrics = self._complete_results()
+                sample = self._summary(p95)
+                sample["median"] = median
+                metrics["base-cli"]["features"]["persistence_enabled_ms"] = sample
+                with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", profile):
+                    failures = benchmark_runtime._check_results(metrics)
+                self.assertEqual(any("persistence_enabled_ms" in failure for failure in failures), fails)
 
     def test_github_summary_separates_lifecycle_overhead_from_parser(self) -> None:
         metrics = self._complete_results(lifecycle_p95=4.0, click_p95=1.5)
@@ -158,6 +164,27 @@ class BenchmarkSummaryTests(unittest.TestCase):
         self.assertIn("Lifecycle overhead versus parser dispatch", summary)
         self.assertIn("base-cli lifecycle increment over Click warm p95", summary)
         self.assertIn("Base CLI feature scenarios", summary)
+
+    def test_stress_regressions_fail_every_platform_profile(self) -> None:
+        for profile in ("unix", "macos", "windows", "wsl"):
+            for metric in (
+                "concurrent_to_serial_p95_ratio",
+                "logging_persistent_us_per_record",
+                "logging_ephemeral_us_per_record",
+                "persistent_to_stdlib_log_p95_ratio",
+            ):
+                with self.subTest(profile=profile, metric=metric):
+                    metrics = self._complete_results()
+                    stress = metrics["base-cli"]["stress"]
+                    stress[metric] = 1000.0 if metric.endswith("ratio") else self._summary(1000.0)
+                    with mock.patch.object(benchmark_runtime, "BENCHMARK_PLATFORM", profile):
+                        failures = benchmark_runtime._check_results(metrics)
+                    self.assertTrue(any("exceeds budget" in failure for failure in failures))
+
+    def test_stress_missing_and_nonfinite_samples_fail(self) -> None:
+        metrics = self._complete_results()
+        metrics["base-cli"]["stress"] = {"concurrent_to_serial_p95_ratio": float("nan")}
+        self.assertEqual(sum("missing, invalid" in failure for failure in benchmark_runtime._check_results(metrics)), 5)
 
     @staticmethod
     def _summary(p95: float) -> dict[str, float]:
@@ -187,6 +214,13 @@ class BenchmarkSummaryTests(unittest.TestCase):
             {
                 "lifecycle_warm_invocation_ms": cls._summary(lifecycle_p95),
                 "production_warm_invocation_ms": cls._summary(4.0),
+                "stress": {
+                    "concurrent_to_serial_p95_ratio": 2.0,
+                    "logging_persistent_us_per_record": cls._summary(10.0),
+                    "logging_ephemeral_us_per_record": cls._summary(5.0),
+                    "logging_stdlib_us_per_record": cls._summary(3.0),
+                    "persistent_to_stdlib_log_p95_ratio": 10.0 / 3.0,
+                },
                 "features": {
                     "lifecycle_noop_ms": cls._summary(1.0),
                     "json_success_ms": cls._summary(1.0),
