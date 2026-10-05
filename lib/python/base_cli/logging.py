@@ -205,10 +205,14 @@ class SecureLogFileHandler(logging.FileHandler):
                 restrict_file(self._lock_path)
                 current = os.stat(self._lock_path, follow_symlinks=False)
                 stream_stat = os.fstat(self._lock_stream.fileno())
-                if self._lock_identity != (current.st_dev, current.st_ino) or (
-                    stream_stat.st_dev,
-                    stream_stat.st_ino,
-                ) != self._lock_identity:
+                if (
+                    self._lock_identity != (current.st_dev, current.st_ino)
+                    or (
+                        stream_stat.st_dev,
+                        stream_stat.st_ino,
+                    )
+                    != self._lock_identity
+                ):
                     stale = self._lock_stream
                     self._lock_stream = None
                     self._lock_identity = None
