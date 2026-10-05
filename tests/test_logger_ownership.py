@@ -33,6 +33,40 @@ def test_consumer_handler_and_level_survive_invocation(tmp_path: Path) -> None:
         logger.removeHandler(sink)
 
 
+def test_foreign_handler_without_level_preserves_debug_records(tmp_path: Path) -> None:
+    logger = logging.getLogger("base_cli.foreign-handler-no-level")
+    consumer_stream = io.StringIO()
+    consumer_handler = logging.StreamHandler(consumer_stream)
+    user_stream = io.StringIO()
+    log_file = tmp_path / "run.log"
+    logger.addHandler(consumer_handler)
+    logger.setLevel(logging.NOTSET)
+    logger.propagate = False
+    try:
+        configured = base_cli.configure_logger(
+            "foreign-handler-no-level",
+            log_file,
+            debug=True,
+            stream=user_stream,
+            propagate=False,
+        )
+        configured.info("info marker")
+        configured.debug("debug marker")
+        assert "info marker" in user_stream.getvalue()
+        assert "debug marker" in user_stream.getvalue()
+        assert "info marker" in consumer_stream.getvalue()
+        assert "debug marker" in consumer_stream.getvalue()
+        file_text = log_file.read_text(encoding="utf-8")
+        assert "info marker" in file_text
+        assert "debug marker" in file_text
+    finally:
+        for handler in list(logger.handlers):
+            handler.close()
+            logger.removeHandler(handler)
+        logger.setLevel(logging.NOTSET)
+        logger.propagate = True
+
+
 def test_default_logger_does_not_duplicate_through_root() -> None:
     stream = io.StringIO()
     root_sink = logging.StreamHandler(stream)
