@@ -74,7 +74,6 @@ exclusions. The typing gate checks every Git-visible Python source outside `lib/
 (checked separately), `scripts/` (validation tools), and `tests/` (test harnesses)
 with strict mypy. This includes example and compatibility consumer packages and
 new top-level source directories; untracked sources are included during development.
-
 ### Project Intake recovery
 
 Project Intake uses REST exclusively, verifies each managed field by independent
