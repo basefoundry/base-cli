@@ -167,6 +167,9 @@ def secure_log_file_permissions(log_file: Path) -> None:
 class SecureLogFileHandler(logging.FileHandler):
     def __init__(self, filename: str | os.PathLike[str], *args: object, **kwargs: object) -> None:
         self._lock_path = Path(filename).with_name(f".{Path(filename).name}.lock")
+        self._lock_stream: BinaryIO | None = None
+        self._lock_identity: tuple[int, int] | None = None
+        self._lock_pid = os.getpid()
         super().__init__(filename, *args, **kwargs)  # type: ignore[arg-type]
 
     def _open(self) -> TextIOWrapper:
@@ -184,22 +187,79 @@ class SecureLogFileHandler(logging.FileHandler):
             raise
 
     def emit(self, record: logging.LogRecord) -> None:
-        lock_stream = _open_log_lock(self._lock_path)
         try:
-            _lock_log_stream(lock_stream)
-            super().emit(record)
+            # An inherited flock descriptor would share ownership with the parent.
+            if self._lock_pid != os.getpid():
+                inherited = self._lock_stream
+                self._lock_stream = None
+                self._lock_identity = None
+                self._lock_pid = os.getpid()
+                if inherited is not None:
+                    try:
+                        inherited.close()
+                    except OSError:
+                        pass
+            if self._lock_stream is not None:
+                try:
+                    current = os.stat(self._lock_path, follow_symlinks=False)
+                    stream_stat = os.fstat(self._lock_stream.fileno())
+                except FileNotFoundError:
+                    current = None
+                    stream_stat = None
+                if (
+                    current is None
+                    or stream_stat is None
+                    or (
+                        self._lock_identity != (current.st_dev, current.st_ino)
+                        or (stream_stat.st_dev, stream_stat.st_ino) != self._lock_identity
+                    )
+                ):
+                    stale = self._lock_stream
+                    self._lock_stream = None
+                    self._lock_identity = None
+                    stale.close()
+                else:
+                    try:
+                        restrict_file(self._lock_path)
+                    except FileNotFoundError:
+                        stale = self._lock_stream
+                        self._lock_stream = None
+                        self._lock_identity = None
+                        stale.close()
+            if self._lock_stream is None:
+                self._lock_stream = _open_log_lock(self._lock_path)
+                lock_stat = os.fstat(self._lock_stream.fileno())
+                self._lock_identity = (lock_stat.st_dev, lock_stat.st_ino)
+            _lock_log_stream(self._lock_stream)
+            try:
+                super().emit(record)
+            finally:
+                _unlock_log_stream(self._lock_stream)
+        except RecursionError:
+            raise
+        except Exception:
+            self.handleError(record)
+
+    def close(self) -> None:
+        self.acquire()
+        try:
+            stream, self._lock_stream = self._lock_stream, None
+            self._lock_identity = None
+            try:
+                if stream is not None:
+                    stream.close()
+            finally:
+                super().close()
         finally:
-            _unlock_log_stream(lock_stream)
-            lock_stream.close()
+            self.release()
 
 
 def _open_log_lock(path: Path) -> BinaryIO:
     path.parent.mkdir(parents=True, exist_ok=True)
     stream = path.open("a+b")
     try:
-        if stream.seek(0, os.SEEK_END) == 0:
-            stream.write(b"0")
-            stream.flush()
+        # Byte-range locks may extend beyond EOF. Writing a sentinel before
+        # acquiring the lock races a Windows writer already holding byte zero.
         restrict_file(path)
         return stream
     except BaseException:
@@ -253,13 +313,19 @@ class CliFormatter(logging.Formatter):
                 resolved_use_utc = legacy_use_utc == "1"
         self.use_utc = resolved_use_utc
         self.use_color = use_color
+        self._source_key: tuple[object, ...] | None = None
+        self._source_roots: tuple[Path, ...] = ()
+        self._source_cache: dict[str, str] = {}
+        self._cache_lock = RLock()
+        self._time_key: tuple[object, ...] | None = None
+        self._time_text = ""
         datefmt = "%Y-%m-%d %H:%M:%S UTC" if self.use_utc else "%Y-%m-%d %H:%M:%S %z"
         super().__init__(datefmt=datefmt)
         self.converter = time.gmtime if self.use_utc else time.localtime
 
     def format(self, record: logging.LogRecord) -> str:
         timestamp = self.formatTime(record, self.datefmt)
-        source = _source_path(record)
+        source = self._source_path(record)
         level = _level_name(record)
         line = f"{timestamp} {level:<7} {source}:{record.lineno} {record.getMessage()}"
         if record.exc_info:
@@ -273,6 +339,49 @@ class CliFormatter(logging.Formatter):
         color = _LEVEL_COLORS.get(record.levelno)
         return f"{color}{line}{_COLOR_RESET}" if color else line
 
+    def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
+        with self._cache_lock:
+            if datefmt is None:
+                return super().formatTime(record, datefmt)
+            # Human timestamps have second precision. Repeated calls to localtime
+            # and strftime otherwise re-read timezone state on some platforms.
+            key = (record.created // 1, datefmt, self.converter, os.environ.get("TZ"), time.tzname)
+            if key != self._time_key:
+                self._time_text = super().formatTime(record, datefmt)
+                self._time_key = key
+            return self._time_text
+
+    def _source_path(self, record: logging.LogRecord) -> str:
+        with self._cache_lock:
+            cwd = current_working_dir()
+            try:
+                context = get_current_context()
+            except RuntimeError:
+                key: tuple[object, ...] = (None, cwd)
+                roots: tuple[Path, ...] = (cwd,)
+            else:
+                key = (context.run_id, context.application_home, context.project_root, cwd)
+                roots = tuple(p for p in (context.application_home, context.project_root) if p is not None)
+            if key != self._source_key:
+                self._source_roots = tuple(p.resolve() for p in (*roots, cwd))
+                self._source_key = key
+                self._source_cache.clear()
+            cached = self._source_cache.get(record.pathname)
+            if cached is not None:
+                return cached
+            path = Path(record.pathname).resolve()
+            source = str(path)
+            for root in self._source_roots:
+                try:
+                    source = str(path.relative_to(root))
+                    break
+                except ValueError:
+                    continue
+            if len(self._source_cache) >= 256:
+                self._source_cache.clear()
+            self._source_cache[record.pathname] = source
+            return source
+
 
 def _level_name(record: logging.LogRecord) -> str:
     if record.levelno == logging.WARNING:
@@ -280,41 +389,6 @@ def _level_name(record: logging.LogRecord) -> str:
     if record.levelno == logging.CRITICAL:
         return "FATAL"
     return record.levelname
-
-
-def _source_path(record: logging.LogRecord) -> str:
-    path = Path(record.pathname)
-    candidates = []
-    application_home = _active_application_home()
-    if application_home is not None:
-        candidates.append(application_home)
-    project_root = _active_project_root()
-    if project_root is not None:
-        candidates.append(project_root)
-    candidates.append(current_working_dir())
-
-    for root in candidates:
-        try:
-            return str(path.resolve().relative_to(root.resolve()))
-        except ValueError:
-            continue
-    return str(path.resolve())
-
-
-def _active_project_root() -> Path | None:
-    try:
-        context = get_current_context()
-    except RuntimeError:
-        return None
-    return context.project_root
-
-
-def _active_application_home() -> Path | None:
-    try:
-        context = get_current_context()
-    except RuntimeError:
-        return None
-    return context.application_home
 
 
 def log_invocation(
