@@ -26,6 +26,11 @@ in memory and rolls the remainder to a temporary file, so both temporary-disk
 use and finalization memory remain bounded. The temporary file is removed when
 the invocation ends.
 
+The JSON capture boundary temporarily redirects process-wide file descriptor 1.
+`run_app()` therefore rejects concurrent invocations in one process; callers
+that need parallel CLI work should use separate processes or serialize the
+invocations.
+
 The mode check respects Click option arity: a value such as
 `--payload --json` does not activate JSON when `--json` is the payload. It does
 not run consumer callbacks, defaults, type converters, or close hooks as a
