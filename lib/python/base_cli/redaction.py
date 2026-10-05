@@ -6,7 +6,42 @@ from dataclasses import dataclass
 from typing import Any
 
 REDACTED = "[REDACTED]"
-SECRET_KEY_RE = re.compile(r"(token|password|secret|api[-_]?key|authorization)", re.IGNORECASE)
+KEY_NAME_PATTERN = r"[A-Za-z][A-Za-z0-9_-]*"
+SECRET_KEY_STEMS = frozenset(
+    {
+        "authorization",
+        "bearer",
+        "cookie",
+        "credential",
+        "passphrase",
+        "passwd",
+        "password",
+        "pem",
+        "pwd",
+        "sas",
+        "salt",
+        "secret",
+        "session",
+        "signature",
+        "token",
+        "otp",
+    }
+)
+SECRET_KEY_COMPOUNDS = frozenset({("access", "key"), ("api", "key"), ("private", "key")})
+SECRET_KEY_SUBSTRINGS = frozenset(
+    {
+        "apikey",
+        "authorization",
+        "credential",
+        "passwd",
+        "password",
+        "passphrase",
+        "secret",
+        "token",
+    }
+)
+_KEY_NAME_RE = re.compile(KEY_NAME_PATTERN)
+_CAMEL_TOKEN_RE = re.compile(r"[A-Z]+(?=[A-Z][a-z]|[0-9]|$)|[A-Z]?[a-z]+|[0-9]+")
 URL_CREDENTIALS_RE = re.compile(r"(?P<prefix>[a-zA-Z][a-zA-Z0-9+.-]*://)[^/@\s]+@")
 # Punctuation is part of a value unless it is immediately followed by another
 # assignment segment. This prevents ``PASSWORD=abc,def`` from exposing ``def``
@@ -16,11 +51,11 @@ _INLINE_SEGMENT_END = (
     r"|\s+[A-Za-z][A-Za-z0-9_-]*\s*[=:])|$)"
 )
 _INLINE_KEY_VALUE_RE = re.compile(
-    rf"(?P<key>(?<![A-Za-z0-9_-])[A-Za-z][A-Za-z0-9_-]*)(?P<separator>=)"
+    rf"(?P<key>(?<![A-Za-z0-9_-]){KEY_NAME_PATTERN})(?P<separator>=)"
     rf"(?P<value>[^\n]*?){_INLINE_SEGMENT_END}"
 )
 _INLINE_COLON_VALUE_RE = re.compile(
-    rf"(?P<key>(?<![A-Za-z0-9_-])[A-Za-z][A-Za-z0-9_-]*)"
+    rf"(?P<key>(?<![A-Za-z0-9_-]){KEY_NAME_PATTERN})"
     rf"(?P<separator>\s*:(?!//)\s*)(?P<value>[^\n]*?){_INLINE_SEGMENT_END}"
 )
 
@@ -160,7 +195,20 @@ def redact_argv(argv: list[str], sensitive_options: set[str]) -> list[str]:
 
 
 def is_secret_key(value: str) -> bool:
-    return SECRET_KEY_RE.search(value) is not None
+    for identifier in _KEY_NAME_RE.findall(value):
+        compact = identifier.replace("-", "").replace("_", "").casefold()
+        if any(stem in compact for stem in SECRET_KEY_SUBSTRINGS):
+            return True
+        tokens = tuple(
+            token.casefold() for part in re.split(r"[-_]", identifier) for token in _CAMEL_TOKEN_RE.findall(part)
+        )
+        if any(token in SECRET_KEY_STEMS for token in tokens) or any(
+            compound == tokens[index : index + len(compound)]
+            for compound in SECRET_KEY_COMPOUNDS
+            for index in range(len(tokens) - len(compound) + 1)
+        ):
+            return True
+    return False
 
 
 def redact_text_value(value: str) -> str:
@@ -568,7 +616,9 @@ def _redact_without_schema(argv: list[str], sensitive_options: set[str]) -> list
         option_name, separator, _attached = value.partition("=")
         normalized = option_name_to_parameter(option_name)
         explicitly_sensitive = option_name in sensitive or normalized in sensitive
-        automatically_sensitive = _is_option_alias(option_name) and is_secret_key(normalized)
+        automatically_sensitive = _is_option_alias(option_name) and (
+            is_secret_key(option_name) or is_secret_key(normalized)
+        )
         if explicitly_sensitive:
             if separator:
                 result[index] = f"{option_name}={REDACTED}"
@@ -615,7 +665,7 @@ def _redact_inline_text(value: str) -> str:
 
 def _redact_inline_segment(match: re.Match[str]) -> str:
     key = match.group("key")
-    if not is_secret_key(option_name_to_parameter(key)):
+    if not is_secret_key(key):
         return match.group(0)
     return f"{key}{match.group('separator')}{REDACTED}"
 
