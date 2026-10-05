@@ -26,9 +26,14 @@ the convention-free default.
 For direct use, `BatteriesIncludedConfigLoader` accepts an optional `cli_name`.
 When no `user_config_dir` is supplied, that identity selects an isolated
 directory below the platform's default config root (for example,
-`~/.config/tool` on Linux). Consumers with an existing configuration-root
-policy should pass `user_config_dir` explicitly; the identity is then metadata
-only.
+`~/.config/tool` on Linux). The directory name uses the same policy as runtime
+namespaces: a readable, filesystem-safe slug plus a stable identity digest when
+normalization would change the name. Dotted identities remain distinct, and
+names such as `Alpha Tool` and `Alpha-Tool` cannot share a directory. Consumers
+with an existing configuration-root policy should pass `user_config_dir`
+explicitly; that path remains authoritative. Existing directories created by an
+older normalized policy are not merged, moved, or deleted automatically; a
+consumer that needs migration must copy them under its chosen policy.
 
 ## Trust of discovered project configuration
 

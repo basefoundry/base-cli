@@ -125,6 +125,17 @@ def runtime_namespace_component(value: str, fallback: str = "application") -> st
     return f"{readable}--{digest}"
 
 
+def config_namespace_component(value: str, fallback: str = "application") -> str:
+    """Return the isolated default-config namespace for an application identity.
+
+    Configuration uses the same readable slug and stable digest policy as
+    runtime state. This preserves dotted identities and distinguishes names
+    that would otherwise collapse through filename normalization.
+    """
+
+    return runtime_namespace_component(value, fallback=fallback)
+
+
 def runtime_slug(value: str, fallback: str = "unnamed") -> str:
     normalized = re.sub(r"[^a-zA-Z0-9._-]+", "-", value.strip()).strip(".-_").lower()
     return normalized or fallback

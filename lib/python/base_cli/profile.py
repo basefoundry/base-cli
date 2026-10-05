@@ -14,7 +14,7 @@ from .config import (
 )
 from .context import Context
 from .history import display_command as _generic_history_display_command
-from .paths import default_cache_root, default_config_root, make_run_id, normalize_cli_name
+from .paths import config_namespace_component, default_cache_root, default_config_root, make_run_id, normalize_cli_name
 from .runtime import RuntimeLayout
 
 __all__ = [
@@ -231,7 +231,11 @@ class CliProfile:
         if not normalized_name:
             raise ValueError("cli_name must contain a non-empty command name")
         root = (config_root or default_config_root()).expanduser()
-        selected_user_dir = user_config_dir.expanduser() if user_config_dir is not None else root / normalized_name
+        selected_user_dir = (
+            user_config_dir.expanduser()
+            if user_config_dir is not None
+            else root / config_namespace_component(cli_name)
+        )
         loader = BatteriesIncludedConfigLoader(
             user_config_dir=selected_user_dir,
             user_config_name=user_config_name,

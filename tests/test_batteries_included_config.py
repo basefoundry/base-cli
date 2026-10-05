@@ -259,11 +259,31 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
             with patch.dict("os.environ", {"BASE_CLI_CONFIG_DIR": str(root)}, clear=False):
                 alpha = BatteriesIncludedConfigLoader("Alpha Tool")
                 beta = BatteriesIncludedConfigLoader("beta")
+                dotted = BatteriesIncludedConfigLoader("acme.tools")
+                deploy = BatteriesIncludedConfigLoader("acme.deploy")
 
         self.assertEqual(alpha.cli_name, "Alpha-Tool")
-        self.assertEqual(alpha.user_config_dir, root / "Alpha-Tool")
+        self.assertNotEqual(alpha.user_config_dir, root / "Alpha-Tool")
         self.assertEqual(beta.user_config_dir, root / "beta")
         self.assertNotEqual(alpha.user_config_dir, beta.user_config_dir)
+        self.assertEqual(dotted.user_config_dir, root / "acme.tools")
+        self.assertEqual(deploy.user_config_dir, root / "acme.deploy")
+        self.assertNotEqual(dotted.user_config_dir, deploy.user_config_dir)
+
+    def test_explicit_user_config_directory_remains_authoritative(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            explicit = Path(tmpdir) / "shared"
+            loader = BatteriesIncludedConfigLoader("acme.tools", user_config_dir=explicit)
+
+        self.assertEqual(loader.user_config_dir, explicit)
+
+    def test_profile_uses_the_same_identity_namespace_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            _write_yaml(root / "acme.tools" / "config.yaml", "answer: 42\n")
+            with patch.dict("os.environ", {"BASE_CLI_CONFIG_DIR": str(root)}, clear=False):
+                profile = base_cli.CliProfile.batteries_included("acme.tools")
+                self.assertEqual(profile.load_user_config(), {"answer": 42})
 
     def test_loader_requires_identity_or_explicit_config_directory(self) -> None:
         with self.assertRaisesRegex(ValueError, "either cli_name or user_config_dir"):
