@@ -93,7 +93,10 @@ def _capture_lifecycle_option(
 ) -> Any:
     source = click_context.get_parameter_source(parameter.name)
     captures = click_context.meta.setdefault(_LIFECYCLE_CAPTURE_META_KEY, {})
-    context_values = captures.setdefault(id(click_context), {})
+    # Keep the context object itself as the key. ``id(context)`` values can be
+    # reused after Click releases a context, which could associate a later
+    # invocation with stale lifecycle values.
+    context_values = captures.setdefault(click_context, {})
     context_values[key] = _RawLifecycleValue(
         value=value,
         source=source,
@@ -537,11 +540,15 @@ def _resolve_lifecycle_values(
         _LIFECYCLE_RESOLUTION_META_KEY,
         {},
     )
+    # These maps live in Click's invocation-shared metadata and retain one
+    # context-keyed entry per context until the root invocation closes. That
+    # bounded, per-invocation retention is deliberate: it prevents id reuse
+    # without retaining state across invocations.
     parent = getattr(click_context, "parent", None)
-    parent_resolution = resolution_map.get(id(parent)) if parent is not None else None
+    parent_resolution = resolution_map.get(parent) if parent is not None else None
     raw = dict(parent_resolution.raw) if isinstance(parent_resolution, _LifecycleResolution) else {}
     captures = click_context.meta.get(_LIFECYCLE_CAPTURE_META_KEY, {})
-    context_captures = captures.get(id(click_context), {})
+    context_captures = captures.get(click_context, {})
     depth = _context_depth(click_context)
 
     for key, binding in bindings.items():
@@ -576,7 +583,7 @@ def _resolve_lifecycle_values(
         values=_normalize_lifecycle_values(click, raw),
         raw=raw,
     )
-    resolution_map[id(click_context)] = resolution
+    resolution_map[click_context] = resolution
     click_context.meta[LIFECYCLE_META_KEY] = resolution.values
     return resolution
 
