@@ -11,6 +11,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+## [0.5.0] - 2026-10-03
+
 ### Added
 
 - Publish versioned, comparative CLI benchmark reports with lifecycle and
@@ -391,7 +393,8 @@ the API stability policy and migration guide before upgrading from `0.3.x`.
 - Pinned the build backend to metadata compatible with the bundled publication
   action and made license-file validation portable across setuptools versions.
 
-[Unreleased]: https://github.com/basefoundry/base-cli/compare/v0.4.3...HEAD
+[Unreleased]: https://github.com/basefoundry/base-cli/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/basefoundry/base-cli/compare/v0.4.3...v0.5.0
 [0.4.3]: https://github.com/basefoundry/base-cli/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/basefoundry/base-cli/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/basefoundry/base-cli/compare/v0.4.0...v0.4.1

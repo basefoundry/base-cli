@@ -78,6 +78,19 @@ class ChangelogValidationTests(unittest.TestCase):
                 errors = validate_changelog.validate_changelog(path, verify_tags=True)
         self.assertIn("published changelog section [1.0.0] differs from tag v1.0.0", errors)
 
+    def test_current_untagged_release_candidate_can_be_prepared(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "CHANGELOG.md"
+            path.write_text(VALID_CHANGELOG, encoding="utf-8")
+            (path.parent / "VERSION").write_text("1.0.0\n")
+            missing = subprocess.CalledProcessError(128, "git", stderr="missing tag")
+            with mock.patch(
+                "scripts.validate_changelog.subprocess.run",
+                side_effect=[missing, subprocess.CompletedProcess("git", 128)],
+            ):
+                errors = validate_changelog.validate_changelog(path, verify_tags=True)
+            self.assertEqual(errors, [])
+
     def test_reports_unavailable_release_tags(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "CHANGELOG.md"
@@ -90,6 +103,17 @@ class ChangelogValidationTests(unittest.TestCase):
             with mock.patch("scripts.validate_changelog.subprocess.run", side_effect=missing_tag):
                 errors = validate_changelog.validate_changelog(path, verify_tags=True)
         self.assertTrue(any("fetch the release tags" in error for error in errors))
+
+    def test_reports_missing_git_without_retrying_with_an_uncaught_oserror(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "CHANGELOG.md"
+            path.write_text(VALID_CHANGELOG, encoding="utf-8")
+            with mock.patch(
+                "scripts.validate_changelog.subprocess.run",
+                side_effect=OSError("git is not installed"),
+            ):
+                errors = validate_changelog.validate_changelog(path, verify_tags=True)
+        self.assertTrue(any("git is not installed" in error for error in errors))
 
 
 if __name__ == "__main__":
