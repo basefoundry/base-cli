@@ -44,6 +44,7 @@ _CONFIGURED_LOG_LEVELS = {
     "error": logging.ERROR,
     "critical": logging.CRITICAL,
 }
+_CONFIGURE_LOGGER_LOCK = RLock()
 
 
 # pylint: disable=too-many-arguments
@@ -84,50 +85,47 @@ def configure_logger(
     while parent is not None and parent is not logging.root:
         parent_configured |= bool(parent.handlers) or parent.level != logging.NOTSET
         parent = parent.parent
-    configured = (
-        foreign_handlers
-        or parent_configured
-        or (logger.level != logging.NOTSET and logger.level != getattr(logger, "_base_cli_level", None))
-    )
-    if not configured:
+    externally_routed = foreign_handlers or parent_configured
+    if logger.level == logging.NOTSET:
         logger.setLevel(logging.DEBUG)
         logger._base_cli_level = logging.DEBUG  # type: ignore[attr-defined]
     if propagate is not None:
         logger.propagate = propagate
-    elif not configured:
-        logger.propagate = False
-    for handler in list(logger.handlers):
-        if getattr(handler, "_base_cli_owned", False):
-            handler.close()
-            logger.removeHandler(handler)
+    else:
+        logger.propagate = externally_routed
+    with _CONFIGURE_LOGGER_LOCK:
+        for handler in list(logger.handlers):
+            if getattr(handler, "_base_cli_owned", False):
+                handler.close()
+                logger.removeHandler(handler)
 
-    user_stream = stream if stream is not None else sys.stderr
-    user_handler = logging.StreamHandler(user_stream)
-    user_handler.setLevel(stream_level)
-    user_handler.setFormatter(
-        _handler_formatter(
-            formatter,
-            use_color=_use_color(user_stream),
-            json_logs=json_logs,
-            run_id=run_id,
-        )
-    )
-    user_handler._base_cli_owned = True  # type: ignore[attr-defined]
-    logger.addHandler(user_handler)
-
-    if log_file is not None:
-        file_handler = SecureLogFileHandler(log_file, encoding="utf-8")
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(
+        user_stream = stream if stream is not None else sys.stderr
+        user_handler = logging.StreamHandler(user_stream)
+        user_handler.setLevel(stream_level)
+        user_handler.setFormatter(
             _handler_formatter(
                 formatter,
-                use_color=False,
+                use_color=_use_color(user_stream),
                 json_logs=json_logs,
                 run_id=run_id,
             )
         )
-        file_handler._base_cli_owned = True  # type: ignore[attr-defined]
-        logger.addHandler(file_handler)
+        user_handler._base_cli_owned = True  # type: ignore[attr-defined]
+        logger.addHandler(user_handler)
+
+        if log_file is not None:
+            file_handler = SecureLogFileHandler(log_file, encoding="utf-8")
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(
+                _handler_formatter(
+                    formatter,
+                    use_color=False,
+                    json_logs=json_logs,
+                    run_id=run_id,
+                )
+            )
+            file_handler._base_cli_owned = True  # type: ignore[attr-defined]
+            logger.addHandler(file_handler)
     return logger
 
 
