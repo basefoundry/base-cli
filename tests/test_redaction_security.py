@@ -4,6 +4,7 @@ import unittest
 
 import click
 from base_cli.history import redact_history_argv
+from base_cli.json_contracts import redact_json_value
 from base_cli.redaction import (
     REDACTED,
     RedactionPlan,
@@ -86,6 +87,85 @@ class LegacySetRedactionTests(unittest.TestCase):
         self.assertEqual(redact_argv(argv, set()), expected)
         self.assertEqual(redact_history_argv(argv, set()), expected)
 
+    def test_extended_secret_name_heuristics_apply_consistently(self) -> None:
+        cases = (
+            ("--passwd", "old-password"),
+            ("--passphrase", "phrase"),
+            ("--credential", "credential-value"),
+            ("--private-key", "private-key-value"),
+            ("--access_key", "access-key-value"),
+            ("--accessToken", "access-token-value"),
+            ("--refreshToken", "refresh-token-value"),
+            ("--idToken", "id-token-value"),
+            ("--clientSecret", "client-secret-value"),
+            ("--authToken", "auth-token-value"),
+            ("--bearer", "bearer-value"),
+            ("--session-cookie", "cookie-value"),
+            ("--signature", "signature-value"),
+            ("--otp", "123456"),
+            ("--salt", "salt-value"),
+            ("--pem", "pem-value"),
+        )
+        for option, value in cases:
+            with self.subTest(option=option):
+                argv = ["tool", option, value]
+                expected = ["tool", option, REDACTED]
+                self.assertEqual(redact_argv(argv, set()), expected)
+                self.assertEqual(redact_history_argv(argv, set()), expected)
+
+    def test_documented_secret_names_cover_argv_inline_and_json(self) -> None:
+        names = (
+            "token",
+            "password",
+            "passwd",
+            "pwd",
+            "passphrase",
+            "secret",
+            "credential",
+            "private-key",
+            "access-key",
+            "api-key",
+            "authorization",
+            "bearer",
+            "session",
+            "cookie",
+            "signature",
+            "otp",
+            "salt",
+            "sas",
+            "pem",
+            "sessionToken",
+            "dbPassword",
+            "bearerToken",
+            "oauthToken",
+            "secretKey",
+            "apikey",
+            "APIKEY",
+            "accesstoken",
+            "ACCESSTOKEN",
+            "clientsecret",
+            "csrftoken",
+            "PGPASSWORD",
+            "x-apikey",
+        )
+        for name in names:
+            with self.subTest(name=name):
+                self.assertEqual(redact_argv(["tool", f"--{name}", "value"], set())[-1], REDACTED)
+                self.assertEqual(redact_argv(["tool", f"{name}=value"], set())[-1], f"{name}={REDACTED}")
+                self.assertEqual(redact_json_value({name: "value"}), {name: REDACTED})
+
+    def test_generic_key_names_remain_visible(self) -> None:
+        for name in ("key-file", "sort-key", "partition-key", "public-key", "keyFile", "publicKey"):
+            with self.subTest(name=name):
+                self.assertEqual(redact_argv(["tool", f"--{name}", "value"], set())[-1], "value")
+                self.assertEqual(redact_argv(["tool", f"{name}=value"], set())[-1], f"{name}=value")
+                self.assertEqual(redact_json_value({name: "value"}), {name: "value"})
+
+    def test_bare_key_is_not_treated_as_a_secret_name(self) -> None:
+        self.assertEqual(redact_argv(["tool", "--key", "visible"], set()), ["tool", "--key", "visible"])
+        self.assertEqual(redact_argv(["tool", "--key-file", "visible"], set()), ["tool", "--key-file", "visible"])
+        self.assertEqual(redact_argv(["tool", "--public-key", "visible"], set()), ["tool", "--public-key", "visible"])
+
     def test_embedded_secret_segments_are_redacted_without_registration(self) -> None:
         cases = (
             (
@@ -139,6 +219,10 @@ class LegacySetRedactionTests(unittest.TestCase):
             (
                 ["tool", "PASSWORD=abc,def&LABEL=visible"],
                 ["tool", f"PASSWORD={REDACTED}&LABEL=visible"],
+            ),
+            (
+                ["tool", "accessToken=camel-case-secret"],
+                ["tool", f"accessToken={REDACTED}"],
             ),
         )
         for argv, expected in cases:

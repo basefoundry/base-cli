@@ -25,6 +25,21 @@ def test_sidecar_is_opened_once_and_closed(tmp_path: Path) -> None:
     assert stream.closed
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows does not permit unlinking an open sidecar")
+def test_deleted_sidecar_reopens_and_preserves_later_records(tmp_path: Path) -> None:
+    handler = module.SecureLogFileHandler(tmp_path / "run.log")
+    try:
+        handler.emit(logging.LogRecord("test", logging.INFO, __file__, 1, "before", (), None))
+        handler._lock_path.unlink()
+        for message in ("after-0", "after-1", "after-2"):
+            handler.emit(logging.LogRecord("test", logging.INFO, __file__, 1, message, (), None))
+    finally:
+        handler.close()
+
+    log_text = (tmp_path / "run.log").read_text(encoding="utf-8")
+    assert log_text.splitlines() == ["before", "after-0", "after-1", "after-2"]
+
+
 def test_shared_formatter_handles_concurrent_user_and_file_logging(tmp_path: Path) -> None:
     user_stream = io.StringIO()
     formatter = module.CliFormatter()
