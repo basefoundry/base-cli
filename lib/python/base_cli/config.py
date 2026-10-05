@@ -318,8 +318,8 @@ def validate_discovered_config_path(path: Path, root: Path | None = None) -> Non
         if os.name != "nt" and (current.st_mode & 0o002 or current.st_uid not in {0, os.getuid()}):
             raise ConfigurationError(
                 f"Untrusted discovered configuration path '{candidate}': require user/root ownership "
-                "and no other-write permission. Fix permissions or explicitly set "
-                "verify_project_config=False in the profile."
+                "and no other-write permission. Fix permissions or see the "
+                "local configuration trust policy for an explicit shared-workspace opt-out."
             )
 
 
