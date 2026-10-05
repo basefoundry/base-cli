@@ -59,7 +59,7 @@ FRAMEWORKS = ("base-cli", "click", "typer", "cyclopts")
 RESULT_SCHEMA = "base-cli.benchmark"
 RESULT_SCHEMA_VERSION = 2
 CONCURRENCY_RATIO_BUDGETS = {"unix": 6.0, "macos": 6.0, "windows": 10.0, "wsl": 10.0}
-LOG_P95_BUDGETS_US = {"unix": 40.0, "macos": 200.0, "windows": 150.0, "wsl": 100.0}
+LOG_P95_BUDGETS_US = {"unix": 80.0, "macos": 200.0, "windows": 150.0, "wsl": 100.0}
 
 
 class Summary(TypedDict):

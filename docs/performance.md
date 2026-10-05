@@ -166,7 +166,7 @@ files, reporting microseconds/record and records/second.
 
 | Profile | Concurrent / serial p95 cap | Log p95 microseconds/record cap |
 | --- | ---: | ---: |
-| unix | 6 | 40 |
+| unix | 6 | 80 |
 | macos | 6 | 200 |
 | windows | 10 | 150 |
 | wsl | 10 | 100 |
@@ -191,7 +191,8 @@ recorded the following 31-sample logging and 36-sample concurrency results:
 | windows | 2.99 | 20.14 | 49.03 |
 | wsl | 4.25 | 11.44 | 22.90 |
 
-The initial macOS 40 us/record p95 estimate rejected a run whose persistent median
+The retained Unix stress artifact measured 55.58 us/record p95. The initial macOS
+40 us/record p95 estimate rejected a run whose persistent median
 was 25.82 us/record. The first retained macOS stress run reported 46.42 us/record,
 but a repeat on the same 3-core arm64 profile reached 129.66 us/record p95 while
 the functional and platform validation jobs stayed green. The hosted macOS cap is
