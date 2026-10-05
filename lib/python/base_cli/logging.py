@@ -8,6 +8,7 @@ import time
 import warnings
 from io import TextIOWrapper
 from pathlib import Path
+from threading import RLock
 from typing import BinaryIO, TextIO, cast
 
 try:
@@ -43,6 +44,7 @@ _CONFIGURED_LOG_LEVELS = {
     "error": logging.ERROR,
     "critical": logging.CRITICAL,
 }
+_CONFIGURE_LOGGER_LOCK = RLock()
 
 
 # pylint: disable=too-many-arguments
@@ -91,38 +93,39 @@ def configure_logger(
         logger.propagate = propagate
     else:
         logger.propagate = externally_routed
-    for handler in list(logger.handlers):
-        if getattr(handler, "_base_cli_owned", False):
-            handler.close()
-            logger.removeHandler(handler)
+    with _CONFIGURE_LOGGER_LOCK:
+        for handler in list(logger.handlers):
+            if getattr(handler, "_base_cli_owned", False):
+                handler.close()
+                logger.removeHandler(handler)
 
-    user_stream = stream if stream is not None else sys.stderr
-    user_handler = logging.StreamHandler(user_stream)
-    user_handler.setLevel(stream_level)
-    user_handler.setFormatter(
-        _handler_formatter(
-            formatter,
-            use_color=_use_color(user_stream),
-            json_logs=json_logs,
-            run_id=run_id,
-        )
-    )
-    user_handler._base_cli_owned = True  # type: ignore[attr-defined]
-    logger.addHandler(user_handler)
-
-    if log_file is not None:
-        file_handler = SecureLogFileHandler(log_file, encoding="utf-8")
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(
+        user_stream = stream if stream is not None else sys.stderr
+        user_handler = logging.StreamHandler(user_stream)
+        user_handler.setLevel(stream_level)
+        user_handler.setFormatter(
             _handler_formatter(
                 formatter,
-                use_color=False,
+                use_color=_use_color(user_stream),
                 json_logs=json_logs,
                 run_id=run_id,
             )
         )
-        file_handler._base_cli_owned = True  # type: ignore[attr-defined]
-        logger.addHandler(file_handler)
+        user_handler._base_cli_owned = True  # type: ignore[attr-defined]
+        logger.addHandler(user_handler)
+
+        if log_file is not None:
+            file_handler = SecureLogFileHandler(log_file, encoding="utf-8")
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(
+                _handler_formatter(
+                    formatter,
+                    use_color=False,
+                    json_logs=json_logs,
+                    run_id=run_id,
+                )
+            )
+            file_handler._base_cli_owned = True  # type: ignore[attr-defined]
+            logger.addHandler(file_handler)
     return logger
 
 
