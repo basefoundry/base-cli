@@ -25,7 +25,9 @@ require_commands() {
 }
 
 run_baseline() {
+  require_commands uv
   bash ./tests/validate.sh
+  uv lock --check
 }
 
 run_runtime() {

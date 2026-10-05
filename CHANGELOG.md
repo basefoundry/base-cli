@@ -20,6 +20,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
 - Bound convenience-profile discovery and validate implicit project configuration trust; cap YAML input size (#385).
 - Skip contended retention passes instead of blocking CLI invocations on housekeeping locks (#386).
 - Reuse secure log lock descriptors and cache source paths per invocation; logging I/O failures stay inside logging (#381).
