@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import logging
+from unittest.mock import patch
 from pathlib import Path
 
 from base_cli import _runtime as runtime
@@ -51,3 +53,9 @@ refresh_run_bundle_index(root)
         assert probe.returncode == 0, probe.stderr
     finally:
         child.communicate("done\n", timeout=5)
+
+
+def test_contended_index_refresh_is_eventually_consistent(tmp_path: Path) -> None:
+    logger = logging.getLogger("retention-index-refresh")
+    with patch.object(runtime, "_retention_lock", side_effect=BlockingIOError("busy")):
+        runtime.refresh_run_bundle_index(tmp_path, logger=logger)
