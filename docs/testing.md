@@ -74,3 +74,13 @@ exclusions. The typing gate checks every Git-visible Python source outside `lib/
 (checked separately), `scripts/` (validation tools), and `tests/` (test harnesses)
 with strict mypy. This includes example and compatibility consumer packages and
 new top-level source directories; untracked sources are included during development.
+### Project Intake recovery
+
+Project Intake uses REST exclusively, verifies each managed field by independent
+readback, and preserves existing planning metadata and active statuses. Primary
+or secondary quota pressure beyond its bounded retry window reports `deferred`,
+not a successful sync. An hourly full issue sweep retries missing and stale cards,
+including events that failed before item creation; manual dispatch remains available.
+The sweep caches stable Project metadata/fields/items during the job. Authentication
+and permission errors fail explicitly and require operator repair. Logs report REST
+calls and zero GraphQL calls/points; token values are redacted from diagnostics.
