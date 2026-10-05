@@ -44,6 +44,8 @@ lifecycle:
 ```python
 from __future__ import annotations
 
+from typing import Any
+
 import base_cli
 
 
@@ -52,7 +54,7 @@ app = base_cli.App(name="hello", version="0.1.0")
 
 @app.command()
 @base_cli.option("--name", default="world", show_default=True)
-def hello(ctx: base_cli.Context[object, object, object], name: str) -> int:
+def hello(ctx: base_cli.Context[Any, Any, Any], name: str) -> int:
     ctx.log.info("greeting %s", name)
     print(f"Hello, {name}!")
     return base_cli.ExitCode.SUCCESS
@@ -177,8 +179,10 @@ from `base_cli`. `RuntimeBinding.layout` uses the public immutable
 service payloads owned by a consumer:
 
 ```python
-Config = dict[str, object]
-context: base_cli.Context[Config, ApplicationState, Services]
+from typing import Any
+
+Config = dict[str, Any]
+context: base_cli.Context[Config, ApplicationContext, Services]
 ```
 
 `App.command()`, `App.subcommand()`, `@base_cli.command()`, `@base_cli.option()`,
@@ -264,6 +268,8 @@ guide](https://basefoundry.github.io/base-cli/adopter-readiness/) and run the th
 ```python
 from __future__ import annotations
 
+from typing import Any
+
 import base_cli
 
 
@@ -276,7 +282,7 @@ app = base_cli.App(
 
 @app.command()
 @base_cli.option("--name", required=True)
-def main(ctx: base_cli.Context[object, object, object], name: str) -> None:
+def main(ctx: base_cli.Context[Any, Any, Any], name: str) -> None:
     ctx.log.info("starting hello")
     print(f"hello {name}")
 
@@ -319,8 +325,10 @@ name to `@app.command(...)`; change `App(name=...)` instead.
 Register the command function explicitly:
 
 ```python
+from typing import Any
+
 @app.command()
-def main(ctx: base_cli.Context[object, object, object]) -> None:
+def main(ctx: base_cli.Context[Any, Any, Any]) -> None:
     ...
 ```
 
@@ -331,8 +339,10 @@ removed from Click's keyword arguments.
 For small scripts, the module-level decorators are available:
 
 ```python
+from typing import Any
+
 @base_cli.command()
-def main(ctx: base_cli.Context[object, object, object]) -> None:
+def main(ctx: base_cli.Context[Any, Any, Any]) -> None:
     ...
 
 
@@ -352,6 +362,8 @@ Use `@app.subcommand()` when one CLI needs multiple verbs while keeping the
 standard context, logging, redaction, and cleanup lifecycle for each invocation:
 
 ```python
+from typing import Any
+
 app = base_cli.App(
     name="workspace-tools",
     version="0.1.0",
@@ -361,13 +373,13 @@ app = base_cli.App(
 
 @app.subcommand()
 @base_cli.argument("project")
-def status(ctx: base_cli.Context[object, object, object], project: str) -> None:
+def status(ctx: base_cli.Context[Any, Any, Any], project: str) -> None:
     ctx.log.info("checking %s", project)
 
 
 @app.subcommand("sync")
 @base_cli.option("--dry-run", is_flag=True)
-def sync_project(ctx: base_cli.Context[object, object, object], dry_run: bool) -> None:
+def sync_project(ctx: base_cli.Context[Any, Any, Any], dry_run: bool) -> None:
     if ctx.dry_run:
         ctx.log.info("previewing sync")
 ```
@@ -463,11 +475,13 @@ root parameters and before any existing group, command, or result callback
 runs:
 
 ```python
-def make_application_context(ctx: base_cli.Context[object, object, object]) -> ApplicationContext:
+def make_application_context(
+    ctx: base_cli.Context[Config, ApplicationContext, Services],
+) -> ApplicationContext:
     return ApplicationContext(environment=ctx.environment)
 
 
-def make_services(ctx: base_cli.Context[object, object, object]) -> Services:
+def make_services(ctx: base_cli.Context[Config, ApplicationContext, Services]) -> Services:
     services = Services(ctx.config)
     ctx.on_cleanup(services.close)
     return services
@@ -481,7 +495,7 @@ cli = base_cli.attach(
 ```
 
 Their results are available as `ctx.application_context` and `ctx.services`.
-The factories receive the active `Context`, may register cleanup hooks,
+The factories receive the active `base_cli.Context`, may register cleanup hooks,
 and never replace the existing Click context object. `get_current_context()` is
 valid in group callbacks, leaf callbacks, result callbacks, and factory-created
 helpers for the duration of the attached invocation. Root Click parameter
@@ -504,10 +518,12 @@ boundaries.
 `base_cli.option` and `base_cli.argument` mirror Click's decorators:
 
 ```python
+from typing import Any
+
 @app.command()
 @base_cli.argument("project")
 @base_cli.option("--workspace", type=str)
-def main(ctx: base_cli.Context[object, object, object], project: str, workspace: str | None) -> None:
+def main(ctx: base_cli.Context[Any, Any, Any], project: str, workspace: str | None) -> None:
     ...
 ```
 
@@ -515,8 +531,10 @@ Use `sensitive=True` for options or arguments whose values must not reach
 invocation logs or history writers:
 
 ```python
+from typing import Any
+
 @base_cli.option("--token", sensitive=True, required=True)
-def main(ctx: base_cli.Context[object, object, object], token: str) -> None:
+def main(ctx: base_cli.Context[Any, Any, Any], token: str) -> None:
     ...
 ```
 
@@ -526,9 +544,11 @@ values are redacted. Sensitive positional arguments are redacted according to
 the Click command schema:
 
 ```python
+from typing import Any
+
 @app.command()
 @base_cli.argument("credential", sensitive=True)
-def login(ctx: base_cli.Context[object, object, object], credential: str) -> None:
+def login(ctx: base_cli.Context[Any, Any, Any], credential: str) -> None:
     ...
 ```
 
@@ -542,8 +562,10 @@ For native `App` commands, use `dry_run=True` when a nonstandard option should
 drive `ctx.dry_run` and the lifecycle's default durable-write suppression:
 
 ```python
+from typing import Any
+
 @base_cli.option("--preview", is_flag=True, dry_run=True)
-def main(ctx: base_cli.Context[object, object, object], preview: bool) -> None:
+def main(ctx: base_cli.Context[Any, Any, Any], preview: bool) -> None:
     if ctx.dry_run:
         ctx.log.info("previewing changes")
 ```
