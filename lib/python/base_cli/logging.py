@@ -200,21 +200,28 @@ class SecureLogFileHandler(logging.FileHandler):
                     except OSError:
                         pass
             if self._lock_stream is not None:
-                restrict_file(self._lock_path)
-                current = os.stat(self._lock_path, follow_symlinks=False)
-                stream_stat = os.fstat(self._lock_stream.fileno())
-                if (
+                try:
+                    current = os.stat(self._lock_path, follow_symlinks=False)
+                    stream_stat = os.fstat(self._lock_stream.fileno())
+                except FileNotFoundError:
+                    current = None
+                    stream_stat = None
+                if current is None or stream_stat is None or (
                     self._lock_identity != (current.st_dev, current.st_ino)
-                    or (
-                        stream_stat.st_dev,
-                        stream_stat.st_ino,
-                    )
-                    != self._lock_identity
+                    or (stream_stat.st_dev, stream_stat.st_ino) != self._lock_identity
                 ):
                     stale = self._lock_stream
                     self._lock_stream = None
                     self._lock_identity = None
                     stale.close()
+                else:
+                    try:
+                        restrict_file(self._lock_path)
+                    except FileNotFoundError:
+                        stale = self._lock_stream
+                        self._lock_stream = None
+                        self._lock_identity = None
+                        stale.close()
             if self._lock_stream is None:
                 self._lock_stream = _open_log_lock(self._lock_path)
                 lock_stat = os.fstat(self._lock_stream.fileno())
@@ -378,41 +385,6 @@ def _level_name(record: logging.LogRecord) -> str:
     if record.levelno == logging.CRITICAL:
         return "FATAL"
     return record.levelname
-
-
-def _source_path(record: logging.LogRecord) -> str:
-    path = Path(record.pathname)
-    candidates = []
-    application_home = _active_application_home()
-    if application_home is not None:
-        candidates.append(application_home)
-    project_root = _active_project_root()
-    if project_root is not None:
-        candidates.append(project_root)
-    candidates.append(current_working_dir())
-
-    for root in candidates:
-        try:
-            return str(path.resolve().relative_to(root.resolve()))
-        except ValueError:
-            continue
-    return str(path.resolve())
-
-
-def _active_project_root() -> Path | None:
-    try:
-        context = get_current_context()
-    except RuntimeError:
-        return None
-    return context.project_root
-
-
-def _active_application_home() -> Path | None:
-    try:
-        context = get_current_context()
-    except RuntimeError:
-        return None
-    return context.application_home
 
 
 def log_invocation(
