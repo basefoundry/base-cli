@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from logging import LogRecord
 from typing import Any
 
-from .redaction import REDACTED, SECRET_KEY_PATTERN, is_secret_key, redact_text_value
+from .redaction import KEY_NAME_PATTERN, REDACTED, is_secret_key, redact_text_value
 
 JSON_CONTRACT_VERSION = 1
 JSON_LOG_SCHEMA = "base-cli.log"
@@ -29,9 +29,10 @@ _SENSITIVE_ASSIGNMENT_BOUNDARY = (
     r"(?=(?:[&,;]\s*(?=[A-Za-z][A-Za-z0-9_-]*\s*[=:])"
     r"|\s+[A-Za-z][A-Za-z0-9_-]*\s*[=:])|\s|$)"
 )
-_SENSITIVE_ASSIGNMENT = re.compile(
-    rf"(?i)({SECRET_KEY_PATTERN}\s*[:=]\s*)"
-    rf"(\S+?){_SENSITIVE_ASSIGNMENT_BOUNDARY}"
+_KEY_ASSIGNMENT = re.compile(
+    rf"(?P<key>{KEY_NAME_PATTERN})(?P<separator>\s*[:=]\s*)"
+    rf"(?P<value>\S+?){_SENSITIVE_ASSIGNMENT_BOUNDARY}",
+    re.IGNORECASE,
 )
 
 __all__ = [
@@ -187,7 +188,13 @@ def _timestamp(value: float) -> str:
 
 def _safe_text(value: str) -> str:
     redacted = redact_text_value(value)
-    return _SENSITIVE_ASSIGNMENT.sub(r"\1" + REDACTED, redacted)
+    return _KEY_ASSIGNMENT.sub(_redact_assignment, redacted)
+
+
+def _redact_assignment(match: re.Match[str]) -> str:
+    if not is_secret_key(match.group("key")):
+        return match.group(0)
+    return f"{match.group('key')}{match.group('separator')}{REDACTED}"
 
 
 def _is_sensitive_key(value: str) -> bool:

@@ -63,6 +63,13 @@ The boundaries are intentionally explicit:
 | Threat / asset | Framework controls and tests | Residual risk and consumer action |
 | --- | --- | --- |
 | Secrets in argv, environment-derived values, config, or prompts leak into logs | Sensitive options/arguments, shared secret-name heuristics (including password/passwd/pwd/passphrase, credential, private/access/API key, camelCase access/refresh/id token and client/auth secret forms, bearer/session/cookie, OTP, salt, SAS, and PEM names), embedded query/list/header segment handling, equals/short-option handling, and redaction before history callbacks; `tests/test_redaction_security.py`, `tests/test_app_security_boundaries.py`, and `tests/test_invocation_parity.py` | A custom secret name or consumer log can still disclose data. Mark domain-specific parameters with `sensitive=True`, do not log `ctx.config`, and review custom formatters/history writers. |
+
+The secret-name backstop tokenizes dash-, underscore-, and camelCase names, so
+`sessionToken`, `dbPassword`, and `bearerToken` receive the same protection as
+their separated forms. It intentionally does not treat a bare `key` as secret:
+`key-file`, `sort-key`, `partition-key`, and `public-key` remain visible unless
+a consumer explicitly marks them sensitive. This heuristic is defense in depth,
+not a replacement for explicit `sensitive=True` declarations.
 | Logs, history, JSON, or run metadata expose credentials or unbounded attacker text | Redacted history boundary, bounded JSON log messages, owner-only POSIX modes, atomic metadata writes, and JSON contract tests | Consumer-owned paths and history stores may have weaker permissions. Set private ACLs, avoid copying raw logs, and treat retained diagnostics as sensitive. |
 | Symlink, traversal, replacement, or mount races redirect cleanup | Exclusive runtime-leaf ownership, retained descriptors, identity checks, no-follow traversal, run-ID containment, and fail-closed cleanup; `tests/test_cleanup_security.py`, `tests/test_app_security_boundaries.py`, and adversarial regression tests | A same-account process with the same filesystem authority can race user-owned paths. Use a private cache root and avoid sharing runtime trees between mutually hostile users. |
 | Insecure permissions expose runtime files | POSIX `0600`/`0700` modes; Windows uses inherited user-profile ACLs and warns when secure handle operations are unavailable | A custom Windows cache root or network filesystem may not inherit private ACLs. Consumers must provision and verify permissions. |

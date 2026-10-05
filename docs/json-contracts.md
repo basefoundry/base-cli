@@ -79,9 +79,12 @@ credential-bearing URLs are redacted recursively. The heuristic covers
 `token`, `password`, `passwd`, `pwd`, `passphrase`, `secret`, `credential`,
 `private-key`, `access-key`, `api-key`, `authorization`, `bearer`, `session`,
 `cookie`, `signature`, `otp`, `salt`, `sas`, and `pem`, including camelCase
-forms such as `accessToken` and `clientSecret`. A generic `key` name, including
-`key-file` and `public-key`, is not treated as secret by itself; explicit
-`sensitive=True` remains the authoritative control for domain-specific names.
+forms such as `accessToken`, `sessionToken`, `dbPassword`, and `bearerToken`.
+The `private-key`, `access-key`, and `api-key` compounds are also recognized
+when written as `privateKey`, `accessKey`, or `apiKey`. A generic `key` name,
+including `key-file`, `sort-key`, and `public-key`, is not treated as secret by
+itself; explicit `sensitive=True` remains the authoritative control for
+domain-specific names.
 Traversal is bounded to 100 container levels; cyclic or more deeply nested
 values are replaced with `[TRUNCATED]`, distinct from the `[REDACTED]` marker
 used for secrets, so public helpers cannot recurse indefinitely while preparing
