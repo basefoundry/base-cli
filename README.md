@@ -52,7 +52,7 @@ app = base_cli.App(name="hello", version="0.1.0")
 
 @app.command()
 @base_cli.option("--name", default="world", show_default=True)
-def hello(ctx: base_cli.Context, name: str) -> int:
+def hello(ctx: base_cli.Context[object, object, object], name: str) -> int:
     ctx.log.info("greeting %s", name)
     print(f"Hello, {name}!")
     return base_cli.ExitCode.SUCCESS
@@ -276,7 +276,7 @@ app = base_cli.App(
 
 @app.command()
 @base_cli.option("--name", required=True)
-def main(ctx: base_cli.Context, name: str) -> None:
+def main(ctx: base_cli.Context[object, object, object], name: str) -> None:
     ctx.log.info("starting hello")
     print(f"hello {name}")
 
@@ -320,7 +320,7 @@ Register the command function explicitly:
 
 ```python
 @app.command()
-def main(ctx: base_cli.Context) -> None:
+def main(ctx: base_cli.Context[object, object, object]) -> None:
     ...
 ```
 
@@ -332,7 +332,7 @@ For small scripts, the module-level decorators are available:
 
 ```python
 @base_cli.command()
-def main(ctx: base_cli.Context) -> None:
+def main(ctx: base_cli.Context[object, object, object]) -> None:
     ...
 
 
@@ -361,13 +361,13 @@ app = base_cli.App(
 
 @app.subcommand()
 @base_cli.argument("project")
-def status(ctx: base_cli.Context, project: str) -> None:
+def status(ctx: base_cli.Context[object, object, object], project: str) -> None:
     ctx.log.info("checking %s", project)
 
 
 @app.subcommand("sync")
 @base_cli.option("--dry-run", is_flag=True)
-def sync_project(ctx: base_cli.Context, dry_run: bool) -> None:
+def sync_project(ctx: base_cli.Context[object, object, object], dry_run: bool) -> None:
     if ctx.dry_run:
         ctx.log.info("previewing sync")
 ```
@@ -463,11 +463,11 @@ root parameters and before any existing group, command, or result callback
 runs:
 
 ```python
-def make_application_context(ctx: base_cli.Context) -> ApplicationContext:
+def make_application_context(ctx: base_cli.Context[object, object, object]) -> ApplicationContext:
     return ApplicationContext(environment=ctx.environment)
 
 
-def make_services(ctx: base_cli.Context) -> Services:
+def make_services(ctx: base_cli.Context[object, object, object]) -> Services:
     services = Services(ctx.config)
     ctx.on_cleanup(services.close)
     return services
@@ -481,7 +481,7 @@ cli = base_cli.attach(
 ```
 
 Their results are available as `ctx.application_context` and `ctx.services`.
-The factories receive the active `base_cli.Context`, may register cleanup hooks,
+The factories receive the active `Context`, may register cleanup hooks,
 and never replace the existing Click context object. `get_current_context()` is
 valid in group callbacks, leaf callbacks, result callbacks, and factory-created
 helpers for the duration of the attached invocation. Root Click parameter
@@ -507,7 +507,7 @@ boundaries.
 @app.command()
 @base_cli.argument("project")
 @base_cli.option("--workspace", type=str)
-def main(ctx: base_cli.Context, project: str, workspace: str | None) -> None:
+def main(ctx: base_cli.Context[object, object, object], project: str, workspace: str | None) -> None:
     ...
 ```
 
@@ -516,7 +516,7 @@ invocation logs or history writers:
 
 ```python
 @base_cli.option("--token", sensitive=True, required=True)
-def main(ctx: base_cli.Context, token: str) -> None:
+def main(ctx: base_cli.Context[object, object, object], token: str) -> None:
     ...
 ```
 
@@ -528,7 +528,7 @@ the Click command schema:
 ```python
 @app.command()
 @base_cli.argument("credential", sensitive=True)
-def login(ctx: base_cli.Context, credential: str) -> None:
+def login(ctx: base_cli.Context[object, object, object], credential: str) -> None:
     ...
 ```
 
@@ -543,7 +543,7 @@ drive `ctx.dry_run` and the lifecycle's default durable-write suppression:
 
 ```python
 @base_cli.option("--preview", is_flag=True, dry_run=True)
-def main(ctx: base_cli.Context, preview: bool) -> None:
+def main(ctx: base_cli.Context[object, object, object], preview: bool) -> None:
     if ctx.dry_run:
         ctx.log.info("previewing changes")
 ```

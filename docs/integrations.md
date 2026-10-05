@@ -19,7 +19,7 @@ import base_cli
 app = base_cli.App(name="catalog", rich=True)
 
 @app.command()
-def list_items(ctx: base_cli.Context) -> None:
+def list_items(ctx: base_cli.Context[object, object, object]) -> None:
     base_cli.render_records(
         ({"name": "base", "path": "/work/base"},),
         requested_format="text",
