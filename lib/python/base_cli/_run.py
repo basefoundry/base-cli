@@ -9,7 +9,6 @@ import sys
 import tempfile
 import traceback
 from collections.abc import Callable, Mapping
-from contextlib import redirect_stdout
 from threading import Lock
 from typing import Any, TextIO, cast
 
@@ -27,6 +26,7 @@ from ._app_core import (
 )
 from ._click_compat import dialect_for_command
 from ._lifecycle import InvocationOutcome, outcome_from_exception, outcome_from_exit_code, system_exit_code
+from ._stdout_capture import StdoutCaptureIncompleteError, capture_stdout
 from .exit_codes import ExitCode
 from .json_contracts import dumps_envelope, error_envelope, success_envelope
 from .lifecycle_options import LifecycleOption, LifecycleOptions
@@ -301,7 +301,7 @@ def _run_app_invocation(
                             standalone_mode=False,
                         )
                     else:
-                        with redirect_stdout(output_capture):
+                        with capture_stdout(output_capture, _MAX_JSON_CAPTURE_BYTES, JsonCaptureLimitError):
                             result = command.main(
                                 args=args,
                                 prog_name=display_command or app.name,
@@ -356,6 +356,12 @@ def _run_app_invocation(
             if exc.code is not None and not isinstance(exc.code, int):
                 print(str(exc.code), file=sys.stderr)
             return system_exit_code(exc)
+        except StdoutCaptureIncompleteError as exc:
+            if state.json_output:
+                outcome = InvocationOutcome("capture_incomplete", "error", ExitCode.FAILURE)
+                _emit_json_error(state, outcome, str(exc), output_capture)
+                return outcome.exit_code
+            raise
         except JsonCaptureLimitError as exc:
             if state.json_output:
                 outcome = InvocationOutcome("capture_limit", "error", ExitCode.FAILURE)

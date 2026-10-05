@@ -18,6 +18,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Bound convenience-profile discovery and validate implicit project configuration trust; cap YAML input size (#385).
+- Skip contended retention passes instead of blocking CLI invocations on housekeeping locks (#386).
 - Reuse secure log lock descriptors and cache source paths per invocation; logging I/O failures stay inside logging (#381).
 - Align the Typer support floor with the tested matrix and cover representative
   minimum/maximum Typer and Click version pairings.
@@ -31,6 +33,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Capture inherited subprocess and descriptor-1 output inside the single JSON envelope, with bounded native-output handling (#379).
 - Enforce native Windows run-bundle retention with pinned directory handles; unsupported platforms fail closed once per pass (#378).
 - Preserve consumer-owned logging handlers, explicit levels, and parent routing across CLI invocations (#387).
 - Validate nested configuration mappings before merge/provenance traversal,
