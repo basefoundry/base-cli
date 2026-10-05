@@ -33,6 +33,7 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Fixed
 
+- Capture inherited subprocess and descriptor-1 output inside the single JSON envelope, with bounded native-output handling (#379).
 - Enforce native Windows run-bundle retention with pinned directory handles; unsupported platforms fail closed once per pass (#378).
 - Preserve consumer-owned logging handlers, explicit levels, and parent routing across CLI invocations (#387).
 - Validate nested configuration mappings before merge/provenance traversal,

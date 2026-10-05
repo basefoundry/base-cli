@@ -26,6 +26,11 @@ in memory and rolls the remainder to a temporary file, so both temporary-disk
 use and finalization memory remain bounded. The temporary file is removed when
 the invocation ends.
 
+The JSON capture boundary temporarily redirects process-wide file descriptor 1.
+`run_app()` therefore rejects concurrent invocations in one process; callers
+that need parallel CLI work should use separate processes or serialize the
+invocations.
+
 The mode check respects Click option arity: a value such as
 `--payload --json` does not activate JSON when `--json` is the payload. It does
 not run consumer callbacks, defaults, type converters, or close hooks as a
@@ -34,6 +39,12 @@ second parse before the real invocation.
 If a command exceeds the limit, base-cli emits one `base-cli.error` envelope
 with `code: "capture_limit"` and exit code `1`; it never silently truncates
 the captured text. Use the NDJSON contract for larger record sets.
+
+If a child retains the inherited stdout descriptor after the command returns,
+base-cli emits `code: "capture_incomplete"` and includes the output drained
+before the timeout in the error envelope. Detached children should use
+`subprocess.DEVNULL` for stdout/stderr (and may use `start_new_session=True`)
+when running under JSON mode.
 
 ## Output and errors
 
@@ -53,7 +64,7 @@ Both envelopes use `schema_version: 1` and stable fields:
 
 Failures use `schema: "base-cli.error"`, `type: "error"`, and a deterministic
 `code` derived from the lifecycle outcome (`usage_error`, `click_error`,
-`capture_limit`, `aborted`, `interrupted`, `unexpected_error`, and so on). `details` always
+`capture_limit`, `capture_incomplete`, `aborted`, `interrupted`, `unexpected_error`, and so on). `details` always
 contains the numeric `exit_code` and captured command stdout. A command's
 human output is represented as a JSON string, so it cannot introduce prose or
 ANSI escapes as a second stdout record.
@@ -156,3 +167,17 @@ Each line is a JSON object with `schema_version`, `schema`, `timestamp` (UTC),
 bounds default-log retention to the most recent 20 run bundles (or the
 explicit `RetentionPolicy` setting). The legacy `max_log_files` option remains
 available for compatibility. JSON logs never use terminal color codes.
+
+### Child processes and native stdout
+
+JSON mode captures Python stdout, `os.write(1, ...)`, `sys.__stdout__`, and
+subprocesses inheriting descriptor 1. The descriptor is restored before emitting
+the single envelope. Use `subprocess.run([...], check=True)` or explicitly wait
+for each `Popen` child before returning. A child retaining stdout after return
+produces a capture error after a bounded wait. Native libraries must flush their
+own stdio buffers before returning; writes after the invocation boundary cannot
+be captured. Invalid UTF-8 bytes are represented with Unicode replacement characters.
+
+The 8 MiB JSON capture limit applies to native/child output as well. Exceeding it
+produces an error envelope rather than a success with silently truncated output.
+NDJSON and human output keep their streaming behavior.
