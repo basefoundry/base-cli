@@ -124,7 +124,14 @@ jobs:
                   time.sleep(delay)
 
 
-          def main():
+          def invalidate_items_cache(project):
+              prefix = f"{project}/items"
+              for key in list(sweep_cache):
+                  if key[0] == prefix:
+                      del sweep_cache[key]
+
+
+          def main(issue_override=None):
               if not os.environ.get("GH_TOKEN"):
                   raise RuntimeError("BASE_PROJECT_TOKEN is required for organization Project writes.")
               number = os.environ.get("BASE_PROJECT_ISSUE_NUMBER", "")
@@ -139,7 +146,7 @@ jobs:
               metadata = api("GET", project)
               if metadata.get("title") != os.environ["BASE_PROJECT_TITLE"]:
                   raise RuntimeError("Configured Project does not match the repository Project title.")
-              issue = api("GET", f"repos/{repo}/issues/{number}")
+              issue = issue_override or api("GET", f"repos/{repo}/issues/{number}")
               if "pull_request" in issue or issue.get("state") not in ("open", "closed"):
                   raise RuntimeError("Intake requires an open or closed issue.")
 
@@ -182,6 +189,10 @@ jobs:
                       if "content already exists in this project" not in str(error).lower():
                           raise
                       for attempt in range(3):
+                          # The first lookup is cached during scheduled
+                          # sweeps. Invalidate it before retrying so a
+                          # concurrent add can become visible.
+                          invalidate_items_cache(project)
                           item = find_item()
                           if item is not None:
                               break
@@ -269,10 +280,21 @@ jobs:
                   # event exhausted quota before any Project item was created.
                   issues = api("GET", f"repos/{os.environ['GITHUB_REPOSITORY']}/issues",
                                paginate=True, params={"state": "all", "per_page": "100"})
+                  failures = []
                   for issue in issues:
                       if "pull_request" not in issue:
                           os.environ["BASE_PROJECT_ISSUE_NUMBER"] = str(issue["number"])
-                          main()
+                          try:
+                              main(issue)
+                          except DeferredReconciliation:
+                              raise
+                          except (RuntimeError, ValueError, KeyError, TypeError, OSError) as error:
+                              failures.append(f"#{issue['number']}: {error}")
+                  if failures:
+                      raise RuntimeError(
+                          "Scheduled Project sweep completed with failures; successful issues were preserved: "
+                          + "; ".join(failures)
+                      )
               else:
                   main()
               print(f"Project Intake REST calls: {calls}; GraphQL calls/points: 0.")

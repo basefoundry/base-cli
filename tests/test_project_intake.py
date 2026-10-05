@@ -114,7 +114,7 @@ class RestFixture:
         if endpoint.endswith("projectsV2/14"):
             result = {"title": "base-cli"}
         elif endpoint == "repos/basefoundry/base-cli/issues":
-            result = [[{"number": 495}, {"number": 496, "pull_request": {}}]]
+            result = [[{"number": 495, "id": 42, "state": "open"}, {"number": 496, "pull_request": {}}]]
         elif endpoint == "repos/basefoundry/base-cli/issues/495":
             result = {"id": 42, "state": "closed" if self.closed else "open"}
         elif endpoint.endswith("/fields"):
