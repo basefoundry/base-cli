@@ -12,6 +12,7 @@ from typing import Any
 from unittest import mock
 
 import base_cli
+from base_cli import _lifecycle_install
 from base_cli._runtime import RuntimeDirectoryError
 from base_cli.testing import invoke
 
@@ -63,6 +64,105 @@ class _CountingApp(base_cli.App):
 
 @unittest.skipUnless(importlib.util.find_spec("click"), "Click is not installed")
 class ClickTreeAttachmentTests(unittest.TestCase):
+    def test_lifecycle_metadata_is_keyed_by_context_identity(self) -> None:
+        class FakeContext:
+            def __init__(self) -> None:
+                self.meta: dict[object, Any] = {}
+
+            def get_parameter_source(self, name: str) -> None:
+                del name
+                return None
+
+        first = FakeContext()
+        second = FakeContext()
+        parameter = type("Parameter", (), {"name": "environment"})()
+
+        _lifecycle_install._capture_lifecycle_option(first, parameter, "first", key="environment")
+        _lifecycle_install._capture_lifecycle_option(second, parameter, "second", key="environment")
+
+        captures = first.meta[next(key for key in first.meta if key is not None)]
+        self.assertIn(first, captures)
+        self.assertNotIn(id(first), captures)
+        self.assertEqual(captures[first]["environment"].value, "first")
+        second_captures = second.meta[next(key for key in second.meta if key is not None)]
+        self.assertIn(second, second_captures)
+        self.assertEqual(second_captures[second]["environment"].value, "second")
+
+    def test_chained_click_contexts_keep_lifecycle_values_through_teardown(self) -> None:
+        import click
+
+        observed: list[tuple[str, str | None, int]] = []
+        closed: list[str] = []
+
+        def capture_environment(click_context: Any, parameter: Any, value: Any) -> Any:
+            return _lifecycle_install._capture_lifecycle_option(
+                click_context,
+                parameter,
+                value,
+                key="environment",
+            )
+
+        @click.group(name="pipeline", chain=True)
+        def pipeline() -> None:
+            pass
+
+        @pipeline.command(name="first")
+        @click.option("--environment", callback=capture_environment)
+        def first(environment: str | None) -> None:
+            del environment
+            click_context = click.get_current_context()
+            captures = click_context.meta[_lifecycle_install._LIFECYCLE_CAPTURE_META_KEY]
+            observed.append(
+                (
+                    "first",
+                    captures[click_context]["environment"].value,
+                    len(captures),
+                )
+            )
+            click_context.call_on_close(lambda: closed.append("first"))
+
+        @pipeline.command(name="second")
+        @click.option("--environment", callback=capture_environment)
+        def second(environment: str | None) -> None:
+            del environment
+            click_context = click.get_current_context()
+            captures = click_context.meta[_lifecycle_install._LIFECYCLE_CAPTURE_META_KEY]
+            observed.append(
+                (
+                    "second",
+                    captures[click_context]["environment"].value,
+                    len(captures),
+                )
+            )
+            self.assertEqual(closed, ["first"])
+            click_context.call_on_close(lambda: closed.append("second"))
+
+        app = base_cli.App(name="pipeline", log_to_file=False)
+        app.attach(pipeline)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = invoke(
+                app,
+                [
+                    "first",
+                    "--environment",
+                    "first-env",
+                    "second",
+                    "--environment",
+                    "second-env",
+                ],
+                home=Path(tmpdir),
+            )
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        self.assertEqual(
+            [(name, value) for name, value, _capture_count in observed],
+            [("first", "first-env"), ("second", "second-env")],
+        )
+        self.assertGreaterEqual(observed[0][2], 2)
+        self.assertEqual(observed[0][2], observed[1][2])
+        self.assertEqual(closed, ["first", "second"])
+
     def test_prebuilt_single_command_preserves_click_contract_and_lifecycle(self) -> None:
         import click
 

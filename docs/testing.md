@@ -56,6 +56,17 @@ The full gate writes a machine-readable result to
 Node.js is unavailable, the result is marked `partial`, the gate exits with
 status `2`, and it cannot be reported as an authoritative pass.
 
+Examples and compatibility consumers use the fully parameterized context type
+when strict mypy checks a callback directly:
+
+```python
+from typing import Any
+import base_cli
+
+def main(ctx: base_cli.Context[Any, Any, Any]) -> None:
+    ...
+```
+
 ### Consumer source quality
 
 The style gate runs Ruff over the entire repository with its standard generated-file

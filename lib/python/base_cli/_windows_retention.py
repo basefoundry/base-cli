@@ -43,7 +43,9 @@ def _pin_directory(path: Path, volume: int | None = None) -> Iterator[os.stat_re
     close.argtypes = [wintypes.HANDLE]
     close.restype = wintypes.BOOL
     before = _check_directory(path, volume)
-    handle = create(str(path), 0x80, 0x1, None, 3, 0x02200000, None)
+    # FILE_LIST_DIRECTORY requests directory data access, so Windows enforces
+    # the share mode instead of treating this as an attribute-only probe.
+    handle = create(str(path), 0x1, 0x1, None, 3, 0x02200000, None)
     if handle == ctypes.c_void_p(-1).value:
         raise OSError(ctypes.get_last_error(), f"cannot pin retention directory '{path}'")  # type: ignore[attr-defined]
     try:
@@ -61,8 +63,17 @@ def _remove_tree(path: Path, volume: int) -> None:
             for entry in entries:
                 child = path / entry.name
                 current = child.lstat()
-                if current.st_dev != volume or getattr(current, "st_file_attributes", 0) & 0x400:
-                    raise OSError(f"refusing volume boundary or reparse point '{child}'")
+                if current.st_dev != volume:
+                    raise OSError(f"refusing volume boundary '{child}'")
+                if getattr(current, "st_file_attributes", 0) & 0x400:
+                    # Reparse points are removed as leaves. Never descend
+                    # through a junction or symlink, but do not strand an
+                    # otherwise removable bundle because it contains one.
+                    if stat.S_ISDIR(current.st_mode):
+                        child.rmdir()
+                    else:
+                        child.unlink()
+                    continue
                 if stat.S_ISDIR(current.st_mode):
                     _remove_tree(child, volume)
                 else:
