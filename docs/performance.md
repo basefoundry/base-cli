@@ -137,3 +137,17 @@ with an advisory lock around each append and a fresh descriptor after fork.
 Human formatters cache up to 256 source paths for the current invocation and
 project binding. Repeated paths require no filesystem resolution. Sidecar I/O
 errors are routed through `logging.Handler.handleError` and do not fail commands.
+
+### Concurrent retention
+
+Retention takes a nonblocking maintenance lock on POSIX and Windows. A busy lock
+skips that pass at debug level; the next successful invocation reconciles policy
+debt. Startup and teardown both acquire the lock before scanning. Command work
+never waits for a stopped lock holder. Deletion still revalidates metadata and
+leases under the lock.
+
+`RetentionPolicy.safe_defaults()` includes `max_total_bytes=512 MiB`, so the
+default policy uses the byte-policy recursive-walk bounds described above. A
+consumer that needs only count/age retention can explicitly omit the byte cap.
+The concurrent benchmark in #391 measures twelve processes against one warmed
+cache and gates the p95-to-serial ratio.
