@@ -8,6 +8,7 @@ import time
 import warnings
 from io import TextIOWrapper
 from pathlib import Path
+from threading import RLock
 from typing import BinaryIO, TextIO, cast
 
 try:
@@ -43,6 +44,7 @@ _CONFIGURED_LOG_LEVELS = {
     "error": logging.ERROR,
     "critical": logging.CRITICAL,
 }
+_CONFIGURE_LOGGER_LOCK = RLock()
 
 
 # pylint: disable=too-many-arguments
@@ -83,50 +85,47 @@ def configure_logger(
     while parent is not None and parent is not logging.root:
         parent_configured |= bool(parent.handlers) or parent.level != logging.NOTSET
         parent = parent.parent
-    configured = (
-        foreign_handlers
-        or parent_configured
-        or (logger.level != logging.NOTSET and logger.level != getattr(logger, "_base_cli_level", None))
-    )
-    if not configured:
+    externally_routed = foreign_handlers or parent_configured
+    if logger.level == logging.NOTSET:
         logger.setLevel(logging.DEBUG)
         logger._base_cli_level = logging.DEBUG  # type: ignore[attr-defined]
     if propagate is not None:
         logger.propagate = propagate
-    elif not configured:
-        logger.propagate = False
-    for handler in list(logger.handlers):
-        if getattr(handler, "_base_cli_owned", False):
-            handler.close()
-            logger.removeHandler(handler)
+    else:
+        logger.propagate = externally_routed
+    with _CONFIGURE_LOGGER_LOCK:
+        for handler in list(logger.handlers):
+            if getattr(handler, "_base_cli_owned", False):
+                handler.close()
+                logger.removeHandler(handler)
 
-    user_stream = stream if stream is not None else sys.stderr
-    user_handler = logging.StreamHandler(user_stream)
-    user_handler.setLevel(stream_level)
-    user_handler.setFormatter(
-        _handler_formatter(
-            formatter,
-            use_color=_use_color(user_stream),
-            json_logs=json_logs,
-            run_id=run_id,
-        )
-    )
-    user_handler._base_cli_owned = True  # type: ignore[attr-defined]
-    logger.addHandler(user_handler)
-
-    if log_file is not None:
-        file_handler = SecureLogFileHandler(log_file, encoding="utf-8")
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(
+        user_stream = stream if stream is not None else sys.stderr
+        user_handler = logging.StreamHandler(user_stream)
+        user_handler.setLevel(stream_level)
+        user_handler.setFormatter(
             _handler_formatter(
                 formatter,
-                use_color=False,
+                use_color=_use_color(user_stream),
                 json_logs=json_logs,
                 run_id=run_id,
             )
         )
-        file_handler._base_cli_owned = True  # type: ignore[attr-defined]
-        logger.addHandler(file_handler)
+        user_handler._base_cli_owned = True  # type: ignore[attr-defined]
+        logger.addHandler(user_handler)
+
+        if log_file is not None:
+            file_handler = SecureLogFileHandler(log_file, encoding="utf-8")
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(
+                _handler_formatter(
+                    formatter,
+                    use_color=False,
+                    json_logs=json_logs,
+                    run_id=run_id,
+                )
+            )
+            file_handler._base_cli_owned = True  # type: ignore[attr-defined]
+            logger.addHandler(file_handler)
     return logger
 
 
@@ -169,6 +168,7 @@ class SecureLogFileHandler(logging.FileHandler):
     def __init__(self, filename: str | os.PathLike[str], *args: object, **kwargs: object) -> None:
         self._lock_path = Path(filename).with_name(f".{Path(filename).name}.lock")
         self._lock_stream: BinaryIO | None = None
+        self._lock_identity: tuple[int, int] | None = None
         self._lock_pid = os.getpid()
         super().__init__(filename, *args, **kwargs)  # type: ignore[arg-type]
 
@@ -190,17 +190,42 @@ class SecureLogFileHandler(logging.FileHandler):
         try:
             # An inherited flock descriptor would share ownership with the parent.
             if self._lock_pid != os.getpid():
-                if self._lock_stream is not None:
-                    self._lock_stream.close()
+                inherited = self._lock_stream
                 self._lock_stream = None
+                self._lock_identity = None
                 self._lock_pid = os.getpid()
+                if inherited is not None:
+                    try:
+                        inherited.close()
+                    except OSError:
+                        pass
+            if self._lock_stream is not None:
+                restrict_file(self._lock_path)
+                current = os.stat(self._lock_path, follow_symlinks=False)
+                stream_stat = os.fstat(self._lock_stream.fileno())
+                if (
+                    self._lock_identity != (current.st_dev, current.st_ino)
+                    or (
+                        stream_stat.st_dev,
+                        stream_stat.st_ino,
+                    )
+                    != self._lock_identity
+                ):
+                    stale = self._lock_stream
+                    self._lock_stream = None
+                    self._lock_identity = None
+                    stale.close()
             if self._lock_stream is None:
                 self._lock_stream = _open_log_lock(self._lock_path)
+                lock_stat = os.fstat(self._lock_stream.fileno())
+                self._lock_identity = (lock_stat.st_dev, lock_stat.st_ino)
             _lock_log_stream(self._lock_stream)
             try:
                 super().emit(record)
             finally:
                 _unlock_log_stream(self._lock_stream)
+        except RecursionError:
+            raise
         except Exception:
             self.handleError(record)
 
@@ -208,6 +233,7 @@ class SecureLogFileHandler(logging.FileHandler):
         self.acquire()
         try:
             stream, self._lock_stream = self._lock_stream, None
+            self._lock_identity = None
             try:
                 if stream is not None:
                     stream.close()
@@ -279,6 +305,7 @@ class CliFormatter(logging.Formatter):
         self._source_key: tuple[object, ...] | None = None
         self._source_roots: tuple[Path, ...] = ()
         self._source_cache: dict[str, str] = {}
+        self._cache_lock = RLock()
         self._time_key: tuple[object, ...] | None = None
         self._time_text = ""
         datefmt = "%Y-%m-%d %H:%M:%S UTC" if self.use_utc else "%Y-%m-%d %H:%M:%S %z"
@@ -302,44 +329,47 @@ class CliFormatter(logging.Formatter):
         return f"{color}{line}{_COLOR_RESET}" if color else line
 
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
-        if datefmt is None:
-            return super().formatTime(record, datefmt)
-        # Human timestamps have second precision. Repeated calls to localtime
-        # and strftime otherwise re-read timezone state on some platforms.
-        key = (record.created // 1, datefmt, self.converter, os.environ.get("TZ"), time.tzname)
-        if key != self._time_key:
-            self._time_text = super().formatTime(record, datefmt)
-            self._time_key = key
-        return self._time_text
+        with self._cache_lock:
+            if datefmt is None:
+                return super().formatTime(record, datefmt)
+            # Human timestamps have second precision. Repeated calls to localtime
+            # and strftime otherwise re-read timezone state on some platforms.
+            key = (record.created // 1, datefmt, self.converter, os.environ.get("TZ"), time.tzname)
+            if key != self._time_key:
+                self._time_text = super().formatTime(record, datefmt)
+                self._time_key = key
+            return self._time_text
 
     def _source_path(self, record: logging.LogRecord) -> str:
-        try:
-            context = get_current_context()
-        except RuntimeError:
-            key: tuple[object, ...] = (None, current_working_dir())
-            roots: tuple[Path, ...] = (current_working_dir(),)
-        else:
-            key = (context.run_id, context.application_home, context.project_root)
-            roots = tuple(p for p in (context.application_home, context.project_root) if p is not None)
-        if key != self._source_key:
-            self._source_roots = tuple(p.resolve() for p in (*roots, current_working_dir()))
-            self._source_key = key
-            self._source_cache.clear()
-        cached = self._source_cache.get(record.pathname)
-        if cached is not None:
-            return cached
-        path = Path(record.pathname).resolve()
-        source = str(path)
-        for root in self._source_roots:
+        with self._cache_lock:
+            cwd = current_working_dir()
             try:
-                source = str(path.relative_to(root))
-                break
-            except ValueError:
-                continue
-        if len(self._source_cache) >= 256:
-            self._source_cache.clear()
-        self._source_cache[record.pathname] = source
-        return source
+                context = get_current_context()
+            except RuntimeError:
+                key: tuple[object, ...] = (None, cwd)
+                roots: tuple[Path, ...] = (cwd,)
+            else:
+                key = (context.run_id, context.application_home, context.project_root, cwd)
+                roots = tuple(p for p in (context.application_home, context.project_root) if p is not None)
+            if key != self._source_key:
+                self._source_roots = tuple(p.resolve() for p in (*roots, cwd))
+                self._source_key = key
+                self._source_cache.clear()
+            cached = self._source_cache.get(record.pathname)
+            if cached is not None:
+                return cached
+            path = Path(record.pathname).resolve()
+            source = str(path)
+            for root in self._source_roots:
+                try:
+                    source = str(path.relative_to(root))
+                    break
+                except ValueError:
+                    continue
+            if len(self._source_cache) >= 256:
+                self._source_cache.clear()
+            self._source_cache[record.pathname] = source
+            return source
 
 
 def _level_name(record: logging.LogRecord) -> str:

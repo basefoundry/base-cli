@@ -20,12 +20,29 @@ def test_unsafe_ancestor_is_refused_and_optout_is_explicit(tmp_path: Path) -> No
     try:
         with pytest.raises(ConfigurationError, match="Untrusted.*project"):
             CliProfile.batteries_included("trust").discover_project(child)
-        assert CliProfile.batteries_included("trust", trust_discovered_config=False).discover_project(child)
+        assert CliProfile.batteries_included("trust", verify_discovered_config=False).discover_project(child)
     finally:
         project.chmod(0o700)
     config.chmod(0o666)
     with pytest.raises(ConfigurationError, match="Untrusted.*base-cli"):
         CliProfile.batteries_included("trust").discover_project(child)
+
+
+def test_group_writable_owned_project_paths_are_accepted(tmp_path: Path) -> None:
+    if os.name == "nt":
+        pytest.skip("POSIX ownership/mode contract")
+    project = tmp_path / "project"
+    child = project / "sub"
+    child.mkdir(parents=True)
+    config = project / ".base-cli.yaml"
+    config.write_text("keep_temp: true\n")
+    project.chmod(0o775)
+    config.chmod(0o664)
+    try:
+        assert CliProfile.batteries_included("group-writable").discover_project(child)
+    finally:
+        config.chmod(0o600)
+        project.chmod(0o700)
 
 
 def test_marker_and_depth_bound_discovery(tmp_path: Path) -> None:

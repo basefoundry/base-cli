@@ -204,7 +204,7 @@ class CliProfile:
         environment_dir_name: str = "environments",
         discover_project: ProjectDiscovery | None = None,
         resolve_runtime: RuntimeResolver | None = None,
-        trust_discovered_config: bool = True,
+        verify_discovered_config: bool = True,
         max_project_ancestor_depth: int = 32,
         project_boundary_marker: str | None = ".git",
     ) -> CliProfile:
@@ -237,11 +237,11 @@ class CliProfile:
             user_config_name=user_config_name,
             project_config_name=project_config_name,
             environment_dir_name=environment_dir_name,
-            trust_project_config=trust_discovered_config,
+            verify_project_config=verify_discovered_config,
         )
         project_discovery = discover_project or _conventional_project_discovery(
             project_config_name,
-            trust=trust_discovered_config,
+            trust=verify_discovered_config,
             max_depth=max_project_ancestor_depth,
             boundary_marker=project_boundary_marker,
         )
