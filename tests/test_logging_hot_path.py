@@ -25,6 +25,7 @@ def test_sidecar_is_opened_once_and_closed(tmp_path: Path) -> None:
     assert stream.closed
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Windows does not permit unlinking an open sidecar")
 def test_deleted_sidecar_reopens_and_preserves_later_records(tmp_path: Path) -> None:
     handler = module.SecureLogFileHandler(tmp_path / "run.log")
     try:
