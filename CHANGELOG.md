@@ -11,6 +11,10 @@ and versions are tracked in the repo-root `VERSION` file.
 
 - Continue compatibility hardening and adoption work for the next release.
 
+### Changed
+
+- Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
+
 ## [0.5.0] - 2026-10-03
 
 ### Added
