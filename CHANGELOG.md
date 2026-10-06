@@ -24,6 +24,8 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Derive default configuration directories from collision-resistant application
+  identity namespaces so distinct names cannot share a path (#425).
 - Bound convenience-profile discovery and validate implicit project configuration trust; cap YAML input size (#385).
 - Skip contended retention passes instead of blocking CLI invocations on housekeeping locks (#386).
 - Reuse secure log lock descriptors and cache source paths per invocation; logging I/O failures stay inside logging (#381).

@@ -15,6 +15,7 @@ _WORKING_DIRECTORY_OVERRIDE: contextvars.ContextVar[Path | None] = contextvars.C
     "base_cli_working_directory_override",
     default=None,
 )
+_SAFE_CONFIG_NAMESPACE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
 def default_cache_root(
@@ -123,6 +124,20 @@ def runtime_namespace_component(value: str, fallback: str = "application") -> st
         return readable
     digest = hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
     return f"{readable}--{digest}"
+
+
+def config_namespace_component(value: str, fallback: str = "application") -> str:
+    """Return the isolated default-config namespace for an application identity.
+
+    Preserve an already-safe identity verbatim so existing user-config
+    directories remain readable after upgrade. Identities that need path
+    normalization use the runtime slug and stable digest policy, which keeps
+    transformed names distinct from their normalized counterparts.
+    """
+
+    if _SAFE_CONFIG_NAMESPACE.fullmatch(value):
+        return value
+    return runtime_namespace_component(value, fallback=fallback)
 
 
 def runtime_slug(value: str, fallback: str = "unnamed") -> str:

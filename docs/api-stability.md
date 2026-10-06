@@ -61,9 +61,11 @@ A future minor release may drop an end-of-life Python or dependency window with
 a migration note.
 
 `BatteriesIncludedConfigLoader.cli_name` is optional. When supplied without an
-explicit `user_config_dir`, it determines the normalized application namespace
-under the platform-default configuration root. An explicit directory always
-takes precedence, so applications that own path policy can omit the identity.
+explicit `user_config_dir`, it determines a readable, filesystem-safe,
+collision-resistant application namespace under the platform-default
+configuration root. An explicit directory always takes precedence, so
+applications that own path policy can omit the identity. Existing directories
+from older normalization rules are not migrated automatically.
 
 Platform tier details and the operating-system support test matrix are kept in
 [`platform-support.md`](platform-support.md).

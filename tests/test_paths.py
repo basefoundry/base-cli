@@ -5,6 +5,7 @@ from pathlib import Path
 
 from base_cli.history import compact_home_text
 from base_cli.paths import (
+    config_namespace_component,
     default_cache_root,
     default_config_root,
     normalize_explicit_cli_name,
@@ -154,3 +155,11 @@ class CliIdentityPathTests(unittest.TestCase):
         component = runtime_namespace_component("../../outside")
         self.assertNotIn("/", component)
         self.assertTrue(component.startswith("outside--"))
+
+    def test_config_namespace_preserves_dotted_identity_and_rejects_collisions(self) -> None:
+        self.assertEqual(config_namespace_component("acme.tools"), "acme.tools")
+        self.assertEqual(config_namespace_component("acme.deploy"), "acme.deploy")
+        self.assertEqual(config_namespace_component("MyTool"), "MyTool")
+        self.assertEqual(config_namespace_component("Alpha-Tool"), "Alpha-Tool")
+        self.assertNotEqual(config_namespace_component("Alpha Tool"), config_namespace_component("Alpha-Tool"))
+        self.assertNotIn("/", config_namespace_component("../../outside"))
