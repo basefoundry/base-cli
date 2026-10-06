@@ -11,7 +11,7 @@ from typing import Any, Final
 
 from ._dependencies import require_yaml
 from .errors import ConfigurationError
-from .paths import default_config_root, normalize_cli_name
+from .paths import config_namespace_component, default_config_root, normalize_cli_name
 
 __all__ = [
     "BatteriesIncludedConfigLoader",
@@ -213,7 +213,8 @@ class BatteriesIncludedConfigLoader:
         if user_config_dir is None:
             if normalized_name is None:
                 raise ValueError("either cli_name or user_config_dir must be provided")
-            user_config_dir = default_config_root() / normalized_name
+            assert cli_name is not None
+            user_config_dir = default_config_root() / config_namespace_component(cli_name)
         self.cli_name = normalized_name
         self.user_config_dir = user_config_dir.expanduser()
         self.user_config_name = user_config_name
