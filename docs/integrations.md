@@ -14,12 +14,14 @@ Pass `rich=True` when constructing an app and pass the active context's flag to
 the shared record renderer:
 
 ```python
+from typing import Any
+
 import base_cli
 
 app = base_cli.App(name="catalog", rich=True)
 
 @app.command()
-def list_items(ctx: base_cli.Context) -> None:
+def list_items(ctx: base_cli.Context[Any, Any, Any]) -> None:
     base_cli.render_records(
         ({"name": "base", "path": "/work/base"},),
         requested_format="text",
