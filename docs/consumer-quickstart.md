@@ -5,6 +5,12 @@ command, one option, and the `run_app()` process boundary. It is suitable for
 a temporary consumer project and does not require Typer, Rich, YAML, or any
 private repository layout.
 
+For a maintained, runnable consumer with nested commands, structured errors,
+and optional Typer, Rich, and OpenTelemetry scenarios, continue to
+[`base-cli-demo`](https://github.com/basefoundry/base-cli-demo). The demo is
+reference/learning evidence rather than an independent adopter, and it is
+versioned separately from the framework.
+
 ## Install and create the command
 
 Use an isolated virtual environment when trying the recipe. Activate it using

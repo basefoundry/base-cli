@@ -69,6 +69,12 @@ if __name__ == "__main__":
 Run it with `python hello.py --name Ada`. The full lifecycle and configuration
 options are documented below.
 
+For a complete maintained example, see the independent
+[`base-cli-demo`](https://github.com/basefoundry/base-cli-demo) reference
+consumer. It is versioned separately (`0.1.0`) and currently tests the released
+`base-cli>=0.4.3,<0.5` line; its 0.5.0 upgrade is tracked in
+[base-cli-demo#47](https://github.com/basefoundry/base-cli-demo/issues/47).
+
 Release builds, TestPyPI rehearsals, and protected PyPI publication are
 documented in [`docs/releasing.md`](https://basefoundry.github.io/base-cli/releasing/). The package exposes
 `base_cli.__version__`, which matches the distribution version.
