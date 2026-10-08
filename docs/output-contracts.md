@@ -12,6 +12,9 @@ Delimited output is intentionally automation-friendly:
 
 - rows are streamed directly from the iterable, so CSV and TSV do not retain
   the complete result set in memory;
+- each row is fully serialized and validated before it is written. If a later
+  row cannot be encoded, earlier rows remain in the sink and the renderer
+  raises the encoding error;
 - the supplied `columns` sequence controls both column order and cell lookup;
 - no column header or footer is emitted;
 - values use the standard `csv` quoting rules, while ANSI escape sequences and
