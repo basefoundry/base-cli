@@ -150,10 +150,7 @@ def render_records(
             # Serialize and validate a complete row before touching the sink.
             # This keeps each row atomic while allowing earlier rows to flow
             # through for one-pass and unbounded producers.
-            row = [
-                _delimited_value(record.get(key), formula_guard=formula_guard)
-                for _header, key in columns
-            ]
+            row = [_delimited_value(record.get(key), formula_guard=formula_guard) for _header, key in columns]
             writer.writerow(row)
         return resolved
 
