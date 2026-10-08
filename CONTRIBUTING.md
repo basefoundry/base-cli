@@ -11,19 +11,16 @@ Base workspace can run the same checks with the project’s standard Python
 tooling:
 
 ```bash
-python3 -m pip install -e ".[dev,typer,quality]"
-python3 -m pytest
-ruff format --check scripts examples
-ruff check lib/python/base_cli scripts examples tests
-python3 -m mypy --strict examples/typed_consumer.py
-python3 scripts/validate_docs.py
-python3 -m compileall -q examples
-python3 -m build
+python3 -m pip install -e ".[dev,typer,quality,benchmark]"
+./tests/full_validate.sh
 ```
 
 Use the Python interpreter from your active virtual environment in place of
-`python3` when necessary. The strict mypy command covers the supported typed
-consumer fixture; the framework-wide typing gate is tracked separately.
+`python3` when necessary. The aggregate is the authoritative local gate and
+includes the framework-wide strict typing, documentation, benchmark, package,
+and security checks. Use `./tests/validate.sh` for the fast repository-baseline
+check when the full extras are not installed; it is not a substitute for the
+aggregate.
 
 ## Workflow
 
