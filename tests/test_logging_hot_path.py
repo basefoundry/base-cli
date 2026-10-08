@@ -169,7 +169,7 @@ def test_logging_sidecar_io_failure_does_not_fail_attached_json_command(tmp_path
     assert result.exit_code == 0, result.output
     assert payload["code"] == "ok"
     assert "attached handler reached end" in payload["details"]["stdout"]
-    assert "logging persistence failed" in result.output
+    assert "logging persistence failed" in result.stderr
 
 
 def test_logging_sidecar_preserves_process_control_exceptions(tmp_path: Path) -> None:
