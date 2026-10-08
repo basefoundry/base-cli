@@ -61,7 +61,24 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
         provenance: dict[str, str] = {}
         _merge_mapping(values, provenance, valid, "user")
         self.assertEqual(values, {"left": shared, "right": shared})
+        self.assertIsNot(values["left"], shared)
+        self.assertIsNot(values["left"], values["right"])
+        assert isinstance(values["left"], dict)
+        values["left"]["answer"] = 7
+        self.assertEqual(values["right"], {"answer": 42})
         self.assertEqual(provenance, {"left.answer": "user", "right.answer": "user"})
+
+    def test_nested_mapping_aliases_are_isolated_across_layers(self) -> None:
+        shared = {"limits": {"retries": 2}}
+        values: dict[str, object] = {}
+        provenance: dict[str, str] = {}
+
+        _merge_mapping(values, provenance, {"first": shared, "second": shared}, "user")
+        _merge_mapping(values, provenance, {"first": {"limits": {"timeout": 30}}}, "project")
+
+        self.assertEqual(values["first"], {"limits": {"retries": 2, "timeout": 30}})
+        self.assertEqual(values["second"], {"limits": {"retries": 2}})
+        self.assertEqual(shared, {"limits": {"retries": 2}})
 
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "recursive.yaml"
