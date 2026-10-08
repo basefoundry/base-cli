@@ -176,8 +176,20 @@ def _merge_mapping_validated(
         for existing_path in tuple(provenance):
             if existing_path == path or existing_path.startswith(f"{path}."):
                 del provenance[existing_path]
-        target[key] = dict(value) if isinstance(value, Mapping) else value
+        target[key] = _copy_config_value(value)
         provenance.update(_leaf_provenance(value, source, path))
+
+
+def _copy_config_value(value: Any) -> Any:
+    """Copy nested configuration containers without preserving YAML aliases."""
+
+    if isinstance(value, Mapping):
+        return {key: _copy_config_value(child) for key, child in value.items()}
+    if isinstance(value, list):
+        return [_copy_config_value(child) for child in value]
+    if isinstance(value, tuple):
+        return tuple(_copy_config_value(child) for child in value)
+    return value
 
 
 class BatteriesIncludedConfigLoader:
