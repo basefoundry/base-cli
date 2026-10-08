@@ -68,6 +68,12 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
         self.assertEqual(values["right"], {"answer": 42})
         self.assertEqual(provenance, {"left.answer": "user", "right.answer": "user"})
 
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "recursive.yaml"
+            _write_yaml(path, "nested: &node\n  child: *node\n")
+            with self.assertRaisesRegex(base_cli.ConfigurationError, "recursive.yaml.*recursive value.*nested.child"):
+                BatteriesIncludedConfigLoader(user_config_dir=Path(tmpdir) / "user").load(None, path)
+
     def test_nested_mapping_aliases_are_isolated_across_layers(self) -> None:
         shared = {"limits": {"retries": 2}}
         values: dict[str, object] = {}
@@ -79,12 +85,6 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
         self.assertEqual(values["first"], {"limits": {"retries": 2, "timeout": 30}})
         self.assertEqual(values["second"], {"limits": {"retries": 2}})
         self.assertEqual(shared, {"limits": {"retries": 2}})
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = Path(tmpdir) / "recursive.yaml"
-            _write_yaml(path, "nested: &node\n  child: *node\n")
-            with self.assertRaisesRegex(base_cli.ConfigurationError, "recursive.yaml.*recursive value.*nested.child"):
-                BatteriesIncludedConfigLoader(user_config_dir=Path(tmpdir) / "user").load(None, path)
 
     def test_mapping_depth_is_bounded_before_recursive_merge_or_provenance(self) -> None:
         nested: dict[str, object] = {"value": 1}
