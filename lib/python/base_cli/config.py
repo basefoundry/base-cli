@@ -285,6 +285,13 @@ class BatteriesIncludedConfigLoader:
         ):
             _merge_mapping(merged, provenance, values, source)
 
+        if environment is not None:
+            # The caller selected this environment before loading its layers.
+            # Keep the snapshot and provenance aligned with that authoritative
+            # selection even when a base or environment file declares another
+            # lifecycle value.
+            _merge_mapping(merged, provenance, {"environment": selected_environment}, "command-line")
+
         framework_values = {key: merged[key] for key in _FRAMEWORK_KEYS if key in merged}
         framework = _validate_framework_config(framework_values)
         consumer_config = {key: value for key, value in merged.items() if key not in _FRAMEWORK_KEYS}

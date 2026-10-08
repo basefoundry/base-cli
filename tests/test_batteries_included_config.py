@@ -218,6 +218,25 @@ class BatteriesIncludedConfigTests(unittest.TestCase):
         self.assertEqual(seen["config"], {"answer": 42})
         self.assertEqual(seen["provenance"]["answer"], "user:environment:prod")
 
+    def test_explicit_environment_selection_is_authoritative_in_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            user_dir = root / "user-config" / "tool"
+            explicit = root / "explicit.yaml"
+            _write_yaml(user_dir / "config.yaml", "environment: dev\n")
+            _write_yaml(user_dir / "environments" / "prod.yaml", "answer: 42\n")
+            _write_yaml(explicit, "environment: staging\n")
+
+            snapshot = BatteriesIncludedConfigLoader(user_config_dir=user_dir).load(
+                None,
+                explicit,
+                environment="prod",
+            )
+
+        self.assertEqual(snapshot.framework.environment, "prod")
+        self.assertEqual(snapshot.provenance["environment"], "command-line")
+        self.assertEqual(snapshot.config, {"answer": 42})
+
     def test_missing_optional_layers_are_empty_but_explicit_paths_are_strict(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
