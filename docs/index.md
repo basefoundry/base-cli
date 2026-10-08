@@ -93,5 +93,9 @@ Continue with the framework guides:
   compatibility policy.
 - [Reference applications](https://github.com/basefoundry/base-cli/tree/main/examples)
   for complete consumer patterns.
+- [`base-cli-demo`](https://github.com/basefoundry/base-cli-demo) for the
+  maintained end-to-end reference consumer, optional integration scenarios,
+  and runnable documentation examples. It is versioned independently and its
+  current released dependency line is `base-cli>=0.4.3,<0.5`.
 - [Installation and packaging](adopter-readiness.md) for dependency extras,
   distribution checks, and release guidance.

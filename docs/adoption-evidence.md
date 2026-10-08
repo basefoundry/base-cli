@@ -22,12 +22,23 @@ written permission from that team.
 | Category | What it proves | Source | Public claim allowed |
 | --- | --- | --- | --- |
 | Reference fixture | A maintained consumer shape remains compatible | [`compatibility/README.md`](https://github.com/basefoundry/base-cli/blob/main/compatibility/README.md) and CI | “The fixture passed.” |
+| Maintained reference/learning consumer | A complete external repository exercises the public consumer boundary | [`base-cli-demo`](https://github.com/basefoundry/base-cli-demo) and its dated CI | “The demo passed its declared framework line.” It is not an adopter claim. |
 | Compatibility run | A specific revision/version passed a dated matrix | `base-cli-compatibility-evidence-<run-id>` artifact | “Version X passed run Y.” |
 | External adopter | A real independent team completed an agreed outcome | Permissioned adopter record | Only the approved case-study facts |
 
 Reference fixtures must remain separate packages with their own metadata and
-tests. Base, base-demo, and other adjacent repositories are explicitly
-excluded from the independent-adopter count.
+tests. Base, base-demo, `base-cli-demo`, and other adjacent repositories are
+explicitly excluded from the independent-adopter count.
+
+`base-cli-demo` is a maintained reference and learning consumer, versioned
+independently (`0.1.0`). Its CI demonstrates that a real consumer can exercise
+the public facade, lifecycle, output, error, and optional-integration paths for
+the exact framework dependency line it declares; it is not an independent
+adopter result or a substitute for a dated compatibility-fixture artifact.
+While its current released line is `base-cli>=0.4.3,<0.5`, the 0.5.0 upgrade is
+tracked in [base-cli-demo#47](https://github.com/basefoundry/base-cli-demo/issues/47)
+and must be green against the published framework before being described as
+0.5.0 evidence.
 
 ## Adopter program
 
