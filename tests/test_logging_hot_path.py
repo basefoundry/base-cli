@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
@@ -103,7 +104,84 @@ def test_logging_lock_failures_do_not_fail_command(tmp_path: Path) -> None:
 
     result = invoke(app, [], home=tmp_path)
     assert result.exit_code == 0
-    assert "Logging error" in result.stderr
+    assert "logging persistence failed" in result.stderr
+
+
+@pytest.mark.parametrize("failure_point", ("open", "lock", "unlock"))
+def test_logging_sidecar_io_failures_do_not_fail_native_command(
+    tmp_path: Path,
+    failure_point: str,
+) -> None:
+    app = base_cli.App(name=f"logging-sidecar-{failure_point}")
+    failure = {
+        "open": ("_open_log_lock", OSError("sidecar open failed")),
+        "lock": ("_lock_log_stream", OSError("sidecar lock failed")),
+        "unlock": ("_unlock_log_stream", OSError("sidecar unlock failed")),
+    }[failure_point]
+
+    @app.command()
+    def main(ctx: base_cli.Context) -> None:
+        if failure_point == "open":
+            for handler in ctx.log.handlers:
+                if isinstance(handler, module.SecureLogFileHandler):
+                    stream = handler._lock_stream
+                    handler._lock_stream = None
+                    handler._lock_identity = None
+                    if stream is not None:
+                        stream.close()
+        with patch.object(module, failure[0], side_effect=failure[1]):
+            ctx.log.info("ordinary command progress")
+        print("handler reached end")
+
+    result = invoke(app, [], home=tmp_path)
+
+    assert result.exit_code == 0, result.output
+    assert "handler reached end" in result.stdout
+    assert "logging persistence failed" in result.stderr
+
+
+def test_logging_sidecar_io_failure_does_not_fail_attached_json_command(tmp_path: Path) -> None:
+    import click
+
+    @click.command(name="attached-logging-sidecar")
+    def attached_command() -> None:
+        context = base_cli.get_current_context()
+        for handler in context.log.handlers:
+            if isinstance(handler, module.SecureLogFileHandler):
+                stream = handler._lock_stream
+                handler._lock_stream = None
+                handler._lock_identity = None
+                if stream is not None:
+                    stream.close()
+        with patch.object(module, "_open_log_lock", side_effect=OSError("sidecar open failed")):
+            context.log.info("attached progress")
+        click.echo("attached handler reached end")
+
+    app = base_cli.App(
+        name="attached-logging-sidecar",
+        lifecycle_options=base_cli.LifecycleOptions(json=base_cli.LifecycleOption("--json")),
+    )
+    attached = app.attach(attached_command)
+
+    result = invoke(attached, ["--json"], home=tmp_path)
+    payload = json.loads(result.stdout)
+
+    assert result.exit_code == 0, result.output
+    assert payload["code"] == "ok"
+    assert "attached handler reached end" in payload["details"]["stdout"]
+    assert "logging persistence failed" in result.output
+
+
+def test_logging_sidecar_preserves_process_control_exceptions(tmp_path: Path) -> None:
+    handler = module.SecureLogFileHandler(tmp_path / "run.log")
+    record = logging.LogRecord("test", logging.INFO, __file__, 1, "message", (), None)
+    try:
+        for exception in (KeyboardInterrupt(), SystemExit(7)):
+            with patch.object(module, "_open_log_lock", side_effect=exception):
+                with pytest.raises(type(exception)):
+                    handler.emit(record)
+    finally:
+        handler.close()
 
 
 def test_formatter_repeated_paths_do_not_resolve_again(tmp_path: Path) -> None:
