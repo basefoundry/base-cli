@@ -83,11 +83,17 @@ jobs:
           python -m pip install dist/*.whl
       - name: Validate consumer manifest
         run: python scripts/validate_consumers.py
-      - name: Install consumers independently
+      - name: Install consumers without dependency resolution
         run: |
-          python -m pip install compatibility/consumers/atlas_click
-          python -m pip install compatibility/consumers/beacon_typer
-          python -m pip install "compatibility/consumers/cinder_automation[observability]"
+          python -m pip install --no-deps compatibility/consumers/atlas_click
+          python -m pip install --no-deps compatibility/consumers/beacon_typer
+          python -m pip install --no-deps "compatibility/consumers/cinder_automation[observability]"
+      - name: Verify the installed framework matches the source release
+        run: |
+          expected="$(tr -d '\r\n' < VERSION)"
+          actual="$(python -c 'from importlib.metadata import version; print(version("base-cli"))')"
+          test "$actual" = "$expected"
+          python -m pip check
       - name: Run downstream compatibility suites
         run: |
           for tests in compatibility/consumers/*/tests; do

@@ -6,4 +6,5 @@ without rebuilding the Click tree or changing the inventory output contract.
 
 Install with `python -m pip install .`, run `atlas-consumer --help`, and execute
 `atlas-consumer --quiet inventory`. The package is pinned to the supported
-`base-cli` 0.3 minor window; tests run against the installed wheel in CI.
+`base-cli` 0.5 minor window; tests run against the installed release-candidate
+wheel in CI.

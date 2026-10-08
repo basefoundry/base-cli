@@ -5,7 +5,8 @@ proves that `base_cli.attach_typer()` preserves Typer's generated help,
 validation, and callback behavior while adding the `base-cli` framework lifecycle.
 
 Install with `python -m pip install .`, run `beacon-consumer --help`, and execute
-`beacon-consumer --quiet deploy --service api --replicas 3`. The supported Typer
-range is explicit in package metadata and is exercised by the compatibility
-workflow across Typer 0.25.1, 0.26.0, and 0.27.1 on Python 3.10 through 3.14.
-Run `python -m pytest tests` to repeat the downstream tests locally.
+`beacon-consumer --quiet deploy --service api --replicas 3`. The package targets
+the `base-cli` 0.5 minor window. The supported Typer range is explicit in
+package metadata and is exercised by the compatibility workflow across Typer
+0.25.1, 0.26.0, 0.27.1, and 0.27.2 on Python 3.10 through 3.14. Run
+`python -m pytest tests` to repeat the downstream tests locally.
