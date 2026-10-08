@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 from datetime import datetime, timezone
+from importlib.metadata import PackageNotFoundError, version as distribution_version
 from pathlib import Path
 from typing import Any
 
@@ -30,14 +31,28 @@ def _version() -> str:
     return (ROOT / "VERSION").read_text(encoding="utf-8").splitlines()[0].strip()
 
 
+def _installed_version() -> str:
+    try:
+        return distribution_version("base-cli")
+    except PackageNotFoundError as exc:
+        raise SystemExit("compatibility evidence requires an installed base-cli distribution") from exc
+
+
 def main() -> None:
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    source_version = _version()
+    installed_version = _installed_version()
+    if installed_version != source_version:
+        raise SystemExit(
+            f"compatibility evidence version mismatch: source {source_version}, installed {installed_version}"
+        )
     record: dict[str, Any] = {
         "schema_version": 1,
         "status": "passed",
         "recorded_at": now,
         "source_revision": _revision(),
-        "framework_version": _version(),
+        "source_version": source_version,
+        "framework_version": installed_version,
         "workflow": os.environ.get("GITHUB_WORKFLOW", "local"),
         "run_id": os.environ.get("GITHUB_RUN_ID"),
         "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
