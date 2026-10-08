@@ -2,7 +2,9 @@
 
 This is release preparation. A dated changelog section does not mean the version
 has been tagged or published. The proposed date must be refreshed if publication
-happens on another day. Issue #307 remains open until publication evidence exists.
+happens on another day. Keep the active 0.5.0 release-tracking issue open until
+publication evidence exists; this checklist intentionally does not hard-code a
+historical issue number.
 
 1. Merge the reviewed 0.5.0 issue train and all remaining 0.5.0 PRs. Refresh the
    release PR against their final integrated commit and include their changelog
@@ -21,6 +23,13 @@ happens on another day. Issue #307 remains open until publication evidence exist
    wheel/sdist, then verify matching SHA256SUMS, SPDX SBOM, provenance and SBOM
    attestations, RELEASE-BOM-ROW, tag target, and GitHub release assets.
 7. Verify a clean installation of exactly `base-cli==0.5.0` from PyPI. Record the
-   immutable release URL and evidence on #307, then close it.
+   immutable tag and GitHub release URLs, PyPI result, checksums, SPDX SBOM,
+   provenance and SBOM attestations, RELEASE-BOM-ROW, and downstream evidence
+   on the active release-tracking issue. Close that issue only after every
+   required artifact and compatibility result has been independently verified.
+
+Merged release preparation is not publication completion: the release is not
+complete while the tag, GitHub release, PyPI package, or required evidence is
+missing, even when the preparation pull request and local gates are green.
 
 The operational commands and recovery rules remain in [Releasing](releasing.md).
