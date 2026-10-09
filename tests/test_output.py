@@ -82,7 +82,7 @@ class OutputTest(unittest.TestCase):
                     emit(stream)
                 self.assertEqual(stream.getvalue(), "")
 
-    def test_delimited_emitters_validate_nested_values_before_writing(self) -> None:
+    def test_delimited_emitters_validate_each_row_before_writing_it(self) -> None:
         records = ({"name": "valid"}, {"name": {"value": float("nan")}})
         for requested_format in ("csv", "tsv"):
             with self.subTest(format=requested_format):
@@ -91,7 +91,20 @@ class OutputTest(unittest.TestCase):
                     render_records(
                         records, requested_format=requested_format, columns=(("NAME", "name"),), stream=stream
                     )
-                self.assertEqual(stream.getvalue(), "")
+                self.assertEqual(stream.getvalue(), "valid\n")
+
+    def test_delimited_emitters_request_the_next_record_only_after_writing_previous_row(self) -> None:
+        stream = io.StringIO()
+
+        def records():
+            yield {"name": "first"}
+            assert stream.getvalue() == "first\n"
+            yield {"name": {"value": float("nan")}}
+
+        with self.assertRaises(ValueError):
+            render_records(records(), requested_format="tsv", columns=(("NAME", "name"),), stream=stream)
+
+        self.assertEqual(stream.getvalue(), "first\n")
 
     def test_delimited_emitters_guard_spreadsheet_formulas_by_default(self) -> None:
         records = ({"name": "=SUM(A1:A2)", "path": "+cmd"}, {"name": "-10", "path": "@user"})
