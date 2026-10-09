@@ -144,12 +144,14 @@ def render_records(
     resolved = resolve_output_format(requested_format, stream=target)
 
     if resolved in ("csv", "tsv"):
-        record_list = [dict(record) for record in records]
-        _validate_delimited_records(record_list, columns)
         delimiter = "," if resolved == "csv" else "\t"
         writer = csv.writer(target, delimiter=delimiter, lineterminator="\n")
-        for row in record_list:
-            writer.writerow([_delimited_value(row.get(key), formula_guard=formula_guard) for _header, key in columns])
+        for record in records:
+            # Serialize and validate a complete row before touching the sink.
+            # This keeps each row atomic while allowing earlier rows to flow
+            # through for one-pass and unbounded producers.
+            row = [_delimited_value(record.get(key), formula_guard=formula_guard) for _header, key in columns]
+            writer.writerow(row)
         return resolved
 
     if resolved == "ndjson":
@@ -266,19 +268,6 @@ def _cell_value(value: Any) -> str:
     if isinstance(value, (Mapping, list, tuple)):
         return dumps_strict_json(value, separators=(",", ":"))
     return str(value)
-
-
-def _validate_delimited_records(
-    records: Sequence[Mapping[str, Any]],
-    columns: Sequence[tuple[str, str]],
-) -> None:
-    """Validate nested cell values before a delimited stream is touched."""
-
-    for record in records:
-        for _header, key in columns:
-            value = record.get(key)
-            if isinstance(value, (Mapping, list, tuple)):
-                dumps_strict_json(value, separators=(",", ":"))
 
 
 def _delimited_value(value: Any, *, formula_guard: bool = True) -> str:

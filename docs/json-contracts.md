@@ -18,6 +18,11 @@ app = base_cli.App(
 envelope on stdout. Logs remain on stderr. Human mode, including the default
 Click error rendering and command stdout behavior, is unchanged.
 
+JSON output remains all-or-nothing at that envelope boundary: a failed command
+emits an error envelope rather than exposing a partially emitted JSON document.
+CSV and TSV are intentionally different streaming formats; if a later row
+cannot be encoded, rows already written to the sink remain available.
+
 Capture is activated only when JSON mode is selected, including an environment
 variable or Click `default_map`. Human and NDJSON invocations write directly to
 the caller's stdout, preserving progress visibility and flush behavior. JSON

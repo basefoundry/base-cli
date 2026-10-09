@@ -34,6 +34,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Prefix formula-leading CSV/TSV cells with an apostrophe by default to protect
   spreadsheet consumers; pass `formula_guard=False` only for an audited raw
   value contract.
+- Stream CSV/TSV rows with bounded memory and document that earlier rows remain
+  available when a later row cannot be encoded.
 
 - Add the namespaced `BASE_CLI_LOG_UTC` environment variable and deprecate
   `LOG_UTC` with a migration warning; the legacy alias is scheduled for removal
