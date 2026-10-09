@@ -15,12 +15,12 @@ def test_package_workflow_uses_numeric_reproducibility_epoch() -> None:
 def test_package_workflow_can_recover_an_immutable_tag_from_default_branch() -> None:
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
 
-    assert 'release_tag:' in workflow
+    assert "release_tag:" in workflow
     assert "ref: ${{ inputs.release_tag || github.ref }}" in workflow
-    assert 'source_commit: ${{ steps.metadata.outputs.source_commit }}' in workflow
-    assert 'SOURCE_COMMIT: ${{ steps.metadata.outputs.source_commit }}' in workflow
+    assert "source_commit: ${{ steps.metadata.outputs.source_commit }}" in workflow
+    assert "SOURCE_COMMIT: ${{ steps.metadata.outputs.source_commit }}" in workflow
     assert 'git archive "$SOURCE_COMMIT"' in workflow
-    assert 'Manual PyPI publication requires the release_tag input.' in workflow
+    assert "Manual PyPI publication requires the release_tag input." in workflow
     assert '--source-commit "$SOURCE_COMMIT"' in workflow
 
 
