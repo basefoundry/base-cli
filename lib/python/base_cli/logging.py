@@ -237,8 +237,8 @@ class SecureLogFileHandler(logging.FileHandler):
                 _unlock_log_stream(self._lock_stream)
         except RecursionError:
             raise
-        except Exception:
-            self.handleError(record)
+        except Exception as exc:
+            _report_persistence_failure(exc)
 
     def close(self) -> None:
         self.acquire()
@@ -248,10 +248,31 @@ class SecureLogFileHandler(logging.FileHandler):
             try:
                 if stream is not None:
                     stream.close()
+            except RecursionError:
+                raise
+            except Exception as exc:
+                _report_persistence_failure(exc)
             finally:
-                super().close()
+                try:
+                    super().close()
+                except RecursionError:
+                    raise
+                except Exception as exc:
+                    _report_persistence_failure(exc)
         finally:
             self.release()
+
+
+def _report_persistence_failure(exc: Exception) -> None:
+    """Report a logging persistence failure without routing through logging."""
+
+    detail = str(exc) or type(exc).__name__
+    try:
+        sys.stderr.write(f"base-cli: logging persistence failed: {detail}\n")
+    except Exception:
+        # Diagnostics must not turn a best-effort logging failure into a command
+        # failure when stderr is closed or otherwise unavailable.
+        pass
 
 
 def _open_log_lock(path: Path) -> BinaryIO:
