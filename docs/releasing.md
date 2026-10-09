@@ -87,7 +87,7 @@ and the PEP 517 backend is pinned to the same setuptools and wheel versions in
 `SOURCE_DATE_EPOCH` and rejects digest drift before publishing the reviewed
 artifacts.
 
-To intentionally refresh the toolchain, edit the four direct requirements in
+To intentionally refresh the toolchain, edit the direct requirements in
 `requirements/release.in` and regenerate the lock with:
 
 ```bash
