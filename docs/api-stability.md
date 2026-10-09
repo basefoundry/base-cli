@@ -45,7 +45,9 @@ Until 1.0, the leading zero is meaningful: patch releases remain compatible,
 while a minor release is a compatibility boundary and may contain a breaking
 change. We still prefer additive changes, and any pre-1.0 break must include a
 warning where practical, a migration path, and a changelog entry. Consumers
-that need a frozen API should pin a minor release (for example, `~=0.4.0`).
+that need a frozen API should pin the current minor release (for example,
+`~=0.5.0` for the 0.5.0 release-preparation target; use it after publication
+and verification).
 
 The core package requires Python `>=3.10` and currently tests CPython 3.10
 through 3.14 on Linux, macOS, and Windows. The core runtime dependency is

@@ -10,6 +10,8 @@
 | `0.4.3` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.4.3](https://github.com/basefoundry/base-cli/releases/tag/v0.4.3) |
 
 Source release candidate: 0.5.0. Publication is pending the [release checklist](docs/release-0.5.0-checklist.md); PyPI remains the authority for available versions.
+The adopter documentation uses `~=0.5.0` for the release-preparation target;
+use that pin only after the 0.5.0 artifact is published and verified.
 
 `base-cli` is the production lifecycle layer for Click and Typer Python CLIs.
 It standardizes context, logging, configuration, cleanup, and machine-readable
