@@ -56,6 +56,16 @@ def test_package_workflow_uses_explicit_release_notes() -> None:
     )
 
 
+def test_package_workflow_gates_tag_publication_on_release_documentation() -> None:
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
+
+    assert "Validate release-facing documentation" in workflow
+    assert "python scripts/validate_release_docs.py" in workflow
+    assert "scripts/verify_pypi_metadata.py" in workflow
+    assert "name: Verify published PyPI metadata" in workflow
+    assert "needs: [build, smoke, provenance, publish, attest, verify_pypi]" in workflow
+
+
 def test_package_workflow_gates_writes_on_release_provenance() -> None:
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
     jobs = yaml.safe_load(workflow)["jobs"]
@@ -65,4 +75,4 @@ def test_package_workflow_gates_writes_on_release_provenance() -> None:
     assert "python scripts/validate_release_provenance.py" in workflow
     assert jobs["publish"]["needs"] == ["build", "smoke", "provenance"]
     assert jobs["attest"]["needs"] == ["build", "smoke", "provenance"]
-    assert jobs["release"]["needs"] == ["build", "smoke", "provenance", "publish", "attest"]
+    assert jobs["release"]["needs"] == ["build", "smoke", "provenance", "publish", "attest", "verify_pypi"]

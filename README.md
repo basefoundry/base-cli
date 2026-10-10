@@ -7,11 +7,10 @@
 
 | Version | License | Install | Release notes |
 | --- | --- | --- | --- |
-| `0.5.0` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.5.0](https://github.com/basefoundry/base-cli/releases/tag/v0.5.0) |
+| `0.5.1` | [Apache-2.0](LICENSE) | `python -m pip install base-cli` | [v0.5.1](https://github.com/basefoundry/base-cli/releases/tag/v0.5.1) |
 
-The 0.5.0 release is bound to the immutable `v0.5.0` tag; PyPI remains the authority for available versions.
-The adopter documentation uses `~=0.5.0` for the release-preparation target;
-use that pin only after the 0.5.0 artifact is published and verified.
+The 0.5.1 release is bound to the immutable `v0.5.1` tag; PyPI remains the authority for available versions.
+The adopter documentation uses `~=0.5.0` for the supported minor-release line.
 
 `base-cli` is the production lifecycle layer for Click and Typer Python CLIs.
 It standardizes context, logging, configuration, cleanup, and machine-readable
@@ -73,9 +72,8 @@ options are documented below.
 
 For a complete maintained example, see the independent
 [`base-cli-demo`](https://github.com/basefoundry/base-cli-demo) reference
-consumer. It is versioned separately (`0.1.0`) and currently tests the released
-`base-cli>=0.4.3,<0.5` line; its 0.5.0 upgrade is tracked in
-[base-cli-demo#47](https://github.com/basefoundry/base-cli-demo/issues/47).
+consumer. It is versioned separately (`0.2.0`) and currently tests the released
+`base-cli>=0.5.0,<0.6` line.
 
 Release builds, TestPyPI rehearsals, and protected PyPI publication are
 documented in [`docs/releasing.md`](https://basefoundry.github.io/base-cli/releasing/). The package exposes

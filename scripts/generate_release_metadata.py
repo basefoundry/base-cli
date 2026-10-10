@@ -136,6 +136,7 @@ def generate(dist: Path, root: Path) -> None:
         "version": version,
         "tag": f"v{version}",
         "commit": revision,
+        "readme_sha256": sha256_file(root / "README.md"),
         "source_mode": "release",
         "api_schema_version": f"base-cli-api@{version}",
         "platforms": ["macos", "ubuntu", "windows"],

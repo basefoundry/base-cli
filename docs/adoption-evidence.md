@@ -31,14 +31,12 @@ tests. Base, base-demo, `base-cli-demo`, and other adjacent repositories are
 explicitly excluded from the independent-adopter count.
 
 `base-cli-demo` is a maintained reference and learning consumer, versioned
-independently (`0.1.0`). Its CI demonstrates that a real consumer can exercise
+independently (`0.2.0`). Its CI demonstrates that a real consumer can exercise
 the public facade, lifecycle, output, error, and optional-integration paths for
 the exact framework dependency line it declares; it is not an independent
 adopter result or a substitute for a dated compatibility-fixture artifact.
-While its current released line is `base-cli>=0.4.3,<0.5`, the 0.5.0 upgrade is
-tracked in [base-cli-demo#47](https://github.com/basefoundry/base-cli-demo/issues/47)
-and must be green against the published framework before being described as
-0.5.0 evidence.
+Its current released line is `base-cli>=0.5.0,<0.6`, and its release evidence is
+maintained against the published framework package.
 
 ## Adopter program
 
