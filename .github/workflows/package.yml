@@ -326,14 +326,14 @@ jobs:
 
       - name: Publish to TestPyPI
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_target == 'testpypi' }}
-        uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@v1.14.2 # v1.14.2 image tag is required by this composite action
         with:
           packages-dir: dist
           repository-url: https://test.pypi.org/legacy/
 
       - name: Publish to PyPI
         if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi') }}
-        uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
+        uses: pypa/gh-action-pypi-publish@v1.14.2 # v1.14.2 image tag is required by this composite action
         with:
           packages-dir: dist
 
