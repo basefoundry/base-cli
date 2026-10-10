@@ -67,7 +67,31 @@ def expected_package_files() -> set[str]:
     return {path.relative_to(package_root).as_posix() for path in package_root.rglob("*") if path.is_file()}
 
 
-def validate_wheel(path: Path, expected_version: str, package_files: set[str]) -> None:
+def read_expected_readme() -> str:
+    readme_path = Path(__file__).resolve().parents[1] / "README.md"
+    try:
+        return readme_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        fail(f"could not read the source README.md: {exc}")
+
+
+def normalized_text(value: str) -> str:
+    return value.replace("\r\n", "\n").strip()
+
+
+def validate_metadata_description(metadata: email.message.Message, expected_readme: str, artifact_name: str) -> None:
+    payload = metadata.get_payload(decode=True)
+    if not isinstance(payload, bytes):
+        fail(f"{artifact_name} has no text long description")
+    try:
+        description = payload.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        fail(f"{artifact_name} long description is not UTF-8: {exc}")
+    if normalized_text(description) != normalized_text(expected_readme):
+        fail(f"{artifact_name} long description does not match the source README.md")
+
+
+def validate_wheel(path: Path, expected_version: str, package_files: set[str], expected_readme: str) -> None:
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
         metadata_names = [name for name in names if name.endswith(".dist-info/METADATA")]
@@ -84,6 +108,7 @@ def validate_wheel(path: Path, expected_version: str, package_files: set[str]) -
         for header, expected in expected_headers.items():
             if metadata.get(header) != expected:
                 fail(f"{path.name} has {header}={metadata.get(header)!r}; expected {expected!r}")
+        validate_metadata_description(metadata, expected_readme, path.name)
 
         dependencies = set(metadata.get_all("Requires-Dist", []))
         for dependency in REQUIRED_DEPENDENCIES:
@@ -131,7 +156,7 @@ def validate_wheel(path: Path, expected_version: str, package_files: set[str]) -
             fail(f"{path.name} contains non-allowlisted archive member {name!r}")
 
 
-def validate_sdist(path: Path, expected_version: str) -> None:
+def validate_sdist(path: Path, expected_version: str, expected_readme: str) -> None:
     with tarfile.open(path, "r:gz") as archive:
         members = archive.getmembers()
         names = [member.name for member in members]
@@ -160,6 +185,22 @@ def validate_sdist(path: Path, expected_version: str) -> None:
         version_text = archive.extractfile(version_members[0])
         if version_text is None or version_text.read().decode().splitlines()[0].strip() != expected_version:
             fail(f"{path.name} VERSION does not match {expected_version}")
+        readme_members = [member for member in members if member.name == f"{root_prefix}README.md"]
+        if len(readme_members) != 1:
+            fail(f"{path.name} must contain exactly one README.md")
+        readme_text = archive.extractfile(readme_members[0])
+        if readme_text is None or normalized_text(readme_text.read().decode("utf-8")) != normalized_text(
+            expected_readme
+        ):
+            fail(f"{path.name} README.md does not match the source README.md")
+        pkg_info_members = [member for member in members if member.name == f"{root_prefix}PKG-INFO"]
+        if len(pkg_info_members) != 1:
+            fail(f"{path.name} must contain exactly one PKG-INFO")
+        pkg_info = archive.extractfile(pkg_info_members[0])
+        if pkg_info is None:
+            fail(f"{path.name} PKG-INFO could not be read")
+        metadata = email.message_from_bytes(pkg_info.read())
+        validate_metadata_description(metadata, expected_readme, path.name)
 
 
 def main() -> None:
@@ -178,8 +219,9 @@ def main() -> None:
     if not wheels[0].name.startswith(expected_stem) or not sdists[0].name.startswith(expected_stem):
         fail(f"artifact filenames do not match version {expected_version}")
 
-    validate_wheel(wheels[0], expected_version, expected_package_files())
-    validate_sdist(sdists[0], expected_version)
+    expected_readme = read_expected_readme()
+    validate_wheel(wheels[0], expected_version, expected_package_files(), expected_readme)
+    validate_sdist(sdists[0], expected_version, expected_readme)
     print(f"Validated {PACKAGE_NAME} {expected_version}: wheel, sdist, metadata, package data, and test boundary.")
 
 

@@ -71,6 +71,9 @@ def main() -> None:
         _fail(f"{BOM_ROW_NAME} repository must be basefoundry/base-cli")
     if bom_row.get("version") != version or bom_row.get("tag") != f"v{version}":
         _fail(f"{BOM_ROW_NAME} version/tag does not match the release")
+    readme_path = Path(__file__).resolve().parents[1] / "README.md"
+    if bom_row.get("readme_sha256") != sha256_file(readme_path):
+        _fail(f"{BOM_ROW_NAME} README hash is not bound to the reviewed source")
     commit = bom_row.get("commit")
     if not isinstance(commit, str) or not SHA_RE.fullmatch(commit):
         _fail(f"{BOM_ROW_NAME} commit must be a lowercase full 40-character SHA")

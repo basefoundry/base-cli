@@ -125,6 +125,22 @@ the downloaded artifact's digest with `SHA256SUMS`, confirm the SBOM namespace
 contains the expected tag commit, and inspect the attestation's workflow and
 repository identity before installation.
 
+## Release-facing documentation guardrails
+
+The package README is part of the published PyPI metadata. Before any tagged
+build, the Package workflow runs `scripts/validate_release_docs.py` to require a
+single release row whose version and GitHub release link match `VERSION` and to
+reject pre-publication wording. `scripts/validate_package_artifact.py` then
+compares the wheel metadata and sdist `PKG-INFO` description with the tagged
+README, and the release BOM records the README SHA-256.
+
+After a production PyPI upload, the workflow runs
+`scripts/verify_pypi_metadata.py` before creating the GitHub Release. It reads
+the published PyPI JSON metadata, retries propagation delays, and requires the
+published version and long description to match the reviewed source. A mismatch
+blocks release completion; published PyPI bytes remain immutable and require a
+new patch version for correction.
+
 ## Changelog and release notes
 
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).

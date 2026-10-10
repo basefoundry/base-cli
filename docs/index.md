@@ -96,6 +96,6 @@ Continue with the framework guides:
 - [`base-cli-demo`](https://github.com/basefoundry/base-cli-demo) for the
   maintained end-to-end reference consumer, optional integration scenarios,
   and runnable documentation examples. It is versioned independently and its
-  current released dependency line is `base-cli>=0.4.3,<0.5`.
+  current released dependency line is `base-cli>=0.5.0,<0.6`.
 - [Installation and packaging](adopter-readiness.md) for dependency extras,
   distribution checks, and release guidance.

@@ -17,12 +17,17 @@ on:
       - "scripts/verify_release_assets.py"
       - "scripts/validate_changelog.py"
       - "scripts/validate_release_ref.py"
+      - "scripts/validate_release_docs.py"
       - "scripts/validate_release_provenance.py"
+      - "scripts/verify_pypi_metadata.py"
       - "CHANGELOG.md"
       - "examples/**"
       - "compatibility/**"
       - "docs/releasing.md"
       - "tests/test_package_workflow.py"
+      - "tests/test_validate_package_artifact.py"
+      - "tests/test_validate_release_docs.py"
+      - "tests/test_verify_pypi_metadata.py"
       - "tests/test_verify_release_assets.py"
       - "tests/test_validate_release_provenance.py"
       - "requirements/release.in"
@@ -132,6 +137,11 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.metadata.outputs.release_tag }}
         run: python scripts/validate_release_ref.py
+
+      - name: Validate release-facing documentation
+        env:
+          RELEASE_TAG: ${{ steps.metadata.outputs.release_tag }}
+        run: python scripts/validate_release_docs.py
 
       - name: Prepare clean artifact destination
         run: |
@@ -371,9 +381,31 @@ jobs:
           subject-checksums: dist/SHA256SUMS
           sbom-path: dist/SBOM.spdx.json
 
+  verify_pypi:
+    name: Verify published PyPI metadata
+    needs: [build, publish, attest]
+    if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi' && inputs.release_tag != '') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.source_commit }}
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Verify PyPI description and version
+        run: python scripts/verify_pypi_metadata.py --version "${{ needs.build.outputs.version }}"
+
   release:
     name: Create GitHub Release
-    needs: [build, smoke, provenance, publish, attest]
+    needs: [build, smoke, provenance, publish, attest, verify_pypi]
     if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi' && inputs.release_tag != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10

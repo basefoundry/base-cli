@@ -37,6 +37,8 @@ required_files=(
   MANIFEST.in
   scripts/validate_package_artifact.py
   scripts/validate_installed_package.py
+  scripts/validate_release_docs.py
+  scripts/verify_pypi_metadata.py
   scripts/validate_docs.py
   scripts/generate_api_reference.py
   scripts/validate_examples.py
@@ -60,8 +62,6 @@ for file in "${required_files[@]}"; do
 done
 
 version="$(head -n 1 VERSION | tr -d '\r')"
-published_version="$(git tag --list 'v[0-9]*' --sort=-version:refname | sed -n '1p' | sed 's/^v//')"
-published_version="${published_version:-$version}"
 readme_head="$(sed -n '1,18p' README.md | tr -d '\r')"
 if ! printf '%s\n' "$readme_head" | grep -F "[![Tests](https://img.shields.io/github/actions/workflow/status/basefoundry/base-cli/tests.yml?branch=main&label=tests)](https://github.com/basefoundry/base-cli/actions/workflows/tests.yml)" >/dev/null; then
   printf 'README.md is missing the main-branch tests health badge.\n' >&2
@@ -79,8 +79,8 @@ if ! printf '%s\n' "$readme_head" | grep -F "[![Python](https://img.shields.io/p
   printf 'README.md is missing the supported Python versions badge.\n' >&2
   exit 1
 fi
-if ! printf '%s\n' "$readme_head" | grep -F "| \`$published_version\` | [Apache-2.0](LICENSE) | \`python -m pip install base-cli\` | [v$published_version](https://github.com/basefoundry/base-cli/releases/tag/v$published_version) |" >/dev/null; then
-  printf 'README.md release strip does not match the latest published tag (%s), license, install command, and release link.\n' "$published_version" >&2
+if ! printf '%s\n' "$readme_head" | grep -F "| \`$version\` | [Apache-2.0](LICENSE) | \`python -m pip install base-cli\` | [v$version](https://github.com/basefoundry/base-cli/releases/tag/v$version) |" >/dev/null; then
+  printf 'README.md release strip does not match VERSION (%s), license, install command, and release link.\n' "$version" >&2
   exit 1
 fi
 
