@@ -50,7 +50,10 @@ def test_package_workflow_uses_explicit_release_notes() -> None:
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
 
     assert "--generate-notes" not in workflow
-    assert '--notes "Published distributions and release metadata for $tag. See CHANGELOG.md for the reviewed release notes."' in workflow
+    assert (
+        '--notes "Published distributions and release metadata for $tag. See CHANGELOG.md for the reviewed release notes."'
+        in workflow
+    )
 
 
 def test_package_workflow_gates_writes_on_release_provenance() -> None:
