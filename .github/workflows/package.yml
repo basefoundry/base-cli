@@ -496,7 +496,6 @@ jobs:
           gh release create "$tag" "${assets[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$tag" \
-            --generate-notes \
             --notes "Published distributions and release metadata for $tag. See CHANGELOG.md for the reviewed release notes." \
             || create_status=$?
 
