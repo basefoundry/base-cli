@@ -14,6 +14,8 @@ and versions are tracked in the repo-root `VERSION` file.
 ### Changed
 
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
+- Add CodeQL analysis, Dependabot update policy, and repository security-control
+  documentation for the 1.0 release gate (#280).
 
 ## [0.5.1] - 2026-10-10
 
