@@ -1,13 +1,53 @@
-# Minimal CLI
+# Minimal CLI starter
 
-This is the smallest complete `base-cli` application: one typed command,
-standard lifecycle flags, file logging, cleanup, and a console-script entry
-point. It is a good starting point for an internal tool or a new product.
+This is the maintained, copyable starter for a new `base-cli` application. It
+is intentionally small: one typed command, standard lifecycle flags, file
+logging, cleanup, and a console-script entry point. It is a good starting
+point for an internal tool or a new product.
+
+The starter is a reference template, not a code generator. Copy the directory
+into your project, run the normal install and test commands below, and then
+replace the command implementation at `src/minimal_cli/cli.py`.
+
+## Start in five minutes
+
+From the root of a `base-cli` checkout:
+
+```bash
+cp -R examples/minimal_cli my-cli
+cd my-cli
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+base-minimal --name Ada
+python -m pytest
+```
+
+The copy is a complete installable project. It exercises the same package,
+console-script, and test boundaries that a production consumer uses; it does
+not import the repository checkout.
+
+## Safe customization points
+
+- `src/minimal_cli/cli.py`: replace `greet()` with the product's commands and
+  keep `base_cli.run_app(app)` as the process boundary.
+- `src/minimal_cli/__init__.py`: update the consumer package version and
+  metadata when the product is released.
+- `pyproject.toml`: rename the distribution and console script, then pin the
+  supported `base-cli` release line.
+- `tests/test_cli.py`: keep a happy-path test and add the product's error and
+  JSON-contract tests.
+- `README.md`: document the product's configuration, output, completion,
+  release, and troubleshooting behavior.
+
+Keep framework internals out of the consumer. Click remains the parser and
+the public `base_cli` facade is the supported integration boundary.
 
 ## Install
 
 ```bash
-python -m pip install "base-cli>=0.3"
+python -m pip install "base-cli>=0.5.1,<1.0"
 python -m pip install .
 base-minimal --help
 ```
