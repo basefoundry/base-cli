@@ -98,7 +98,12 @@ class ExtensionLoadError(ExtensionDiscoveryError):
 
 @dataclass(frozen=True)
 class ExtensionDescriptor:
-    """Stable metadata for one entry point, before its object is loaded."""
+    """Stable metadata for one entry point, before its object is loaded.
+
+    ``capabilities`` is inventory metadata only. It lets a consumer inspect
+    what an extension claims before loading it; it does not grant permission,
+    restrict the in-process Python object, or provide a sandbox.
+    """
 
     group: str
     name: str
@@ -175,7 +180,7 @@ class ExtensionDiscovery:
         if entry_points is not None and paths is not None:
             raise ValueError("pass either entry_points or paths, not both")
         self.disabled = disabled
-        self.allowlist = frozenset(allowlist) if allowlist is not None else None
+        self.allowlist = _normalise_allowlist(allowlist)
         self._entry_points = entry_points
         self._paths = tuple(Path(path) for path in paths) if paths is not None else None
         self.supported_api_versions = frozenset(str(version) for version in supported_api_versions)
@@ -315,11 +320,13 @@ class ExtensionDiscovery:
     def _allowed(self, descriptor: ExtensionDescriptor) -> bool:
         if self.allowlist is None:
             return True
-        return bool(
-            descriptor.name in self.allowlist
-            or descriptor.key in self.allowlist
-            or (descriptor.distribution is not None and descriptor.distribution in self.allowlist)
-        )
+        if descriptor.key in self.allowlist:
+            return True
+        if descriptor.distribution is None:
+            return False
+        return f"dist:{descriptor.distribution}".casefold() in {
+            value.casefold() for value in self.allowlist if value.startswith("dist:")
+        }
 
     def _load_descriptor(self, descriptor: ExtensionDescriptor) -> Any:
         entry_point = self._entry_point_cache.get(descriptor)
@@ -338,6 +345,35 @@ def _validate_group(group: str) -> None:
     if group not in ENTRY_POINT_GROUPS:
         expected = ", ".join(ENTRY_POINT_GROUPS)
         raise ValueError(f"Unsupported extension group '{group}'. Expected one of: {expected}.")
+
+
+def _normalise_allowlist(values: Iterable[str] | None) -> frozenset[str] | None:
+    """Validate canonical allowlist entries before discovery begins.
+
+    A fully-qualified ``group:name`` entry selects one entry point. A
+    ``dist:name`` entry selects all entry points from one distribution. Bare
+    names are rejected because they can accidentally trust a same-named entry
+    point from another group or distribution.
+    """
+
+    if values is None:
+        return None
+    normalised: set[str] = set()
+    for value in values:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("allowlist entries must be non-empty strings")
+        value = value.strip()
+        if value.startswith("dist:"):
+            if not value.removeprefix("dist:"):
+                raise ValueError("distribution allowlist entries must use dist:<distribution>")
+            normalised.add(value)
+            continue
+        group, separator, name = value.partition(":")
+        if not separator or group not in ENTRY_POINT_GROUPS or not name:
+            expected = "group:name or dist:distribution"
+            raise ValueError(f"allowlist entry {value!r} must use {expected}; bare names are not allowed")
+        normalised.add(f"{group}:{name}")
+    return frozenset(normalised)
 
 
 def _normalise_entry_points(values: Any) -> tuple[Any, ...]:
