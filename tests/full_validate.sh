@@ -60,6 +60,7 @@ run_contracts() {
   require_commands python
   python scripts/validate_docs.py
   python scripts/validate_changelog.py
+  python scripts/validate_api_manifest.py
   python scripts/validate_schemas.py
   python scripts/validate_contract_fixtures.py
   if command -v node >/dev/null 2>&1; then

@@ -110,7 +110,7 @@ def render(base_cli: Any) -> str:
             "\n".join(
                 (
                     f"### `{name}`",
-                    f"**Kind:** {kind}  ",
+                    f"**Kind:** {kind}<br>",
                     f"**Signature:** {_signature(name, value)}",
                     "",
                     f"**Behavior:** {_description(name, value)}",
@@ -128,8 +128,10 @@ def render(base_cli: Any) -> str:
     lines = [
         "# Public API reference",
         "",
-        "This page is generated from `base_cli.__all__`. It is the complete stable",
-        "facade: private modules and names are deliberately excluded. Each entry",
+        "This page is generated from `base_cli.__all__` and checked against",
+        "`api-manifest.json`. It is the compatibility facade: private modules and",
+        "names are deliberately excluded. New applications should start with the",
+        "smaller `base_cli.core` surface described in `api-stability.md`. Each entry",
         "includes the runtime signature when Python can inspect one, the public",
         "docstring summary, compatibility guidance, and a minimal usage shape.",
         "For behavior that is shared by several symbols, follow the linked",

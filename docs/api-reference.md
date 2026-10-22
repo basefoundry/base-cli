@@ -1,7 +1,9 @@
 # Public API reference
 
-This page is generated from `base_cli.__all__`. It is the complete stable
-facade: private modules and names are deliberately excluded. Each entry
+This page is generated from `base_cli.__all__` and checked against
+`api-manifest.json`. It is the compatibility facade: private modules and
+names are deliberately excluded. New applications should start with the
+smaller `base_cli.core` surface described in `api-stability.md`. Each entry
 includes the runtime signature when Python can inspect one, the public
 docstring summary, compatibility guidance, and a minimal usage shape.
 For behavior that is shared by several symbols, follow the linked
@@ -19,7 +21,7 @@ The facade currently documents **124** public symbols.
 ## Classes and protocols
 
 ### `App`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `App(name: 'str | None' = None, version: 'str | None' = None, help: 'str | None' = None, log_to_file: 'bool' = True, max_log_files: 'int | None' = None, profile: 'CliProfile | None' = None, lifecycle_options: 'LifecycleOptions | None' = None, retention: 'RetentionPolicy | None' = None, max_run_bundles: 'int | None' = None, max_run_age_seconds: 'float | None' = None, max_run_total_bytes: 'int | None' = None, rich: 'bool' = False, telemetry: 'TelemetryOptions | None' = None) -> 'None'`
 
 **Behavior:** Define a Click-backed command with a shared runtime lifecycle.
@@ -35,7 +37,7 @@ base_cli.App(...)
 ```
 
 ### `AttachmentAdapter`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `AttachmentAdapter(*args, **kwargs)`
 
 **Behavior:** Lifecycle adapter contract implemented by :class:`base_cli.App`.
@@ -51,7 +53,7 @@ base_cli.AttachmentAdapter(...)
 ```
 
 ### `AttachmentContextFactory`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `AttachmentContextFactory(*args, **kwargs)`
 
 **Behavior:** Create consumer-owned application state for an active Context.
@@ -67,7 +69,7 @@ base_cli.AttachmentContextFactory(...)
 ```
 
 ### `AttachmentContract`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `AttachmentContract(app: 'Any', command: 'CommandT', context_factory: 'Callable[[Context[Any, Any, Any]], Any] | None', service_factory: 'Callable[[Context[Any, Any, Any]], Any] | None', sensitive_parameters: 'frozenset[str]', lifecycle_options: 'Any', standard_bindings: 'dict[str, Any]') -> None`
 
 **Behavior:** Immutable attachment state shared by the private Click adapter.
@@ -83,7 +85,7 @@ base_cli.AttachmentContract(...)
 ```
 
 ### `AttachmentServiceFactory`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `AttachmentServiceFactory(*args, **kwargs)`
 
 **Behavior:** Create consumer-owned services for an active Context.
@@ -99,7 +101,7 @@ base_cli.AttachmentServiceFactory(...)
 ```
 
 ### `TyperAdapter`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `TyperAdapter(typer_app: '_TyperApp') -> 'None'`
 
 **Behavior:** Attach one Typer application to a base-cli lifecycle.
@@ -115,7 +117,7 @@ base_cli.TyperAdapter(...)
 ```
 
 ### `BatteriesIncludedConfigLoader`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `BatteriesIncludedConfigLoader(cli_name: 'str | None' = None, *, user_config_dir: 'Path | None' = None, user_config_name: 'str' = 'config.yaml', project_config_name: 'str' = '.base-cli.yaml', environment_dir_name: 'str' = 'environments', verify_project_config: 'bool' = False) -> 'None'`
 
 **Behavior:** Load conventional user, project, environment, and explicit layers.
@@ -131,7 +133,7 @@ base_cli.BatteriesIncludedConfigLoader(...)
 ```
 
 ### `BaseCliDeprecationWarning`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Warning emitted when a supported base-cli API is being retired.
@@ -147,7 +149,7 @@ base_cli.BaseCliDeprecationWarning(...)
 ```
 
 ### `CliProfile`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `CliProfile(discover_project: 'ProjectDiscovery', load_user_config: 'UserConfigLoader', load_config: 'ConfigLoader', resolve_runtime: 'RuntimeResolver', history_writer: 'HistoryWriter | None' = None, display_command: 'DisplayCommandResolver' = <function _no_display_command>, history_display_command: 'HistoryDisplayResolver' = <function display_command>, resolve_workspace_root: 'WorkspaceRootResolver' = <function _no_workspace_root>, load_config_for_environment: 'EnvironmentConfigLoader | None' = None) -> None`
 
 **Behavior:** Policy boundary between the generic CLI lifecycle and its consumer.
@@ -163,7 +165,7 @@ base_cli.CliProfile(...)
 ```
 
 ### `ConfigLoader`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ConfigLoader(*args, **kwargs)`
 
 **Behavior:** Load validated framework configuration and opaque consumer settings.
@@ -179,7 +181,7 @@ base_cli.ConfigLoader(...)
 ```
 
 ### `ConfigSnapshot`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ConfigSnapshot(config: 'dict[str, Any]', framework: 'FrameworkConfig', provenance: 'Mapping[str, str]') -> None`
 
 **Behavior:** One deterministic layered configuration result.
@@ -194,8 +196,24 @@ import base_cli
 base_cli.ConfigSnapshot(...)
 ```
 
+### `CommandFilterNormalizer`
+**Kind:** class<br>
+**Signature:** `CommandFilterNormalizer()`
+
+**Behavior:** Callable type for canonicalizing command filter names.
+
+**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
+
+**Example:**
+```python
+import base_cli
+
+# See the callable signature above and pass consumer-owned values.
+base_cli.CommandFilterNormalizer(...)
+```
+
 ### `CommandCodec`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `CommandCodec(registry: 'CommandSchemaRegistry | None' = None) -> 'None'`
 
 **Behavior:** Encode and decode records using one isolated schema registry.
@@ -211,7 +229,7 @@ base_cli.CommandCodec(...)
 ```
 
 ### `CommandProtocolError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Raised when a command-protocol schema or payload violates its contract.
@@ -227,7 +245,7 @@ base_cli.CommandProtocolError(...)
 ```
 
 ### `CommandSchemaRegistry`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `CommandSchemaRegistry() -> 'None'`
 
 **Behavior:** Own an isolated set of command record schemas.
@@ -243,7 +261,7 @@ base_cli.CommandSchemaRegistry(...)
 ```
 
 ### `ConfigurationError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** (value is not callable)
 
 **Behavior:** A user-correctable configuration error that is safe to show.
@@ -259,7 +277,7 @@ base_cli.ConfigurationError(...)
 ```
 
 ### `CommandExtension`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `CommandExtension(*args, **kwargs)`
 
 **Behavior:** Callable contract for ``base_cli.commands`` entry points.
@@ -275,7 +293,7 @@ base_cli.CommandExtension(...)
 ```
 
 ### `Context`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `Context(cli_name: 'str', run_id: 'str', state_dir: 'Path', log_dir: 'Path', cache_dir: 'Path', temp_dir: 'Path', log_file: 'Path | None', config: 'ConfigT', environment: 'str', debug: 'bool', keep_temp: 'bool', log: 'logging.Logger', dry_run: 'bool' = False, application_home: 'Path | None' = None, project_root: 'Path | None' = None, manifest_path: 'Path | None' = None, project_name: 'str | None' = None, history_scope: 'str' = 'primary', history_parent_run_id: 'str | None' = None, user_config: 'object | None' = None, history_display_command: 'Callable[[str, list[str]], str]' = <function display_command>, cleanup_hooks: 'list[Callable[[], None]]' = <factory>, workspace_root: 'Path | None' = None, quiet: 'bool' = False, runtime_owner: 'str' = 'default', owner_root: 'Path | None' = None, run_root: 'Path | None' = None, application_context: 'ApplicationStateT | None' = None, services: 'ServicesT | None' = None, framework_config: 'FrameworkConfig | None' = None, config_provenance: 'Mapping[str, str]' = <factory>, json_output: 'bool' = False, rich: 'bool' = False) -> None`
 
 **Behavior:** Runtime state and cleanup hooks available to an active CLI command.
@@ -291,7 +309,7 @@ base_cli.Context(...)
 ```
 
 ### `ExtensionCompatibilityError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ExtensionCompatibilityError(descriptor: 'ExtensionDescriptor', supported: 'Sequence[str]') -> 'None'`
 
 **Behavior:** Raised when an extension declares an unsupported SDK version.
@@ -307,7 +325,7 @@ base_cli.ExtensionCompatibilityError(...)
 ```
 
 ### `ExtensionCollisionError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ExtensionCollisionError(group: 'str', name: 'str', descriptors: 'Sequence[ExtensionDescriptor]') -> 'None'`
 
 **Behavior:** Raised when more than one distribution claims the same extension name.
@@ -323,7 +341,7 @@ base_cli.ExtensionCollisionError(...)
 ```
 
 ### `ExtensionDescriptor`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ExtensionDescriptor(group: 'str', name: 'str', value: 'str', distribution: 'str | None', version: 'str | None', extras: 'tuple[str, ...]' = (), api_version: 'str' = '1', capabilities: 'tuple[str, ...]' = ()) -> None`
 
 **Behavior:** Stable metadata for one entry point, before its object is loaded.
@@ -339,7 +357,7 @@ base_cli.ExtensionDescriptor(...)
 ```
 
 ### `ExtensionDiscovery`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ExtensionDiscovery(*, disabled: 'bool' = False, allowlist: 'Iterable[str] | None' = None, entry_points: 'Iterable[Any] | EntryPointProvider | None' = None, paths: 'Iterable[Path] | None' = None, supported_api_versions: 'Iterable[str]' = ('1',)) -> 'None'`
 
 **Behavior:** Discover and lazily load command, profile, and plugin entry points.
@@ -355,7 +373,7 @@ base_cli.ExtensionDiscovery(...)
 ```
 
 ### `ExtensionDiscoveryError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Base class for actionable extension discovery failures.
@@ -371,7 +389,7 @@ base_cli.ExtensionDiscoveryError(...)
 ```
 
 ### `ExtensionLoadError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ExtensionLoadError(descriptor: 'ExtensionDescriptor', cause: 'BaseException') -> 'None'`
 
 **Behavior:** Wrap an extension import failure without hiding its source metadata.
@@ -387,7 +405,7 @@ base_cli.ExtensionLoadError(...)
 ```
 
 ### `ExtensionLoadResult`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ExtensionLoadResult(descriptor: 'ExtensionDescriptor', value: 'Any | None' = None, error: 'ExtensionLoadError | None' = None) -> None`
 
 **Behavior:** Result of an isolated bulk extension load.
@@ -403,7 +421,7 @@ base_cli.ExtensionLoadResult(...)
 ```
 
 ### `ExtensionsDisabledError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Raised when a caller attempts to load an extension while disabled.
@@ -419,7 +437,7 @@ base_cli.ExtensionsDisabledError(...)
 ```
 
 ### `DisplayCommandResolver`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `DisplayCommandResolver(*args, **kwargs)`
 
 **Behavior:** Resolve the process-facing command label used in diagnostics.
@@ -435,7 +453,7 @@ base_cli.DisplayCommandResolver(...)
 ```
 
 ### `EnvironmentConfigLoader`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `EnvironmentConfigLoader(*args, **kwargs)`
 
 **Behavior:** Load configuration with an explicitly selected environment.
@@ -451,7 +469,7 @@ base_cli.EnvironmentConfigLoader(...)
 ```
 
 ### `ExitCode`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ExitCode()`
 
 **Behavior:** Standard command exit code constants.
@@ -467,7 +485,7 @@ base_cli.ExitCode(...)
 ```
 
 ### `FieldSpec`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `FieldSpec(value_type: 'str', nullable: 'bool' = False) -> None`
 
 **Behavior:** Describe the wire type and nullability of one command-record field.
@@ -483,7 +501,7 @@ base_cli.FieldSpec(...)
 ```
 
 ### `FrameworkConfig`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `FrameworkConfig(environment: 'str' = 'dev', log_level: 'str | None' = None, keep_temp: 'bool' = False) -> None`
 
 **Behavior:** Validated lifecycle settings separated from consumer configuration.
@@ -499,7 +517,7 @@ base_cli.FrameworkConfig(...)
 ```
 
 ### `LifecycleOption`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `LifecycleOption(*param_decls: 'str', name: 'str | None' = None, help: 'str | None' = None, metavar: 'str | None' = None, envvar: 'str | tuple[str, ...] | list[str] | None' = None, show_envvar: 'bool' = False, show_default: 'bool | str | None' = None, hidden: 'bool' = False, default: 'Any' = None) -> 'None'`
 
 **Behavior:** Immutable public configuration for one lifecycle-owned Click option.
@@ -515,7 +533,7 @@ base_cli.LifecycleOption(...)
 ```
 
 ### `LifecycleOptions`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `LifecycleOptions(debug: 'LifecycleOption | None' = <factory>, quiet: 'LifecycleOption | None' = <factory>, environment: 'LifecycleOption | None' = <factory>, config: 'LifecycleOption | None' = <factory>, keep_temp: 'LifecycleOption | None' = <factory>, log_file: 'LifecycleOption | None' = <factory>, version: 'LifecycleOption | None' = <factory>, dry_run: 'LifecycleOption | None' = None, json: 'LifecycleOption | None' = None) -> None`
 
 **Behavior:** Composable option policy used by native and attached applications.
@@ -531,7 +549,7 @@ base_cli.LifecycleOptions(...)
 ```
 
 ### `LifecycleValues`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `LifecycleValues(debug: 'bool' = False, quiet: 'bool' = False, environment: 'str | None' = None, config: 'Path | None' = None, keep_temp: 'bool' = False, log_file: 'Path | None' = None, dry_run: 'bool' = False, json: 'bool' = False) -> None`
 
 **Behavior:** Normalized lifecycle values resolved for the active Click context.
@@ -547,7 +565,7 @@ base_cli.LifecycleValues(...)
 ```
 
 ### `JsonLogFormatter`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `JsonLogFormatter(run_id: 'str | None' = None) -> 'None'`
 
 **Behavior:** Format one ``LogRecord`` as a bounded, redacted JSON object.
@@ -563,7 +581,7 @@ base_cli.JsonLogFormatter(...)
 ```
 
 ### `NdjsonWriter`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `NdjsonWriter(stream: 'TextIO', schema: 'str' = 'base-cli.record', schema_version: 'int' = 1) -> None`
 
 **Behavior:** Write versioned structured records as newline-delimited JSON.
@@ -579,7 +597,7 @@ base_cli.NdjsonWriter(...)
 ```
 
 ### `OutputFormatError`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Raised when a public output format is not supported.
@@ -594,8 +612,24 @@ import base_cli
 base_cli.OutputFormatError(...)
 ```
 
+### `StructuredRecord`
+**Kind:** class<br>
+**Signature:** `StructuredRecord()`
+
+**Behavior:** Mapping shape accepted by the versioned command-record serializers.
+
+**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
+
+**Example:**
+```python
+import base_cli
+
+# See the callable signature above and pass consumer-owned values.
+base_cli.StructuredRecord(...)
+```
+
 ### `StructuredResultWriter`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `StructuredResultWriter(*args, **kwargs)`
 
 **Behavior:** Typed sink for one structured result at a time.
@@ -611,7 +645,7 @@ base_cli.StructuredResultWriter(...)
 ```
 
 ### `ProjectInfo`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ProjectInfo(root: 'Path | None' = None, manifest: 'Path | None' = None, name: 'str | None' = None) -> None`
 
 **Behavior:** Consumer-neutral project information discovered for an invocation.
@@ -627,7 +661,7 @@ base_cli.ProjectInfo(...)
 ```
 
 ### `ProjectDiscovery`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ProjectDiscovery(*args, **kwargs)`
 
 **Behavior:** Discover consumer-owned project information for the current directory.
@@ -643,7 +677,7 @@ base_cli.ProjectDiscovery(...)
 ```
 
 ### `RuntimeLayout`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `RuntimeLayout(owner_root: 'Path', run_root: 'Path', state_dir: 'Path', log_dir: 'Path', cache_dir: 'Path', temp_dir: 'Path') -> None`
 
 **Behavior:** Filesystem locations owned by one base-cli runtime binding.
@@ -659,7 +693,7 @@ base_cli.RuntimeLayout(...)
 ```
 
 ### `PluginExtension`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `PluginExtension(*args, **kwargs)`
 
 **Behavior:** Callable contract for ``base_cli.plugins`` entry points.
@@ -675,7 +709,7 @@ base_cli.PluginExtension(...)
 ```
 
 ### `ProfileExtension`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `ProfileExtension(*args, **kwargs)`
 
 **Behavior:** Callable contract for ``base_cli.profiles`` entry points.
@@ -691,7 +725,7 @@ base_cli.ProfileExtension(...)
 ```
 
 ### `RetentionPolicy`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `RetentionPolicy(max_bundles: 'int | None' = None, max_age_seconds: 'float | None' = None, max_total_bytes: 'int | None' = None) -> None`
 
 **Behavior:** Bounds for complete invocation bundles.
@@ -707,7 +741,7 @@ base_cli.RetentionPolicy(...)
 ```
 
 ### `RuntimeResolver`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `RuntimeResolver(*args, **kwargs)`
 
 **Behavior:** Resolve the runtime directories and ownership for one invocation.
@@ -723,7 +757,7 @@ base_cli.RuntimeResolver(...)
 ```
 
 ### `RuntimeBinding`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `RuntimeBinding(cache_root: 'Path', layout: 'RuntimeLayout', application_home: 'Path | None', runtime_owner: 'str', project_root: 'Path | None', project_name: 'str | None', inherited_path: 'Path | None', history_parent_run_id: 'str | None', run_id: 'str', primary_log_file: 'Path | None' = None, history_scope: 'str' = 'primary', write_identity: 'bool' = False) -> None`
 
 **Behavior:** Runtime decisions supplied by a consumer profile.
@@ -739,7 +773,7 @@ base_cli.RuntimeBinding(...)
 ```
 
 ### `TelemetryOptions`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `TelemetryOptions(enabled: 'bool' = True, tracer: 'Any | None' = None, tracer_provider: 'Any | None' = None, tracer_name: 'str' = 'base_cli') -> None`
 
 **Behavior:** Opt-in OpenTelemetry configuration for one :class:`base_cli.App`.
@@ -755,7 +789,7 @@ base_cli.TelemetryOptions(...)
 ```
 
 ### `TelemetrySession`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `TelemetrySession(span: 'Any', started_monotonic_ns: 'int') -> None`
 
 **Behavior:** Best-effort state for a single lifecycle span.
@@ -771,7 +805,7 @@ base_cli.TelemetrySession(...)
 ```
 
 ### `HistoryWriter`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `HistoryWriter(*args, **kwargs)`
 
 **Behavior:** Persist one completed invocation using the active typed Context.
@@ -787,7 +821,7 @@ base_cli.HistoryWriter(...)
 ```
 
 ### `HistoryDisplayResolver`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `HistoryDisplayResolver(*args, **kwargs)`
 
 **Behavior:** Resolve the command label persisted in consumer history.
@@ -803,7 +837,7 @@ base_cli.HistoryDisplayResolver(...)
 ```
 
 ### `UserConfigLoader`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `UserConfigLoader(*args, **kwargs)`
 
 **Behavior:** Load opaque consumer-owned user configuration.
@@ -819,7 +853,7 @@ base_cli.UserConfigLoader(...)
 ```
 
 ### `WorkspaceRootResolver`
-**Kind:** class  
+**Kind:** class<br>
 **Signature:** `WorkspaceRootResolver(*args, **kwargs)`
 
 **Behavior:** Project a consumer-owned user configuration into a workspace root.
@@ -837,7 +871,7 @@ base_cli.WorkspaceRootResolver(...)
 ## Functions
 
 ### `command_matches`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `command_matches(value: 'str', command_filters: 'tuple[str, ...]', *, normalizer: 'CommandFilterNormalizer | None' = None) -> 'bool'`
 
 **Behavior:** Return whether a command value matches one of the normalized filters.
@@ -853,7 +887,7 @@ base_cli.command_matches(...)
 ```
 
 ### `dumps_envelope`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `dumps_envelope(envelope: 'Mapping[str, Any]') -> 'str'`
 
 **Behavior:** Serialize an envelope as one compact, newline-terminated JSON record.
@@ -869,7 +903,7 @@ base_cli.dumps_envelope(...)
 ```
 
 ### `dumps_record`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `dumps_record(record_type: 'str', record: 'Record', *, protocol_header: 'str' = 'COMMAND_PROTOCOL_V1', registry: 'CommandSchemaRegistry | None' = None) -> 'str'`
 
 **Behavior:** Serialize one typed command record using the protocol framing.
@@ -885,7 +919,7 @@ base_cli.dumps_record(...)
 ```
 
 ### `dumps_records`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `dumps_records(record_type: 'str', records: 'tuple[Record, ...] | list[Record]', *, protocol_header: 'str' = 'COMMAND_PROTOCOL_V1', registry: 'CommandSchemaRegistry | None' = None) -> 'str'`
 
 **Behavior:** Serialize a sequence of typed command records using the protocol framing.
@@ -901,7 +935,7 @@ base_cli.dumps_records(...)
 ```
 
 ### `error_envelope`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `error_envelope(*, run_id: 'str | None', code: 'str', message: 'str', details: 'Mapping[str, Any] | None' = None) -> 'dict[str, Any]'`
 
 **Behavior:** Return the stable v1 machine-readable error envelope.
@@ -917,7 +951,7 @@ base_cli.error_envelope(...)
 ```
 
 ### `inspection_envelope`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `inspection_envelope(*, command: 'str', status: 'InspectionStatus', data: 'Mapping[str, Any]', error: 'Mapping[str, Any] | None' = None) -> 'dict[str, Any]'`
 
 **Behavior:** Build the stable v1 envelope for read-only inspection commands.
@@ -933,7 +967,7 @@ base_cli.inspection_envelope(...)
 ```
 
 ### `render_inspection_json`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `render_inspection_json(*, command: 'str', status: 'InspectionStatus', data: 'Mapping[str, Any]', error: 'Mapping[str, Any] | None' = None) -> 'str'`
 
 **Behavior:** Serialize the stable inspection envelope with Python's JSON encoder.
@@ -949,7 +983,7 @@ base_cli.render_inspection_json(...)
 ```
 
 ### `argument`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `argument(*param_decls: 'str', sensitive: 'bool' = False, **attrs: 'Any') -> 'Callable[[Callable[_P, _R]], Callable[_P, _R]]'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -965,7 +999,7 @@ base_cli.argument(...)
 ```
 
 ### `run_async`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `run_async(awaitable: 'Awaitable[_T]') -> '_T'`
 
 **Behavior:** Run one awaitable with an adapter-owned event loop.
@@ -981,7 +1015,7 @@ base_cli.run_async(...)
 ```
 
 ### `attach`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `attach(command: '_ClickCommandT', *, app: 'App | None' = None, context_factory: 'Callable[[Context[Any, Any, Any]], Any] | None' = None, service_factory: 'Callable[[Context[Any, Any, Any]], Any] | None' = None, sensitive_parameters: 'Iterable[str]' = (), **app_kwargs: 'Any') -> '_ClickCommandT'`
 
 **Behavior:** Attach lifecycle middleware and return the same Click command object.
@@ -997,7 +1031,7 @@ base_cli.attach(...)
 ```
 
 ### `attach_typer`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `attach_typer(typer_app: '_TyperApp', *, app: 'App | None' = None, context_factory: 'Callable[[Context[Any, Any, Any]], Any] | None' = None, service_factory: 'Callable[[Context[Any, Any, Any]], Any] | None' = None, sensitive_parameters: 'Iterable[str]' = (), name: 'str | None' = None, **app_kwargs: 'Any') -> '_ClickCommand'`
 
 **Behavior:** Attach a Typer application and return its native Click command.
@@ -1013,7 +1047,7 @@ base_cli.attach_typer(...)
 ```
 
 ### `command`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `command(*args: 'Any', **kwargs: 'Any') -> 'Callable[[Callable[_P, _R]], Callable[_P, _R]]'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1029,7 +1063,7 @@ base_cli.command(...)
 ```
 
 ### `configure_logger`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `configure_logger(cli_name: 'str', log_file: 'Path | None', debug: 'bool', *, quiet: 'bool' = False, stream: 'TextIO | None' = None, formatter: 'logging.Formatter | None' = None, json_logs: 'bool' = False, run_id: 'str | None' = None, log_level: 'str | None' = None, propagate: 'bool | None' = None) -> 'logging.Logger'`
 
 **Behavior:** Configure user-facing and persistent handlers for a CLI logger.
@@ -1045,7 +1079,7 @@ base_cli.configure_logger(...)
 ```
 
 ### `delegated_display_command`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `delegated_display_command(default: 'str | None' = None) -> 'str | None'`
 
 **Behavior:** Return the wrapper display label or ``default`` when none is set.
@@ -1061,7 +1095,7 @@ base_cli.delegated_display_command(...)
 ```
 
 ### `deprecated`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `deprecated(since: 'str', *, remove: 'str', alternative: 'str | None' = None) -> 'Callable[[Callable[P, R]], Callable[P, R]]'`
 
 **Behavior:** Mark a callable as deprecated while preserving its normal behavior.
@@ -1077,7 +1111,7 @@ base_cli.deprecated(...)
 ```
 
 ### `get_command_app`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `get_command_app(command_func: 'Any') -> 'App'`
 
 **Behavior:** Return the :class:`App` owning a registered function or attached tree.
@@ -1093,7 +1127,7 @@ base_cli.get_command_app(...)
 ```
 
 ### `get_current_context`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `get_current_context() -> 'Context[Any, Any, Any]'`
 
 **Behavior:** Return the active command context or raise when called outside a command.
@@ -1109,7 +1143,7 @@ base_cli.get_current_context(...)
 ```
 
 ### `get_typer_command`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `get_typer_command(typer_app: '_TyperApp') -> '_ClickCommand'`
 
 **Behavior:** Materialize Typer's native Click command tree.
@@ -1125,7 +1159,7 @@ base_cli.get_typer_command(...)
 ```
 
 ### `get_lifecycle_values`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `get_lifecycle_values(click_context: 'Any | None' = None) -> 'LifecycleValues'`
 
 **Behavior:** Return normalized lifecycle values stored on an active Click context.
@@ -1141,7 +1175,7 @@ base_cli.get_lifecycle_values(...)
 ```
 
 ### `log_critical`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `log_critical(message: 'str', *args: 'object') -> 'None'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1157,7 +1191,7 @@ base_cli.log_critical(...)
 ```
 
 ### `log_debug`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `log_debug(message: 'str', *args: 'object') -> 'None'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1173,7 +1207,7 @@ base_cli.log_debug(...)
 ```
 
 ### `log_error`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `log_error(message: 'str', *args: 'object') -> 'None'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1189,7 +1223,7 @@ base_cli.log_error(...)
 ```
 
 ### `log_info`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `log_info(message: 'str', *args: 'object') -> 'None'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1205,7 +1239,7 @@ base_cli.log_info(...)
 ```
 
 ### `log_warning`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `log_warning(message: 'str', *args: 'object') -> 'None'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1221,7 +1255,7 @@ base_cli.log_warning(...)
 ```
 
 ### `loads_records`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `loads_records(payload: 'str', expected_record_type: 'str | None' = None, *, protocol_header: 'str' = 'COMMAND_PROTOCOL_V1', registry: 'CommandSchemaRegistry | None' = None) -> 'tuple[str, tuple[dict[str, RecordValue], ...]]'`
 
 **Behavior:** Validate and decode protocol-framed command records.
@@ -1237,7 +1271,7 @@ base_cli.loads_records(...)
 ```
 
 ### `normalize_command_filter`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `normalize_command_filter(value: 'str', *, normalizer: 'CommandFilterNormalizer | None' = None) -> 'str'`
 
 **Behavior:** Normalize one command name for matching.
@@ -1253,7 +1287,7 @@ base_cli.normalize_command_filter(...)
 ```
 
 ### `normalize_command_filters`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `normalize_command_filters(value: 'str | None', *, normalizer: 'CommandFilterNormalizer | None' = None) -> 'tuple[str, ...]'`
 
 **Behavior:** Normalize a comma-separated command filter and reject empty entries.
@@ -1269,7 +1303,7 @@ base_cli.normalize_command_filters(...)
 ```
 
 ### `is_terminal`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `is_terminal(stream: 'TextIO | None' = None) -> 'bool'`
 
 **Behavior:** Return whether *stream* is an interactive terminal.
@@ -1285,7 +1319,7 @@ base_cli.is_terminal(...)
 ```
 
 ### `output_format_choices`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `output_format_choices() -> 'str'`
 
 **Behavior:** Return the public choices in help/error-message order.
@@ -1301,7 +1335,7 @@ base_cli.output_format_choices(...)
 ```
 
 ### `option`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `option(*param_decls: 'str', sensitive: 'bool' = False, dry_run: 'bool' = False, **attrs: 'Any') -> 'Callable[[Callable[_P, _R]], Callable[_P, _R]]'`
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1317,7 +1351,7 @@ base_cli.option(...)
 ```
 
 ### `render_document`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `render_document(document: 'Mapping[str, Any]', *, requested_format: 'str | None', records_key: 'str | None' = None, columns: 'Sequence[tuple[str, str]] | None' = None, stream: 'TextIO | None' = None, formula_guard: 'bool' = True) -> 'str'`
 
 **Behavior:** Render a structured report or leave terminal text to its existing renderer.
@@ -1333,7 +1367,7 @@ base_cli.render_document(...)
 ```
 
 ### `render_records`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `render_records(records: 'Iterable[Mapping[str, Any]]', *, requested_format: 'str | None', columns: 'Sequence[tuple[str, str]]', stream: 'TextIO | None' = None, footer: 'str | None' = None, minimum_widths: 'Sequence[int] | None' = None, terminal_width: 'int | None' = None, max_cell_width: 'int | None' = 80, rich: 'bool' = False, formula_guard: 'bool' = True) -> 'str'`
 
 **Behavior:** Render records according to the shared public output contract.
@@ -1349,7 +1383,7 @@ base_cli.render_records(...)
 ```
 
 ### `register_record_schema`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `register_record_schema(record_type: 'str', fields: 'Mapping[str, FieldSpec]') -> 'None'`
 
 **Behavior:** Register an application-specific record schema for the wire protocol.
@@ -1365,7 +1399,7 @@ base_cli.register_record_schema(...)
 ```
 
 ### `redact_json_value`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `redact_json_value(value: 'Any', *, _key: 'str | None' = None, _depth: 'int' = 0, _seen: 'set[int] | None' = None) -> 'Any'`
 
 **Behavior:** Recursively redact JSON values with bounded depth and cycle handling.
@@ -1381,7 +1415,7 @@ base_cli.redact_json_value(...)
 ```
 
 ### `resolve_output_format`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `resolve_output_format(requested: 'str | None', *, stream: 'TextIO | None' = None) -> 'str'`
 
 **Behavior:** Resolve a requested format, making text TTY-aware.
@@ -1397,7 +1431,7 @@ base_cli.resolve_output_format(...)
 ```
 
 ### `run_app`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `run_app(app: 'App | Callable[..., Any]', argv: 'list[str] | None' = None, *, reraise_unexpected: 'bool' = False) -> 'int'`
 
 **Behavior:** Run an App, registered command, or attached Click tree and return its status.
@@ -1413,7 +1447,7 @@ base_cli.run_app(...)
 ```
 
 ### `success_envelope`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `success_envelope(*, run_id: 'str | None', details: 'Mapping[str, Any] | None' = None, message: 'str' = 'Success', code: 'str' = 'ok') -> 'dict[str, Any]'`
 
 **Behavior:** Return the stable v1 machine-readable success envelope.
@@ -1429,7 +1463,7 @@ base_cli.success_envelope(...)
 ```
 
 ### `try_render_rich_table`
-**Kind:** function  
+**Kind:** function<br>
 **Signature:** `try_render_rich_table(stream: 'TextIO', headers: 'Sequence[str]', rows: 'Sequence[Sequence[str]]', footer: 'str | None', *, terminal_width: 'int | None' = None) -> 'bool'`
 
 **Behavior:** Render a human table with Rich when it is installed and healthy.
@@ -1447,7 +1481,7 @@ base_cli.try_render_rich_table(...)
 ## Modules
 
 ### `asyncio_adapter`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Explicit asyncio support for commands that opt into an async boundary.
@@ -1462,7 +1496,7 @@ base_cli.asyncio_adapter
 ```
 
 ### `command_filters`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Shared command-name filter normalization for CLI reports.
@@ -1477,7 +1511,7 @@ base_cli.command_filters
 ```
 
 ### `command_protocol`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1492,7 +1526,7 @@ base_cli.command_protocol
 ```
 
 ### `deprecations`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Small, consistent deprecation primitives for public base-cli APIs.
@@ -1507,7 +1541,7 @@ base_cli.deprecations
 ```
 
 ### `experimental`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Preview APIs under active development.
@@ -1522,7 +1556,7 @@ base_cli.experimental
 ```
 
 ### `json_contracts`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Versioned JSON contracts for machine-facing CLI consumers.
@@ -1537,7 +1571,7 @@ base_cli.json_contracts
 ```
 
 ### `extensions`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Lazy, deterministic discovery of optional Python entry-point extensions.
@@ -1552,7 +1586,7 @@ base_cli.extensions
 ```
 
 ### `history`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1567,7 +1601,7 @@ base_cli.history
 ```
 
 ### `integrations`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Optional Rich and OpenTelemetry integrations.
@@ -1582,7 +1616,7 @@ base_cli.integrations
 ```
 
 ### `testing`
-**Kind:** module  
+**Kind:** module<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Public facade symbol; see the linked contract and source annotations for details.
@@ -1599,7 +1633,7 @@ base_cli.testing
 ## Constants and typing helpers
 
 ### `__version__`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Installed base-cli distribution version exposed by the public facade.
@@ -1614,7 +1648,7 @@ value = base_cli.__version__
 ```
 
 ### `BOOLEAN`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Schema field descriptor for a required boolean command-record value.
@@ -1629,7 +1663,7 @@ value = base_cli.BOOLEAN
 ```
 
 ### `ApplicationStateT`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Consumer-owned application-state type parameter carried by Context.
@@ -1643,23 +1677,8 @@ import base_cli
 value = base_cli.ApplicationStateT
 ```
 
-### `CommandFilterNormalizer`
-**Kind:** constant/type  
-**Signature:** (value is not callable)
-
-**Behavior:** Callable type for canonicalizing command filter names.
-
-**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
-
-**Example:**
-```python
-import base_cli
-
-value = base_cli.CommandFilterNormalizer
-```
-
 ### `COMMAND_ENTRY_POINT_GROUP`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Entry-point group name used to discover command extensions.
@@ -1674,7 +1693,7 @@ value = base_cli.COMMAND_ENTRY_POINT_GROUP
 ```
 
 ### `ConfigT`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Consumer-owned configuration type parameter carried by Context and App.
@@ -1689,7 +1708,7 @@ value = base_cli.ConfigT
 ```
 
 ### `ENTRY_POINT_GROUPS`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Supported base-cli extension entry-point groups in discovery order.
@@ -1704,7 +1723,7 @@ value = base_cli.ENTRY_POINT_GROUPS
 ```
 
 ### `EXTENSION_API_VERSION`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Extension API version negotiated through entry-point metadata.
@@ -1719,7 +1738,7 @@ value = base_cli.EXTENSION_API_VERSION
 ```
 
 ### `DEFAULT_SCHEMA_REGISTRY`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Process-local registry containing built-in and consumer record schemas.
@@ -1734,7 +1753,7 @@ value = base_cli.DEFAULT_SCHEMA_REGISTRY
 ```
 
 ### `LIFECYCLE_META_KEY`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Metadata key used to mark lifecycle-owned Click parameters.
@@ -1749,7 +1768,7 @@ value = base_cli.LIFECYCLE_META_KEY
 ```
 
 ### `NULLABLE_STRING`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Schema field descriptor for a nullable string command-record value.
@@ -1764,7 +1783,7 @@ value = base_cli.NULLABLE_STRING
 ```
 
 ### `STRING`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Schema field descriptor for a required string command-record value.
@@ -1779,7 +1798,7 @@ value = base_cli.STRING
 ```
 
 ### `JSON_CONTRACT_VERSION`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Version number for the stable JSON output, error, and log contracts.
@@ -1794,7 +1813,7 @@ value = base_cli.JSON_CONTRACT_VERSION
 ```
 
 ### `JSON_ERROR_SCHEMA`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Schema identifier emitted by machine-readable error envelopes.
@@ -1809,7 +1828,7 @@ value = base_cli.JSON_ERROR_SCHEMA
 ```
 
 ### `JSON_LOG_SCHEMA`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Schema identifier emitted by structured JSON log records.
@@ -1824,7 +1843,7 @@ value = base_cli.JSON_LOG_SCHEMA
 ```
 
 ### `JSON_OUTPUT_SCHEMA`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Schema identifier emitted by successful JSON output envelopes.
@@ -1839,7 +1858,7 @@ value = base_cli.JSON_OUTPUT_SCHEMA
 ```
 
 ### `MAX_JSON_LOG_MESSAGE_LENGTH`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Maximum retained message length for one structured JSON log record.
@@ -1854,7 +1873,7 @@ value = base_cli.MAX_JSON_LOG_MESSAGE_LENGTH
 ```
 
 ### `NDJSON_SCHEMA`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Schema identifier emitted by versioned newline-delimited record output.
@@ -1869,7 +1888,7 @@ value = base_cli.NDJSON_SCHEMA
 ```
 
 ### `NDJSON_SCHEMA_VERSION`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Version number for the newline-delimited record contract.
@@ -1884,7 +1903,7 @@ value = base_cli.NDJSON_SCHEMA_VERSION
 ```
 
 ### `PUBLIC_OUTPUT_FORMATS`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Supported public output format names and their resolution order.
@@ -1898,23 +1917,8 @@ import base_cli
 value = base_cli.PUBLIC_OUTPUT_FORMATS
 ```
 
-### `StructuredRecord`
-**Kind:** constant/type  
-**Signature:** (value is not callable)
-
-**Behavior:** Mapping shape accepted by the versioned command-record serializers.
-
-**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
-
-**Example:**
-```python
-import base_cli
-
-value = base_cli.StructuredRecord
-```
-
 ### `RECORD_SCHEMAS`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Mutable registry mapping consumer record names to FieldSpec definitions.
@@ -1929,7 +1933,7 @@ value = base_cli.RECORD_SCHEMAS
 ```
 
 ### `PLUGIN_ENTRY_POINT_GROUP`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Entry-point group name used to discover optional plugin extensions.
@@ -1944,7 +1948,7 @@ value = base_cli.PLUGIN_ENTRY_POINT_GROUP
 ```
 
 ### `PROFILE_ENTRY_POINT_GROUP`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Entry-point group name used to discover profile extensions.
@@ -1959,7 +1963,7 @@ value = base_cli.PROFILE_ENTRY_POINT_GROUP
 ```
 
 ### `ServicesT`
-**Kind:** constant/type  
+**Kind:** constant/type<br>
 **Signature:** (value is not callable)
 
 **Behavior:** Consumer-owned service-container type parameter carried by Context.
