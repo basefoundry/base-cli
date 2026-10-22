@@ -14,6 +14,8 @@ and versions are tracked in the repo-root `VERSION` file.
 ### Changed
 
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
+- Document maintainer, independent review, release continuity, and reviewer
+  onboarding responsibilities for the 1.0 release gate (#252).
 
 ## [0.5.1] - 2026-10-10
 
