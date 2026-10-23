@@ -99,7 +99,7 @@ The generic framework defaults to:
 These defaults reduce accidental exposure; they are not a sandbox or encryption
 boundary.
 
-## Repository controls
+## GitHub repository security controls
 
 The repository supplements the runtime threat model with GitHub controls:
 

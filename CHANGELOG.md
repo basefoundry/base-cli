@@ -16,6 +16,8 @@ and versions are tracked in the repo-root `VERSION` file.
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
 - Add CodeQL analysis, Dependabot update policy, and repository security-control
   documentation for the 1.0 release gate (#280).
+- Configure Dependabot for the repository's checked-in uv lockfile instead of
+  the pip ecosystem so automated updates preserve the lockfile validation gate.
 
 ## [0.5.1] - 2026-10-10
 
