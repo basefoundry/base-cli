@@ -28,7 +28,7 @@ def test_starter_docs_explain_copying_and_safe_customization() -> None:
     text = STARTER_DOC.read_text(encoding="utf-8")
     for required in (
         "examples/minimal_cli",
-        "python -m pip install -e .",
+        'python -m pip install -e ".[dev]"',
         "python -m pytest",
         "base_cli.run_app(app)",
         "no `base-cli init` command yet",
