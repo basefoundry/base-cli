@@ -18,6 +18,8 @@ and versions are tracked in the repo-root `VERSION` file.
   fully qualified or distribution-prefixed extension allowlist entries (#397).
 - Match distribution-prefixed extension allowlists against the exact installed
   metadata spelling and precompute the approved distribution set.
+- Classify the compatibility facade in a reviewed API manifest and add the
+  smaller `base_cli.core` starting surface for new applications (#242).
 
 ## [0.5.1] - 2026-10-10
 
