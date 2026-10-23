@@ -21,7 +21,7 @@ def test_starter_has_the_copyable_project_boundaries() -> None:
 
 def test_starter_pins_the_current_pre_one_release_line() -> None:
     metadata = (STARTER / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'base-cli>=0.5.1,<1.0' in metadata
+    assert "base-cli>=0.5.1,<1.0" in metadata
 
 
 def test_starter_docs_explain_copying_and_safe_customization() -> None:
