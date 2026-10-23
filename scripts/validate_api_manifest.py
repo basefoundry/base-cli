@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
 
 from api_manifest import load_manifest
 from generate_api_reference import _load_package

@@ -12,6 +12,7 @@ from __future__ import annotations
 import inspect
 import re
 import sys
+import typing
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,11 @@ def _load_package() -> Any:
 
 
 def _kind(value: Any) -> str:
+    # Generic aliases changed from non-classes to class-like objects across
+    # supported Python versions. Treat typing aliases as data first so the
+    # generated reference is byte-identical on Python 3.10 through 3.14.
+    if typing.get_origin(value) is not None:
+        return "constant/type"
     if inspect.ismodule(value):
         return "module"
     if inspect.isclass(value):
@@ -75,6 +81,8 @@ def _kind(value: Any) -> str:
 
 def _signature(name: str, value: Any) -> str:
     try:
+        if typing.get_origin(value) is not None:
+            return "(value is not callable)"
         if inspect.isclass(value) or inspect.isfunction(value) or inspect.ismethod(value):
             signature = str(inspect.signature(value))
             # Default callback reprs contain process-specific memory addresses.

@@ -196,22 +196,6 @@ import base_cli
 base_cli.ConfigSnapshot(...)
 ```
 
-### `CommandFilterNormalizer`
-**Kind:** class<br>
-**Signature:** `CommandFilterNormalizer()`
-
-**Behavior:** Callable type for canonicalizing command filter names.
-
-**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
-
-**Example:**
-```python
-import base_cli
-
-# See the callable signature above and pass consumer-owned values.
-base_cli.CommandFilterNormalizer(...)
-```
-
 ### `CommandCodec`
 **Kind:** class<br>
 **Signature:** `CommandCodec(registry: 'CommandSchemaRegistry | None' = None) -> 'None'`
@@ -610,22 +594,6 @@ import base_cli
 
 # See the callable signature above and pass consumer-owned values.
 base_cli.OutputFormatError(...)
-```
-
-### `StructuredRecord`
-**Kind:** class<br>
-**Signature:** `StructuredRecord()`
-
-**Behavior:** Mapping shape accepted by the versioned command-record serializers.
-
-**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
-
-**Example:**
-```python
-import base_cli
-
-# See the callable signature above and pass consumer-owned values.
-base_cli.StructuredRecord(...)
 ```
 
 ### `StructuredResultWriter`
@@ -1677,6 +1645,21 @@ import base_cli
 value = base_cli.ApplicationStateT
 ```
 
+### `CommandFilterNormalizer`
+**Kind:** constant/type<br>
+**Signature:** (value is not callable)
+
+**Behavior:** Callable type for canonicalizing command filter names.
+
+**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
+
+**Example:**
+```python
+import base_cli
+
+value = base_cli.CommandFilterNormalizer
+```
+
 ### `COMMAND_ENTRY_POINT_GROUP`
 **Kind:** constant/type<br>
 **Signature:** (value is not callable)
@@ -1915,6 +1898,21 @@ value = base_cli.NDJSON_SCHEMA_VERSION
 import base_cli
 
 value = base_cli.PUBLIC_OUTPUT_FORMATS
+```
+
+### `StructuredRecord`
+**Kind:** constant/type<br>
+**Signature:** (value is not callable)
+
+**Behavior:** Mapping shape accepted by the versioned command-record serializers.
+
+**Errors and compatibility:** Follow the contract documentation linked in the description. Callers should handle the documented exception types and pin a compatible minor release.
+
+**Example:**
+```python
+import base_cli
+
+value = base_cli.StructuredRecord
 ```
 
 ### `RECORD_SCHEMAS`
