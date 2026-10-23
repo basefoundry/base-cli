@@ -88,6 +88,11 @@ and independently released.
 an application's project model. Base is one consumer of the library, not part
 of its generic contract.
 
+New applications can start with the smaller `base_cli.core` surface. The
+compatibility facade remains available for existing 0.x consumers; the
+[API manifest](https://basefoundry.github.io/base-cli/api-stability/#public-surface)
+classifies advanced and optional integration APIs.
+
 It is intentionally thin. Click still owns argument parsing and command
 execution, while `base_cli` provides reusable lifecycle behavior:
 

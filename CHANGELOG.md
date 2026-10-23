@@ -14,6 +14,8 @@ and versions are tracked in the repo-root `VERSION` file.
 ### Changed
 
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
+- Classify the compatibility facade in a reviewed API manifest and add the
+  smaller `base_cli.core` starting surface for new applications (#242).
 
 ## [0.5.1] - 2026-10-10
 
