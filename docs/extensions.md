@@ -79,6 +79,9 @@ does not hide healthy extensions.
 
 Use `allowlist={"base_cli.commands:audit"}` to restrict one entry point, or
 `allowlist={"dist:acme-cli"}` to trust all entry points from one distribution.
+Distribution allowlist values use the exact installed metadata spelling,
+including case; base-cli does not silently normalize case, hyphens, or
+underscores for a security decision.
 `ExtensionDiscovery(disabled=True)` disables discovery entirely. Bare entry
 point names and unqualified distribution names are rejected because they can
 silently trust an unintended group or distribution.

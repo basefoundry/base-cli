@@ -181,6 +181,11 @@ class ExtensionDiscovery:
             raise ValueError("pass either entry_points or paths, not both")
         self.disabled = disabled
         self.allowlist = _normalise_allowlist(allowlist)
+        self._distribution_allowlist = (
+            frozenset(value.removeprefix("dist:") for value in self.allowlist if value.startswith("dist:"))
+            if self.allowlist is not None
+            else None
+        )
         self._entry_points = entry_points
         self._paths = tuple(Path(path) for path in paths) if paths is not None else None
         self.supported_api_versions = frozenset(str(version) for version in supported_api_versions)
@@ -324,9 +329,7 @@ class ExtensionDiscovery:
             return True
         if descriptor.distribution is None:
             return False
-        return f"dist:{descriptor.distribution}".casefold() in {
-            value.casefold() for value in self.allowlist if value.startswith("dist:")
-        }
+        return self._distribution_allowlist is not None and descriptor.distribution in self._distribution_allowlist
 
     def _load_descriptor(self, descriptor: ExtensionDescriptor) -> Any:
         entry_point = self._entry_point_cache.get(descriptor)
@@ -351,9 +354,12 @@ def _normalise_allowlist(values: Iterable[str] | None) -> frozenset[str] | None:
     """Validate canonical allowlist entries before discovery begins.
 
     A fully-qualified ``group:name`` entry selects one entry point. A
-    ``dist:name`` entry selects all entry points from one distribution. Bare
-    names are rejected because they can accidentally trust a same-named entry
-    point from another group or distribution.
+    ``dist:name`` entry selects all entry points from one distribution. The
+    distribution spelling is matched exactly, including case; callers should
+    copy the ``Name`` value from installed metadata rather than relying on
+    implicit case or punctuation normalization. Bare names are rejected
+    because they can accidentally trust a same-named entry point from another
+    group or distribution.
     """
 
     if values is None:

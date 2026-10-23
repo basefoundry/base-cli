@@ -112,6 +112,16 @@ class ExtensionDiscoveryTests(unittest.TestCase):
             discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "shared")
         trusted.load.assert_not_called()
 
+    def test_distribution_allowlist_requires_exact_metadata_spelling(self) -> None:
+        legitimate = _entry_point("shared", "same.module:plugin", distribution="trusted-pkg")
+        case_variant = _entry_point("case", "same.module:plugin", distribution="TRUSTED-PKG")
+        discovery = base_cli.ExtensionDiscovery(
+            entry_points=(legitimate, case_variant),
+            allowlist={"dist:trusted-pkg"},
+        )
+
+        self.assertEqual([item.name for item in discovery.list_commands()], ["shared"])
+
     def test_refresh_cannot_race_an_inflight_descriptor_load(self) -> None:
         entry_point = _entry_point("shared", "same.module:plugin", distribution="trusted")
         entered = threading.Event()
