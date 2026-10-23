@@ -3,29 +3,23 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 from typing import Any
+
+from api_manifest import load_manifest
+from generate_api_reference import _load_package
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "docs" / "api-manifest.json"
 PACKAGE_ROOT = ROOT / "lib" / "python"
 
 
-def _load_manifest() -> dict[str, Any]:
-    value = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise ValueError("API manifest must contain a JSON object")
-    return value
-
-
-def main() -> None:
-    sys.path.insert(0, str(PACKAGE_ROOT))
-    import base_cli
+def _validate() -> None:
+    base_cli = _load_package()
     import base_cli.core as core
 
-    manifest = _load_manifest()
+    manifest = load_manifest(MANIFEST)
     if manifest.get("schema_version") != 1:
         raise ValueError("unsupported API manifest schema version")
     if manifest.get("facade") != "base_cli":
@@ -68,8 +62,19 @@ def main() -> None:
         raise ValueError("base_cli.core.__all__ must match the manifest core lifecycle symbols")
     if any(not hasattr(core, name) for name in core.__all__):
         raise ValueError("base_cli.core contains an unresolved export")
+    for name in core_names:
+        if getattr(core, name) is not getattr(base_cli, name):
+            raise ValueError(f"base_cli.core.{name} is not identical to base_cli.{name}")
 
     print(f"Validated API manifest: {len(exported)} facade symbols, {len(core.__all__)} core symbols.")
+
+
+def main() -> None:
+    try:
+        _validate()
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"API manifest validation failed: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
 
 
 if __name__ == "__main__":
