@@ -37,6 +37,7 @@ changes the supported window will update this table and the changelog.
 | --- | --- |
 | `0.5.x` | Supported |
 | `0.4.x` | Upgrade strongly recommended; best effort only |
+| `0.3.x` | Upgrade strongly recommended; best effort only |
 | `main` | Supported for fixes merged before the next release |
 | `<0.3` | Upgrade strongly recommended; best effort only |
 

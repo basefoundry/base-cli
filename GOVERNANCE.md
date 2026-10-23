@@ -70,7 +70,9 @@ Maintainers review these indicators at least once per release cycle:
 - security-alert age and remediation status; and
 - independent adopter pilots and permissioned outcomes.
 
-The current `v1.0.0` plan targets a stable core release in November 2026. The
+The current `v1.0.0` plan targets a stable core release after the documented
+release-candidate, downstream, and independent-review evidence is complete;
+the milestone and linked issues are the source of truth for scheduling. The
 broader language-neutral platform and catalog work remains explicitly deferred
 unless a separate roadmap decision brings it into scope.
 
