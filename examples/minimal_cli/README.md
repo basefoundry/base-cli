@@ -17,9 +17,9 @@ From the root of a `base-cli` checkout:
 cp -R examples/minimal_cli my-cli
 cd my-cli
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 python -m pip install --upgrade pip
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 base-minimal --name Ada
 python -m pytest
 ```
@@ -46,9 +46,11 @@ the public `base_cli` facade is the supported integration boundary.
 
 ## Install
 
+From the copied project directory, use the editable install so changes to
+`src/minimal_cli/` are immediately reflected when you rerun the command:
+
 ```bash
-python -m pip install "base-cli>=0.5.1,<1.0"
-python -m pip install .
+python -m pip install -e ".[dev]"
 base-minimal --help
 ```
 
@@ -69,7 +71,6 @@ errors follow the versioned JSON contract documented by base-cli.
 ## Tests
 
 ```bash
-python -m pip install "base-cli[dev]"
 python -m pytest tests
 ```
 

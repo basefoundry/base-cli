@@ -14,9 +14,9 @@ consumer would use:
 cp -R examples/minimal_cli my-cli
 cd my-cli
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
 python -m pip install --upgrade pip
-python -m pip install -e .
+python -m pip install -e ".[dev]"
 base-minimal --name Ada
 python -m pytest
 ```
