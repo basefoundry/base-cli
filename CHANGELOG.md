@@ -14,6 +14,10 @@ and versions are tracked in the repo-root `VERSION` file.
 ### Changed
 
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
+- Add CodeQL analysis, Dependabot update policy, and repository security-control
+  documentation for the 1.0 release gate (#280).
+- Configure Dependabot for the repository's checked-in uv lockfile instead of
+  the pip ecosystem so automated updates preserve the lockfile validation gate.
 - Clarify that extension capabilities are informational metadata, and require
   fully qualified or distribution-prefixed extension allowlist entries (#397).
 - Match distribution-prefixed extension allowlists against the exact installed

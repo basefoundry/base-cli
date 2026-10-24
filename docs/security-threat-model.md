@@ -99,6 +99,21 @@ The generic framework defaults to:
 These defaults reduce accidental exposure; they are not a sandbox or encryption
 boundary.
 
+## GitHub repository security controls
+
+The repository supplements the runtime threat model with GitHub controls:
+
+- Dependabot security updates and weekly dependency update proposals;
+- secret scanning and push protection, subject to the organization plan's
+  supported provider and non-provider patterns; and
+- CodeQL analysis for the Python source on pushes, pull requests, and a weekly
+  scheduled run.
+
+These controls are defense in depth. They do not replace the local Bandit,
+`pip-audit`, redaction, extension trust-boundary, or release-attestation gates.
+Maintainers should read back the repository settings after changes and record
+any plan-limited control together with its compensating control.
+
 ## Non-goals
 
 `base-cli` does not provide:
