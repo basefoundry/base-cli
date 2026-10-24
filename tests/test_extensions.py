@@ -85,7 +85,7 @@ class ExtensionDiscoveryTests(unittest.TestCase):
                 denied.load = mock.Mock(return_value="denied")
                 trusted.load = mock.Mock(return_value="trusted")
                 entries = (trusted, denied) if trusted_first else (denied, trusted)
-                discovery = base_cli.ExtensionDiscovery(entry_points=entries, allowlist={"trusted"})
+                discovery = base_cli.ExtensionDiscovery(entry_points=entries, allowlist={"dist:trusted"})
 
                 descriptors = discovery.list_commands()
                 self.assertEqual(len(descriptors), 1)
@@ -104,13 +104,23 @@ class ExtensionDiscoveryTests(unittest.TestCase):
     def test_allowlisted_entry_point_identity_change_fails_closed(self) -> None:
         trusted = _entry_point("shared", "same.module:plugin", distribution="trusted")
         trusted.load = mock.Mock(return_value="trusted")
-        discovery = base_cli.ExtensionDiscovery(entry_points=(trusted,), allowlist={"trusted"})
+        discovery = base_cli.ExtensionDiscovery(entry_points=(trusted,), allowlist={"dist:trusted"})
         self.assertEqual(len(discovery.list_commands()), 1)
 
         trusted.dist.name = "denied"
         with self.assertRaisesRegex(base_cli.ExtensionLoadError, "identity changed"):
             discovery.load(base_cli.COMMAND_ENTRY_POINT_GROUP, "shared")
         trusted.load.assert_not_called()
+
+    def test_distribution_allowlist_requires_exact_metadata_spelling(self) -> None:
+        legitimate = _entry_point("shared", "same.module:plugin", distribution="trusted-pkg")
+        case_variant = _entry_point("case", "same.module:plugin", distribution="TRUSTED-PKG")
+        discovery = base_cli.ExtensionDiscovery(
+            entry_points=(legitimate, case_variant),
+            allowlist={"dist:trusted-pkg"},
+        )
+
+        self.assertEqual([item.name for item in discovery.list_commands()], ["shared"])
 
     def test_refresh_cannot_race_an_inflight_descriptor_load(self) -> None:
         entry_point = _entry_point("shared", "same.module:plugin", distribution="trusted")
@@ -123,7 +133,7 @@ class ExtensionDiscoveryTests(unittest.TestCase):
             return "trusted"
 
         entry_point.load = load
-        discovery = base_cli.ExtensionDiscovery(entry_points=(entry_point,), allowlist={"trusted"})
+        discovery = base_cli.ExtensionDiscovery(entry_points=(entry_point,), allowlist={"dist:trusted"})
         result: list[object] = []
 
         def worker() -> None:
@@ -210,6 +220,10 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         self.assertEqual(descriptor.api_version, "1")
         self.assertEqual(descriptor.capabilities, ("metrics", "tracing"))
 
+        compatible.load = mock.Mock(return_value="loaded")
+        self.assertEqual(discovery.load(base_cli.PLUGIN_ENTRY_POINT_GROUP, "telemetry"), "loaded")
+        compatible.load.assert_called_once_with()
+
         incompatible = _entry_point(
             "future",
             "two:install",
@@ -220,6 +234,13 @@ class ExtensionDiscoveryTests(unittest.TestCase):
         future = base_cli.ExtensionDiscovery(entry_points=(incompatible,))
         with self.assertRaisesRegex(base_cli.ExtensionCompatibilityError, "API version '2'"):
             future.load(base_cli.PLUGIN_ENTRY_POINT_GROUP, "future")
+
+    def test_allowlist_rejects_ambiguous_bare_names(self) -> None:
+        with self.assertRaisesRegex(ValueError, "bare names are not allowed"):
+            base_cli.ExtensionDiscovery(allowlist={"audit"})
+
+        with self.assertRaisesRegex(ValueError, "group:name or dist:distribution"):
+            base_cli.ExtensionDiscovery(allowlist={"unknown:audit"})
 
     def test_real_distribution_metadata_is_discovered_from_a_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
