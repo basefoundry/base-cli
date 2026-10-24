@@ -14,6 +14,10 @@ and versions are tracked in the repo-root `VERSION` file.
 ### Changed
 
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
+- Clarify that extension capabilities are informational metadata, and require
+  fully qualified or distribution-prefixed extension allowlist entries (#397).
+- Match distribution-prefixed extension allowlists against the exact installed
+  metadata spelling and precompute the approved distribution set.
 - Classify the compatibility facade in a reviewed API manifest and add the
   smaller `base_cli.core` starting surface for new applications (#242).
 
