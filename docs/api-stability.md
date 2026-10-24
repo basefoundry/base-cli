@@ -14,6 +14,21 @@ the other modules listed in their module-level `__all__`) are public as well.
 Names beginning with `_`, modules not documented here, and implementation
 details are private and may change without notice.
 
+The reviewed facade is classified in [`api-manifest.json`](api-manifest.json).
+Every facade symbol belongs to exactly one of four tiers:
+
+- **core** — the small lifecycle surface recommended for new applications;
+- **integration** — optional parser, telemetry, and presentation adapters;
+- **advanced** — explicit configuration, contract, extension, and runtime APIs;
+- **provisional** — public for compatibility, but not a 1.0 default.
+
+New applications should begin with `import base_cli.core as cli`. The broad
+`base_cli` facade remains available during the 0.x compatibility window so
+existing consumers can migrate deliberately. The manifest and its validator
+prevent an export from appearing without a reviewed tier classification.
+Optional integration packages remain lazy: importing `base_cli.core` does not
+require Typer, Rich, or OpenTelemetry.
+
 The following machine-facing contracts are public and versioned:
 
 - command framing defaults to `COMMAND_PROTOCOL_V1`; record schemas are owned

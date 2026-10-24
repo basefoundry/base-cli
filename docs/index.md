@@ -66,6 +66,8 @@ application.
   for dated CI results and the permissioned-adopter program.
 - Read [API stability](api-stability.md) and the [migration guide](migrations.md)
   before upgrading across a compatibility boundary.
+- Start new applications with the small `base_cli.core` surface and consult the
+  [API manifest](api-manifest.json) for advanced and integration tiers.
 - Browse the [complete public API reference](api-reference.md) for exported
   symbols, signatures, and usage shapes.
 - Follow [consumer profiles](consumer-profiles.md) when your application owns
