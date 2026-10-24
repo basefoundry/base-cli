@@ -3,6 +3,8 @@
 Thank you for improving this project.
 
 Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
+Project roles, review expectations, and release continuity are documented in
+[`GOVERNANCE.md`](GOVERNANCE.md).
 
 ## Development setup
 
