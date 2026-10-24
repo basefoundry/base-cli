@@ -50,10 +50,15 @@ telemetry = "acme_cli.telemetry:install [base-cli-api-v1, base-cli-cap-tracing]"
 
 `ExtensionDescriptor.api_version` and `.capabilities` expose this metadata.
 `ExtensionDiscovery` rejects an unsupported API version before loading the
-entry point and reports the supported versions in the error. This is a
-negotiation boundary, not an installation-order heuristic; the consumer can
-select another plugin release or widen its `supported_api_versions` policy
-after running its compatibility suite.
+entry point and reports the supported versions in the error. Capabilities are
+currently **informational inventory metadata**: they do not grant or restrict
+permissions and do not sandbox an in-process Python extension. A consumer that
+needs a capability policy must inspect the descriptor and make that decision
+before calling `load()`.
+
+This is a negotiation boundary, not an installation-order heuristic; the
+consumer can select another plugin release or widen its
+`supported_api_versions` policy after running its compatibility suite.
 
 An entry point must declare at most one `base-cli-api-vN` extra. Discovery
 skips an entry point with malformed metadata on a per-entry-point basis, so a
@@ -72,10 +77,14 @@ runtime environment change. `load_all()` isolates broken third-party imports
 and returns an `ExtensionLoadResult` for every descriptor so one broken plugin
 does not hide healthy extensions.
 
-Use `allowlist={"base_cli.commands:audit"}` to restrict names, or
-`ExtensionDiscovery(disabled=True)` to disable discovery entirely. Allowlist
-entries may be a bare entry-point name, a fully-qualified `group:name`, or a
-distribution name.
+Use `allowlist={"base_cli.commands:audit"}` to restrict one entry point, or
+`allowlist={"dist:acme-cli"}` to trust all entry points from one distribution.
+Distribution allowlist values use the exact installed metadata spelling,
+including case; base-cli does not silently normalize case, hyphens, or
+underscores for a security decision.
+`ExtensionDiscovery(disabled=True)` disables discovery entirely. Bare entry
+point names and unqualified distribution names are rejected because they can
+silently trust an unintended group or distribution.
 
 Loading uses the exact entry-point source and distribution identity approved by
 discovery rather than re-selecting an entry point by a potentially colliding
