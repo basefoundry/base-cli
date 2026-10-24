@@ -7,7 +7,7 @@ directory.
 
 | Example | Demonstrates | Launcher |
 | --- | --- | --- |
-| [`minimal_cli`](minimal_cli/README.md) | A single `base_cli.App` command | `base-minimal` |
+| [`minimal_cli`](minimal_cli/README.md) | The five-minute copyable starter and a single `base_cli.App` command | `base-minimal` |
 | [`nested_click_app`](nested_click_app/README.md) | Native Click groups and plugin discovery | `base-nested` |
 | [`typer_app`](typer_app/README.md) | Typed Typer commands through the optional adapter | `base-typer` |
 | [`automation_observability_app`](automation_observability_app/README.md) | JSON output, dry runs, Rich, and telemetry | `base-automation` |

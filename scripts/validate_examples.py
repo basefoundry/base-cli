@@ -24,6 +24,7 @@ REQUIRED_SECTIONS = (
     "Operational troubleshooting",
 )
 SCRIPT_PATTERN = re.compile(r"^\s*base-[a-z0-9-]+\s*=\s*\"[a-zA-Z0-9_.]+:[a-zA-Z0-9_]+\"\s*$", re.MULTILINE)
+BASE_CLI_REQUIREMENT = "base-cli>=0.5.1,<1.0"
 
 
 def fail(message: str) -> None:
@@ -50,7 +51,9 @@ def validate_example(root: Path, name: str) -> None:
         if not required.exists():
             fail(f"{required.relative_to(root)} is required")
     metadata = pyproject.read_text(encoding="utf-8")
-    if "base-cli" not in metadata or "[project.scripts]" not in metadata:
+    if BASE_CLI_REQUIREMENT not in metadata:
+        fail(f"{pyproject.relative_to(root)} must require {BASE_CLI_REQUIREMENT!r}")
+    if "[project.scripts]" not in metadata:
         fail(f"{pyproject.relative_to(root)} must declare base-cli and a console script")
     if not SCRIPT_PATTERN.search(metadata):
         fail(f"{pyproject.relative_to(root)} has no base-* console script")
