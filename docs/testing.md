@@ -4,8 +4,11 @@ The Base manifest declares `./tests/full_validate.sh` as the authoritative
 local aggregate. It composes the same named gates used by CI: repository
 baseline, Python tests with coverage, strict typing, formatting and lint,
 documentation/schema/contract validation, benchmark budgets, and security.
-Bandit and pip-audit are required; a missing tool is an error rather than a
-skipped check.
+Bandit and pip-audit are required on the Python 3.11+ quality lane; a missing
+tool there is an error rather than a skipped check. The runtime package still
+supports Python 3.10, but the security extra intentionally does not install
+pip-audit on that interpreter because its CacheControl file-cache dependency
+has no patched release for Python 3.10.
 
 The repository is managed locally through uv, so `uv.lock` is checked into the
 repository. Validate that it still matches `pyproject.toml` with:

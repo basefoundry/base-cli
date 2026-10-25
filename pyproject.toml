@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==84.0.0", "wheel==0.48.0"]
+requires = ["setuptools==84.1.0", "wheel==0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -75,7 +75,12 @@ telemetry = [
 quality = [
   "bandit>=1.7,<2",
   "coverage[toml]>=7.6,<8",
-  "pip-audit>=2.7,<3",
+  # pip-audit uses CacheControl's file cache; keep its Python 3.11+ path on
+  # the first patched filelock release while retaining the Python 3.10 floor.
+  "filelock>=4.2.1; python_version >= '3.11'",
+  # pip-audit's CacheControl file cache is audited on the Python 3.11+ quality
+  # lane; the core/runtime support floor remains Python 3.10.
+  "pip-audit>=2.7,<3; python_version >= '3.11'",
   "pytest-cov>=5,<7",
   "ruff>=0.8,<1",
 ]
