@@ -24,3 +24,10 @@ def test_help_exposes_lifecycle_options() -> None:
     assert result.exit_code == 0, result.output
     assert "--name" in result.stdout
     assert "--environment" in result.stdout
+
+
+def test_missing_name_is_an_actionable_production_error() -> None:
+    result = base_cli.testing.invoke(app, [])
+
+    assert result.exit_code != 0
+    assert "Missing option '--name'" in result.stderr
