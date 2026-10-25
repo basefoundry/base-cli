@@ -13,6 +13,9 @@ and versions are tracked in the repo-root `VERSION` file.
 
 ### Changed
 
+- Add a maintained, copyable five-minute starter template with explicit safe
+  customization points and installed-consumer validation (#244).
+
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
 - Document maintainer, independent review, release continuity, and reviewer
   onboarding responsibilities for the 1.0 release gate (#252).
