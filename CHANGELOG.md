@@ -17,6 +17,10 @@ and versions are tracked in the repo-root `VERSION` file.
   customization points and installed-consumer validation (#244).
 
 - Include `uv.lock` freshness in the authoritative local validation aggregate (#424).
+- Document maintainer, independent review, release continuity, and reviewer
+  onboarding responsibilities for the 1.0 release gate (#252).
+- State the explicit 0.3.x security-support row and make the v1.0 schedule
+  evidence-driven rather than asserting an untracked ship date.
 - Add CodeQL analysis, Dependabot update policy, and repository security-control
   documentation for the 1.0 release gate (#280).
 - Configure Dependabot for the repository's checked-in uv lockfile instead of

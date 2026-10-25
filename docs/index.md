@@ -66,6 +66,10 @@ application.
   for dated CI results and the permissioned-adopter program.
 - Read [API stability](api-stability.md) and the [migration guide](migrations.md)
   before upgrading across a compatibility boundary.
+- Review the project's [governance and maintainer responsibilities](https://github.com/basefoundry/base-cli/blob/main/GOVERNANCE.md)
+  before taking on release or security work.
+- Start new applications with the small `base_cli.core` surface and consult the
+  [API manifest](api-manifest.json) for advanced and integration tiers.
 - Start new applications with the small `base_cli.core` surface and consult the
   [API manifest](api-manifest.json) for advanced and integration tiers.
 - Browse the [complete public API reference](api-reference.md) for exported
