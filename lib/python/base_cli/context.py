@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 import os
 from collections.abc import Callable, Mapping
@@ -75,9 +76,31 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
     _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
     _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)
     _owned_temp_descriptor: int | None = field(default=None, init=False, repr=False, compare=False)
+    _structured_result: dict[str, Any] | None = field(default=None, init=False, repr=False, compare=False)
 
     def on_cleanup(self, hook: Callable[[], None]) -> None:
         self.cleanup_hooks.append(hook)
+
+    def set_result(self, result: Mapping[str, Any]) -> None:
+        """Set structured command details for the JSON lifecycle envelope.
+
+        The mapping is snapshotted and strictly validated when set. In JSON mode it is emitted as the
+        machine-readable ``details.result`` object; ``details.stdout`` keeps
+        its existing captured-text meaning. Human and NDJSON commands can
+        use the same mapping with the output helpers documented in
+        ``docs/json-contracts.md``.
+        """
+        if not isinstance(result, Mapping):
+            raise TypeError(f"structured results must be mappings, got {type(result).__name__}")
+        try:
+            # A strict JSON round-trip both rejects non-JSON values/non-finite
+            # numbers and isolates nested containers from later mutation.
+            snapshot = json.loads(json.dumps(dict(result), allow_nan=False))
+        except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+            raise TypeError("structured results must contain JSON-serializable finite values") from exc
+        if not isinstance(snapshot, dict):  # pragma: no cover - json object invariant
+            raise TypeError("structured results must serialize to a JSON object")
+        self._structured_result = snapshot
 
     def bind_project(self, project_name: str | None, project_root: Path, manifest_path: Path | None = None) -> None:
         """Bind the selected project to this invocation's history context."""

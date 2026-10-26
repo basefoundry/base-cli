@@ -73,6 +73,17 @@ Failures use `schema: "base-cli.error"`, `type: "error"`, and a deterministic
 contains the numeric `exit_code` and captured command stdout. A command's
 human output is represented as a JSON string, so it cannot introduce prose or
 ANSI escapes as a second stdout record.
+Commands that have machine-facing fields can call `ctx.set_result(mapping)` while
+running. JSON mode adds the redacted mapping as `details.result` without changing
+`details.stdout`; a second call replaces the first mapping. The mapping is
+strictly JSON-validated and snapshotted when set, so non-serializable values,
+non-finite numbers, and later nested mutations cannot break or alter the emitted
+envelope. Commands that also support NDJSON or human output can use the same
+source data with `NdjsonWriter` or `render_records` in their non-JSON branch,
+but those lower-level output helpers do not apply lifecycle JSON redaction
+automatically. Apply `redact_json_value()` first when the shared data contains
+sensitive fields, or define an explicit non-JSON redaction policy; do not assume
+that `ctx.set_result()` protects a separate output call.
 
 All JSON and NDJSON emitters use strict JSON serialization and reject
 non-finite numeric values (`NaN`, positive infinity, and negative infinity).

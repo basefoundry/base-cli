@@ -13,6 +13,7 @@ SCHEMA_DIR = Path("lib/python/base_cli/schemas/v1")
 FIXTURE_DIR = Path("tests/fixtures/contracts")
 FIXTURE_SCHEMAS = {
     "output-success.json": "output.schema.json",
+    "output-structured-result.json": "output.schema.json",
     "error-usage.json": "error.schema.json",
     "inspection-warn.json": "inspection.schema.json",
     "log-record.json": "log.schema.json",
