@@ -1107,14 +1107,14 @@ class App:
                             recorder = RunRecorder(context, started_at, started_monotonic_ns)
                         except BaseException as exc:  # pylint: disable=broad-exception-caught
                             _warn_lifecycle_failure(context, "Run recorder construction failed", exc)
+                    finish_telemetry(
+                        telemetry_session,
+                        context,
+                        outcome,
+                        ended_monotonic_ns=ended_monotonic_ns,
+                        exception=exception,
+                    )
                     if recorder is not None:
-                        finish_telemetry(
-                            telemetry_session,
-                            context,
-                            outcome,
-                            ended_monotonic_ns=ended_monotonic_ns,
-                            exception=exception,
-                        )
                         _finish_run_recorder(
                             recorder,
                             outcome,

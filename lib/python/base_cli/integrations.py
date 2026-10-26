@@ -10,10 +10,13 @@ primary command outcome.
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, TextIO
+
+from ._propagation import TRACEPARENT_ENV, TRACESTATE_ENV
 
 
 @dataclass(frozen=True)
@@ -37,6 +40,8 @@ class TelemetrySession:
 
     span: Any
     started_monotonic_ns: int
+    context_api: Any | None = None
+    context_token: Any | None = None
 
 
 def try_render_rich_table(
@@ -102,23 +107,69 @@ def start_telemetry(options: TelemetryOptions | None, context: Any) -> Telemetry
 
     try:
         tracer = options.tracer
-        if tracer is None:
-            from opentelemetry import trace
+        otel_context_api: Any | None = None
+        parent_context: Any | None = None
+        otel_trace_api: Any | None = None
+        try:
+            from opentelemetry import context as otel_context
+            from opentelemetry import propagate
+            from opentelemetry import trace as otel_trace
 
-            tracer = trace.get_tracer(
+            # W3C carriers are lower-case; process environments are commonly
+            # upper-case. Normalize only the documented trace variables, never
+            # the complete environment (which could accidentally carry W3C
+            # baggage from an unrelated variable).
+            carrier: dict[str, str] = {}
+            for variable in (TRACEPARENT_ENV, TRACESTATE_ENV):
+                value = os.environ.get(variable)
+                if value is None:
+                    value = os.environ.get(variable.lower())
+                if value is not None:
+                    carrier[variable.lower()] = value
+            if carrier:
+                parent_context = propagate.extract(carrier)
+            otel_context_api = otel_context
+            otel_trace_api = otel_trace
+        except ImportError:
+            pass
+        if tracer is None:
+            if otel_trace_api is None:
+                from opentelemetry import trace as otel_trace
+
+                otel_trace_api = otel_trace
+            tracer = otel_trace_api.get_tracer(
                 options.tracer_name,
                 tracer_provider=options.tracer_provider,
             )
         attributes = _start_attributes(context)
         try:
-            span = tracer.start_span("base_cli.run", attributes=attributes)
+            if parent_context is None:
+                span = tracer.start_span("base_cli.run", attributes=attributes)
+            else:
+                span = tracer.start_span("base_cli.run", attributes=attributes, context=parent_context)
         except TypeError:
-            # Small test/demonstration tracers may only accept a span name.
-            span = tracer.start_span("base_cli.run")
+            try:
+                # Small test/demonstration tracers may reject context or
+                # attributes; preserve the historical name-only fallback.
+                span = tracer.start_span("base_cli.run", attributes=attributes)
+            except TypeError:
+                span = tracer.start_span("base_cli.run")
         if span is None:
             return None
         _safe_span_call(span, "add_event", "base_cli.run.started", attributes=attributes)
-        return TelemetrySession(span=span, started_monotonic_ns=time.monotonic_ns())
+        context_token = None
+        if otel_context_api is not None and otel_trace_api is not None and hasattr(span, "get_span_context"):
+            try:
+                active_context = otel_trace_api.set_span_in_context(span, parent_context)
+                context_token = otel_context_api.attach(active_context)
+            except Exception:
+                context_token = None
+        return TelemetrySession(
+            span=span,
+            started_monotonic_ns=time.monotonic_ns(),
+            context_api=otel_context_api,
+            context_token=context_token,
+        )
     except Exception as exc:  # pragma: no cover - optional package/runtime dependent
         _debug_integration_failure(context, "OpenTelemetry start failed", exc)
         return None
@@ -164,6 +215,30 @@ def finish_telemetry(
         # command result even if an exporter or logger raises process-control
         # exceptions while the span is being closed.
         _debug_integration_failure(context, "OpenTelemetry finish failed", exc)
+    finally:
+        if session.context_api is not None and session.context_token is not None:
+            try:
+                session.context_api.detach(session.context_token)
+            except Exception:
+                pass
+
+
+def inject_trace_context(environ: dict[str, str]) -> None:
+    """Inject the current OpenTelemetry span into a child process environment."""
+
+    try:
+        from opentelemetry import propagate
+
+        carrier: dict[str, str] = {}
+        propagate.inject(carrier)
+        for key, value in carrier.items():
+            if key.lower() == TRACEPARENT_ENV.lower():
+                environ[TRACEPARENT_ENV] = value
+            elif key.lower() == TRACESTATE_ENV.lower():
+                environ[TRACESTATE_ENV] = value
+    except Exception:
+        # Trace propagation is optional and must never change command behavior.
+        pass
 
 
 def _start_attributes(context: Any) -> dict[str, Any]:
@@ -216,6 +291,7 @@ __all__ = [
     "TelemetryOptions",
     "TelemetrySession",
     "finish_telemetry",
+    "inject_trace_context",
     "start_telemetry",
     "try_render_rich_table",
 ]

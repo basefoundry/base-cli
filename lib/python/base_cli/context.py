@@ -9,8 +9,18 @@ from pathlib import Path
 from typing import Any, Generic, TypeVar
 
 from ._cleanup import remove_owned_temp_directory
+from ._propagation import (
+    PARENT_RUN_ID_ENV,
+    PROPAGATE_ENV,
+    RUN_ID_ENV,
+    RUN_ROOT_ENV,
+    RUN_SCOPE_ENV,
+    TRACEPARENT_ENV,
+    TRACESTATE_ENV,
+)
 from .config import FrameworkConfig
 from .history import display_command as _default_history_display_command
+from .integrations import inject_trace_context
 
 _current_context: contextvars.ContextVar[Context[Any, Any, Any] | None] = contextvars.ContextVar(
     "base_cli_current_context",
@@ -84,6 +94,46 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
         self.project_name = project_name
         self.project_root = project_root.resolve()
         self.manifest_path = manifest_path.resolve() if manifest_path is not None else None
+
+    def child_environment(
+        self,
+        *,
+        environ: Mapping[str, str] | None = None,
+        propagate: bool = True,
+    ) -> dict[str, str]:
+        """Return an environment for a child process correlated to this run.
+
+        The returned copy carries the run identity, parent identity, shared
+        bundle path, and internal history scope. When the optional telemetry
+        extra is installed, the current W3C trace context is injected too.
+        Set ``propagate=False`` for an intentionally independent child.
+        """
+
+        child_env = dict(os.environ if environ is None else environ)
+        if not propagate:
+            for variable in (
+                RUN_ID_ENV,
+                PARENT_RUN_ID_ENV,
+                RUN_ROOT_ENV,
+                RUN_SCOPE_ENV,
+                TRACEPARENT_ENV,
+                TRACESTATE_ENV,
+            ):
+                child_env.pop(variable, None)
+            child_env[PROPAGATE_ENV] = "0"
+            return child_env
+
+        child_env[PROPAGATE_ENV] = "1"
+        child_env[RUN_ID_ENV] = self.run_id
+        child_env[PARENT_RUN_ID_ENV] = self.run_id
+        child_env[RUN_SCOPE_ENV] = "internal"
+        if self.run_root is not None:
+            child_env[RUN_ROOT_ENV] = str(self.run_root.resolve())
+        else:
+            child_env.pop(RUN_ROOT_ENV, None)
+
+        inject_trace_context(child_env)
+        return child_env
 
     def _warn_cleanup_failure(self, message: str, *args: object) -> None:
         try:
