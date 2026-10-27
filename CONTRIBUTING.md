@@ -79,7 +79,9 @@ the source of truth; update the pack when they disagree. State context impact in
 the PR, including a reason when no update is needed. Typo-only and internal changes
 without behavioral or architectural impact usually need no context update.
 
-Validate changes with `basectl export-context --list-files` and
-`basectl export-context --print` from the checkout, plus `git diff --check`.
+Validate changes with `basectl export-context --list-files`,
+`basectl export-context --print`, and `python scripts/validate_docs.py` from the
+checkout, plus `git diff --check`. The documentation validator includes
+`.ai-context/*.md` so links from the curated pack fail in CI when they drift.
 Keep the pack self-contained enough for offline reading, free of secrets and
 private runtime data, and independent of generated timestamps or export bundles.

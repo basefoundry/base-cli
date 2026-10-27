@@ -81,6 +81,7 @@ def validate_links(root: Path) -> None:
         *sorted((root / "docs").rglob("*.md")),
         *sorted((root / "examples").rglob("*.md")),
         *sorted((root / "compatibility").rglob("*.md")),
+        *sorted((root / ".ai-context").rglob("*.md")),
     ]
     for document in markdown_files:
         text = document.read_text(encoding="utf-8")
