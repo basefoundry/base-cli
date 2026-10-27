@@ -46,6 +46,15 @@ class _Tracer:
         return self.span
 
 
+class _NameOnlyTracer:
+    def __init__(self) -> None:
+        self.span = _Span()
+
+    def start_span(self, name: str) -> _Span:
+        self.span.name = name
+        return self.span
+
+
 class _BrokenTracer:
     def start_span(self, *_args: object, **_kwargs: object) -> object:
         raise RuntimeError("exporter unavailable")
@@ -128,6 +137,14 @@ class IntegrationTests(unittest.TestCase):
         self.assertIn("base_cli.duration_ms", tracer.span.attributes)
         self.assertEqual(tracer.span.exceptions, [])
         self.assertIsNotNone(tracer.span.status)
+
+    def test_name_only_tracer_remains_supported(self) -> None:
+        tracer = _NameOnlyTracer()
+
+        session = start_telemetry(base_cli.TelemetryOptions(tracer=tracer), object())
+
+        self.assertIsNotNone(session)
+        self.assertEqual(tracer.span.name, "base_cli.run")
 
     def test_telemetry_marks_failures_and_records_exception(self) -> None:
         tracer = _Tracer()

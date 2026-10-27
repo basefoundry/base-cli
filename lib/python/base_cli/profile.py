@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from ._propagation import read_runtime_propagation
 from ._runtime import runtime_layout
 from .config import (
     BatteriesIncludedConfigLoader,
@@ -324,7 +325,16 @@ def _generic_runtime_resolver(
 ) -> RuntimeResolver:
     def resolve_runtime(cli_name: str, project: ProjectInfo | None) -> RuntimeBinding:
         root = (cache_root if cache_root is not None else default_cache_root()).expanduser().resolve()
-        run_id = make_run_id()
+        propagated = read_runtime_propagation()
+        run_id = propagated.run_id or make_run_id()
+        inherited_path = propagated.run_root
+        parent_run_id = propagated.parent_run_id
+        if inherited_path is not None:
+            # A run root always identifies the parent invocation. When a
+            # caller forwards only BASE_CLI_RUN_ID, the shared bundle's run ID
+            # is the parent identity as well.
+            parent_run_id = parent_run_id or propagated.run_id
+        history_scope = propagated.scope or ("internal" if parent_run_id is not None else "primary")
         project_root = project.root if project is not None else None
         project_name = project.name if project is not None else None
         return RuntimeBinding(
@@ -335,14 +345,16 @@ def _generic_runtime_resolver(
                 run_id,
                 namespace=cli_name,
                 project_name=project_name,
+                inherited_run_root=inherited_path,
             ),
             application_home=application_home,
             runtime_owner="default",
             project_root=project_root,
             project_name=project_name,
-            inherited_path=None,
-            history_parent_run_id=None,
+            inherited_path=inherited_path,
+            history_parent_run_id=parent_run_id,
             run_id=run_id,
+            history_scope=history_scope,
         )
 
     return resolve_runtime
