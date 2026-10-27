@@ -10,6 +10,7 @@ const schemaDir = path.join(root, "lib", "python", "base_cli", "schemas", "v1");
 const fixtureDir = path.join(root, "tests", "fixtures", "contracts");
 const fixtures = new Map([
   ["output-success.json", "output.schema.json"],
+  ["output-structured-result.json", "output.schema.json"],
   ["error-usage.json", "error.schema.json"],
   ["inspection-warn.json", "inspection.schema.json"],
   ["log-record.json", "log.schema.json"],
