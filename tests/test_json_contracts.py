@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import math
 import os
 import tempfile
 import unittest
@@ -171,6 +172,101 @@ class JsonContractTests(unittest.TestCase):
         self.assertTrue(log_lines)
         self.assertTrue(all(line["schema"] == "base-cli.log" for line in log_lines))
         self.assertTrue(all("[REDACTED]" in line["message"] or "token" not in line["message"] for line in log_lines))
+
+    def test_json_command_can_attach_redacted_structured_result(self) -> None:
+        app = base_cli.App(
+            name="json-result",
+            log_to_file=False,
+            lifecycle_options=self._lifecycle_options(),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            ctx.set_result(
+                {
+                    "records": [{"name": "web-1", "status": "ok"}],
+                    "api_token": "secret",
+                }
+            )
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["--json"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(
+            envelope["details"]["result"],
+            {"records": [{"name": "web-1", "status": "ok"}], "api_token": "[REDACTED]"},
+        )
+        self.assertEqual(envelope["details"]["stdout"], "")
+
+    def test_json_error_preserves_structured_result(self) -> None:
+        import click
+
+        app = base_cli.App(
+            name="json-result-error",
+            log_to_file=False,
+            lifecycle_options=self._lifecycle_options(),
+        )
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            ctx.set_result({"phase": "validated"})
+            raise click.ClickException("failed after validation")
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["--json"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 1)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["type"], "error")
+        self.assertEqual(envelope["details"]["result"], {"phase": "validated"})
+
+    def test_invalid_structured_result_becomes_a_clean_json_error(self) -> None:
+        def app_for(value: object) -> base_cli.App:
+            app = base_cli.App(
+                name="json-result-invalid",
+                log_to_file=False,
+                lifecycle_options=self._lifecycle_options(),
+            )
+
+            @app.command()
+            def main(ctx: base_cli.Context) -> None:
+                ctx.set_result(value)  # type: ignore[arg-type]
+
+            return app
+
+        for value in ({"items": {"not", "json"}}, {"value": math.nan}):
+            with self.subTest(value=value):
+                app = app_for(value)
+
+                with tempfile.TemporaryDirectory() as home:
+                    result = base_cli.testing.invoke(app, ["--json"], home=Path(home))
+
+                self.assertNotEqual(result.exit_code, 0)
+                envelope = json.loads(result.stdout)
+                self.assertEqual(envelope["type"], "error")
+                self.assertNotIn("result", envelope["details"])
+
+    def test_structured_result_is_a_deep_snapshot(self) -> None:
+        app = base_cli.App(
+            name="json-result-snapshot",
+            log_to_file=False,
+            lifecycle_options=self._lifecycle_options(),
+        )
+        payload = {"items": []}
+
+        @app.command()
+        def main(ctx: base_cli.Context) -> None:
+            ctx.set_result(payload)
+            payload["items"].append("late-mutation")
+
+        with tempfile.TemporaryDirectory() as home:
+            result = base_cli.testing.invoke(app, ["--json"], home=Path(home))
+
+        self.assertEqual(result.exit_code, 0, result.output)
+        envelope = json.loads(result.stdout)
+        self.assertEqual(envelope["details"]["result"], {"items": []})
 
     def test_json_error_is_machine_only_and_exit_code_is_deterministic(self) -> None:
         import click
