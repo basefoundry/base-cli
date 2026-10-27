@@ -45,6 +45,7 @@ PUBLIC_DOCS = frozenset(
         "security-threat-model.md",
         "schemas.md",
         "strict-json-consumer.md",
+        "starter-template.md",
         "typer-adapter.md",
         "user-config-typing.md",
     }

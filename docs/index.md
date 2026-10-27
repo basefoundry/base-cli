@@ -58,12 +58,20 @@ application.
   with the underlying parser and decide whether its lifecycle boundary fits.
 - Follow the [five-minute consumer quickstart](consumer-quickstart.md) for a
   minimal public `App`, `run_app()`, human output, and JSON invocation.
+- Use the [starter template](starter-template.md) when you want a complete
+  copyable project with packaging and tests.
 - Start with the [adopter readiness guide](adopter-readiness.md) for a
   production evaluation.
 - See the [adoption and compatibility evidence guide](adoption-evidence.md)
   for dated CI results and the permissioned-adopter program.
 - Read [API stability](api-stability.md) and the [migration guide](migrations.md)
   before upgrading across a compatibility boundary.
+- Review the project's [governance and maintainer responsibilities](https://github.com/basefoundry/base-cli/blob/main/GOVERNANCE.md)
+  before taking on release or security work.
+- Start new applications with the small `base_cli.core` surface and consult the
+  [API manifest](api-manifest.json) for advanced and integration tiers.
+- Start new applications with the small `base_cli.core` surface and consult the
+  [API manifest](api-manifest.json) for advanced and integration tiers.
 - Browse the [complete public API reference](api-reference.md) for exported
   symbols, signatures, and usage shapes.
 - Follow [consumer profiles](consumer-profiles.md) when your application owns

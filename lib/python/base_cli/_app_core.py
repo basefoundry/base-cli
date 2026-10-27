@@ -127,6 +127,7 @@ class _InvocationState:
     attached_completion: bool = False
     json_output: bool = False
     output_router: Any = None
+    structured_result: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -322,6 +323,13 @@ def _capture_invocation_context(context: Context[Any, Any, Any], owner_app: App)
     state.log_file = context.log_file
     state.debug = context.debug
     state.quiet = context.quiet
+
+
+def _capture_structured_result(context: Context[Any, Any, Any], owner_app: App) -> None:
+    state = _INVOCATION_STATE.get()
+    if state is None or state.owner_app is not owner_app:
+        return
+    state.structured_result = None if context._structured_result is None else dict(context._structured_result)
 
 
 def _capture_standard_options(standard: dict[str, Any], owner_app: App) -> None:
@@ -1107,20 +1115,22 @@ class App:
                             recorder = RunRecorder(context, started_at, started_monotonic_ns)
                         except BaseException as exc:  # pylint: disable=broad-exception-caught
                             _warn_lifecycle_failure(context, "Run recorder construction failed", exc)
+                    finish_telemetry(
+                        telemetry_session,
+                        context,
+                        outcome,
+                        ended_monotonic_ns=ended_monotonic_ns,
+                        exception=exception,
+                    )
                     if recorder is not None:
-                        finish_telemetry(
-                            telemetry_session,
-                            context,
-                            outcome,
-                            ended_monotonic_ns=ended_monotonic_ns,
-                            exception=exception,
-                        )
                         _finish_run_recorder(
                             recorder,
                             outcome,
                             ended_at=ended_at,
                             ended_monotonic_ns=ended_monotonic_ns,
                         )
+
+                    _capture_structured_result(context, self)
 
                     try:
                         context.cleanup()

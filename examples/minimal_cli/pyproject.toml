@@ -7,7 +7,10 @@ name = "base-cli-reference-minimal"
 version = "0.1.0"
 description = "Minimal production-style base-cli reference application"
 requires-python = ">=3.10"
-dependencies = ["base-cli>=0.3"]
+dependencies = ["base-cli>=0.5.1,<1.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9"]
 
 [project.scripts]
 base-minimal = "minimal_cli.cli:main"

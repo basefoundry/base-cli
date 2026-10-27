@@ -208,11 +208,12 @@ publishing for this repository and workflow before the dispatch can upload.
 The `pypi` GitHub environment requires approval, rejects self-review, disallows
 administrator bypass, and is configured with the PyPI trusted publisher for
 `.github/workflows/package.yml`. No long-lived PyPI token is stored in the
-repository. Production publication therefore waits for an independent
-reviewer until maintainer-capacity work in [#252](https://github.com/basefoundry/base-cli/issues/252)
-adds one. If a temporary solo-maintainer exception is ever needed, it must be
-time-bounded and record an owner, expiry, audit trail, and link to #252 before
-an administrator changes the environment policy.
+repository. The independent release/security reviewer is designated in
+[`GOVERNANCE.md`](https://github.com/basefoundry/base-cli/blob/main/GOVERNANCE.md); the release record must identify the
+reviewer who checked the exact artifact and commit. If a temporary solo-
+maintainer exception is ever needed, it must be time-bounded and record an
+owner, expiry, audit trail, and link to [#252](https://github.com/basefoundry/base-cli/issues/252)
+before an administrator changes the environment policy.
 
 ## Recovery
 

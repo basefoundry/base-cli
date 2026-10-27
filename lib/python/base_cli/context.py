@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextvars
+import json
 import logging
 import os
 from collections.abc import Callable, Mapping
@@ -9,8 +10,18 @@ from pathlib import Path
 from typing import Any, Generic, TypeVar
 
 from ._cleanup import remove_owned_temp_directory
+from ._propagation import (
+    PARENT_RUN_ID_ENV,
+    PROPAGATE_ENV,
+    RUN_ID_ENV,
+    RUN_ROOT_ENV,
+    RUN_SCOPE_ENV,
+    TRACEPARENT_ENV,
+    TRACESTATE_ENV,
+)
 from .config import FrameworkConfig
 from .history import display_command as _default_history_display_command
+from .integrations import inject_trace_context
 
 _current_context: contextvars.ContextVar[Context[Any, Any, Any] | None] = contextvars.ContextVar(
     "base_cli_current_context",
@@ -75,15 +86,77 @@ class Context(Generic[ConfigT, ApplicationStateT, ServicesT]):
     _owns_temp_dir: bool = field(default=False, init=False, repr=False, compare=False)
     _owned_temp_identity: tuple[int, int] | None = field(default=None, init=False, repr=False, compare=False)
     _owned_temp_descriptor: int | None = field(default=None, init=False, repr=False, compare=False)
+    _structured_result: dict[str, Any] | None = field(default=None, init=False, repr=False, compare=False)
 
     def on_cleanup(self, hook: Callable[[], None]) -> None:
         self.cleanup_hooks.append(hook)
+
+    def set_result(self, result: Mapping[str, Any]) -> None:
+        """Set structured command details for the JSON lifecycle envelope.
+
+        The mapping is snapshotted and strictly validated when set. In JSON mode it is emitted as the
+        machine-readable ``details.result`` object; ``details.stdout`` keeps
+        its existing captured-text meaning. Human and NDJSON commands can
+        use the same mapping with the output helpers documented in
+        ``docs/json-contracts.md``.
+        """
+        if not isinstance(result, Mapping):
+            raise TypeError(f"structured results must be mappings, got {type(result).__name__}")
+        try:
+            # A strict JSON round-trip both rejects non-JSON values/non-finite
+            # numbers and isolates nested containers from later mutation.
+            snapshot = json.loads(json.dumps(dict(result), allow_nan=False))
+        except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+            raise TypeError("structured results must contain JSON-serializable finite values") from exc
+        if not isinstance(snapshot, dict):  # pragma: no cover - json object invariant
+            raise TypeError("structured results must serialize to a JSON object")
+        self._structured_result = snapshot
 
     def bind_project(self, project_name: str | None, project_root: Path, manifest_path: Path | None = None) -> None:
         """Bind the selected project to this invocation's history context."""
         self.project_name = project_name
         self.project_root = project_root.resolve()
         self.manifest_path = manifest_path.resolve() if manifest_path is not None else None
+
+    def child_environment(
+        self,
+        *,
+        environ: Mapping[str, str] | None = None,
+        propagate: bool = True,
+    ) -> dict[str, str]:
+        """Return an environment for a child process correlated to this run.
+
+        The returned copy carries the run identity, parent identity, shared
+        bundle path, and internal history scope. When the optional telemetry
+        extra is installed, the current W3C trace context is injected too.
+        Set ``propagate=False`` for an intentionally independent child.
+        """
+
+        child_env = dict(os.environ if environ is None else environ)
+        if not propagate:
+            for variable in (
+                RUN_ID_ENV,
+                PARENT_RUN_ID_ENV,
+                RUN_ROOT_ENV,
+                RUN_SCOPE_ENV,
+                TRACEPARENT_ENV,
+                TRACESTATE_ENV,
+            ):
+                child_env.pop(variable, None)
+            child_env[PROPAGATE_ENV] = "0"
+            return child_env
+
+        child_env[PROPAGATE_ENV] = "1"
+        child_env[RUN_ID_ENV] = self.run_id
+        child_env[PARENT_RUN_ID_ENV] = self.run_id
+        child_env[RUN_SCOPE_ENV] = "internal"
+        if self.run_root is not None:
+            child_env[RUN_ROOT_ENV] = str(self.run_root.resolve())
+        else:
+            child_env.pop(RUN_ROOT_ENV, None)
+
+        inject_trace_context(child_env)
+        return child_env
 
     def _warn_cleanup_failure(self, message: str, *args: object) -> None:
         try:

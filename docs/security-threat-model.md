@@ -74,9 +74,10 @@ not a replacement for explicit `sensitive=True` declarations.
 | Symlink, traversal, replacement, or mount races redirect cleanup | Exclusive runtime-leaf ownership, retained descriptors, identity checks, no-follow traversal, run-ID containment, and fail-closed cleanup; `tests/test_cleanup_security.py`, `tests/test_app_security_boundaries.py`, and adversarial regression tests | A same-account process with the same filesystem authority can race user-owned paths. Use a private cache root and avoid sharing runtime trees between mutually hostile users. |
 | Insecure permissions expose runtime files | POSIX `0600`/`0700` modes; Windows uses inherited user-profile ACLs and warns when secure handle operations are unavailable | A custom Windows cache root or network filesystem may not inherit private ACLs. Consumers must provision and verify permissions. |
 | Malicious or accidental config content changes execution | Explicit config paths must be readable regular files; YAML is parsed as data; generic profile has no implicit product files; consumer profiles own schema validation and precedence | The consumer still decides which files, environment variables, and values are trusted. Validate schema, reject unexpected keys, and do not treat config as a secret store. |
-| A plugin executes unwanted code or changes command behavior | Lazy discovery, deterministic ordering, duplicate detection, explicit `load`/`load_all`, `allowlist`, and `disabled`; `tests/test_extensions.py` | Loaded extensions have the process's authority and are not sandboxed. Pin and review distributions, disable discovery by default where possible, and use an allowlist. |
+| A plugin executes unwanted code or changes command behavior | Lazy discovery, deterministic ordering, duplicate detection, explicit `load`/`load_all`, canonical `group:name` or `dist:distribution` allowlists, and `disabled`; `tests/test_extensions.py` | Loaded extensions have the process's authority and are not sandboxed. Capability extras are informational metadata, not authorization. Pin and review distributions, disable discovery by default where possible, and use an allowlist. |
 | Concurrency corrupts logs, history, metadata, or retention state | Atomic replacement, sidecar/process locks, per-run leases, bounded complete-bundle retention, and concurrency/adversarial tests | The framework cannot make consumer databases or external stores transactional. Use a transactional writer and define recovery for multi-process consumers. Unknown run liveness fails closed. |
 | Child/inherited runs mutate or delete a parent's artifacts | Inherited runtimes do not own a new bundle, do not finalize parent metadata, and are excluded from cleanup/retention; inherited-run tests cover startup, success, and failure | Parent and child processes still share the user's filesystem authority. Consumers must validate parent provenance and avoid inheriting from untrusted paths. |
+| Untrusted process environment redirects a child into an arbitrary run bundle | The generic propagation contract validates single-component run IDs, absolute non-symlinked bundle roots, active `run.json` metadata, and `primary`/`internal` scopes before constructing a layout; `Context.child_environment()` emits a copied, opt-out-capable contract | Environment values are still same-user input. Use the helper rather than forwarding arbitrary paths, keep cache roots private, and provide an explicit `RuntimeResolver` when a consumer has a stronger provenance policy. |
 | Telemetry leaks argv, config, paths, or secrets | Telemetry is opt-in; only run ID, CLI name, environment, dry-run, outcome, exit code, and duration are attached; missing/broken exporters are no-ops; `tests/test_integrations.py` | A consumer-supplied tracer/exporter can add arbitrary attributes or send to an untrusted endpoint. Review provider configuration, use TLS/authentication, and never attach raw command data. |
 | Optional integrations or dependencies broaden the attack surface | Rich, Typer, and OpenTelemetry are optional extras; import/use is lazy; quality CI runs Bandit and pip-audit | A vulnerable or malicious dependency remains a supply-chain risk. Pin/lock deployments, review updates, and install only required extras. |
 | Secondary persistence failure hides the real command result or leaves false state | Transactional startup/teardown, terminal outcome finalization, best-effort history, and rollback tests | A crash can still lose diagnostics. Treat logs/history as evidence, not an authorization or billing source, and alert on persistence warnings. |
@@ -98,6 +99,21 @@ The generic framework defaults to:
 
 These defaults reduce accidental exposure; they are not a sandbox or encryption
 boundary.
+
+## GitHub repository security controls
+
+The repository supplements the runtime threat model with GitHub controls:
+
+- Dependabot security updates and weekly dependency update proposals;
+- secret scanning and push protection, subject to the organization plan's
+  supported provider and non-provider patterns; and
+- CodeQL analysis for the Python source on pushes, pull requests, and a weekly
+  scheduled run.
+
+These controls are defense in depth. They do not replace the local Bandit,
+`pip-audit`, redaction, extension trust-boundary, or release-attestation gates.
+Maintainers should read back the repository settings after changes and record
+any plan-limited control together with its compensating control.
 
 ## Non-goals
 

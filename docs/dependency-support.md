@@ -27,6 +27,11 @@ Optional integrations are intentionally independent of the core window:
 | `rich` | `>=13.7,<15` | Integration tests and graceful-degradation checks |
 | `telemetry` | `>=1.24,<2` | Telemetry integration tests |
 
+The `quality` extra is security-tested on Python 3.11 and newer. Its
+`pip-audit`/file-cache toolchain is not installed on Python 3.10 because the
+first patched `filelock` release requires Python 3.11; this does not change the
+core runtime support floor.
+
 ## Updating a window
 
 1. Add the candidate lower or upper line to the dependency matrix. The

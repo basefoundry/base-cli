@@ -681,6 +681,8 @@ def _emit_json_success(
         "exit_code": exit_code,
         "stdout": _captured_stdout(output_capture),
     }
+    if state.structured_result is not None:
+        details["result"] = state.structured_result
     sys.stdout.write(
         dumps_envelope(
             success_envelope(
@@ -702,16 +704,19 @@ def _emit_json_error(
     if outcome.exit_code == ExitCode.SUCCESS:
         _emit_json_success(state, outcome.exit_code, output_capture)
         return
+    details = {
+        "exit_code": outcome.exit_code,
+        "stdout": _captured_stdout(output_capture),
+    }
+    if state.structured_result is not None:
+        details["result"] = state.structured_result
     sys.stdout.write(
         dumps_envelope(
             error_envelope(
                 run_id=state.run_id,
                 code=outcome.kind,
                 message=message,
-                details={
-                    "exit_code": outcome.exit_code,
-                    "stdout": _captured_stdout(output_capture),
-                },
+                details=details,
             )
         )
     )

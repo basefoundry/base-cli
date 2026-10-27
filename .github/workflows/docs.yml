@@ -17,6 +17,7 @@ on:
       - ".github/workflows/dependency-matrix.yml"
       - ".github/workflows/compatibility.yml"
       - "scripts/generate_api_reference.py"
+      - "scripts/generate_core_surface.py"
       - "scripts/generate_compatibility_dashboard.py"
       - ".github/workflows/tests.yml"
       - ".github/workflows/dependency-matrix.yml"
@@ -74,6 +75,8 @@ jobs:
 
       - name: Validate generated public API reference
         run: python scripts/generate_api_reference.py --check
+      - name: Validate generated core surface
+        run: python scripts/generate_core_surface.py --check
 
       - name: Build documentation with strict warnings
         run: python -m mkdocs build --strict --site-dir site
