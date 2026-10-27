@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import argparse
 import email
+import hashlib
 import re
 import sys
 import tarfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import NoReturn
 
 PACKAGE_NAME = "base-cli"
@@ -18,6 +19,8 @@ MINIMUM_PYTHON = ">=3.10"
 REQUIRED_DEPENDENCIES = ("click<8.6,>=8.1",)
 YAML_DEPENDENCY_PREFIX = "PyYAML<7,>=6.0"
 DOCUMENTATION_URL = "Documentation, https://basefoundry.github.io/base-cli/"
+STARTUP_HOOK_NAMES = frozenset({"sitecustomize.py", "usercustomize.py"})
+NATIVE_OR_EXECUTABLE_SUFFIXES = (".dll", ".dylib", ".exe", ".pyd", ".so")
 ALLOWED_WHEEL_DIST_INFO_FILES = frozenset({"METADATA", "RECORD", "WHEEL", "top_level.txt", "entry_points.txt"})
 ALLOWED_SDIST_FILES = frozenset(
     {
@@ -64,7 +67,40 @@ def expected_package_files() -> set[str]:
     package_root = Path(__file__).resolve().parents[1] / "lib" / "python" / IMPORT_NAME
     if not package_root.is_dir():
         fail(f"package source directory does not exist: {package_root}")
-    return {path.relative_to(package_root).as_posix() for path in package_root.rglob("*") if path.is_file()}
+    return {
+        path.relative_to(package_root).as_posix()
+        for path in package_root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+    }
+
+
+def expected_package_hashes() -> dict[str, str]:
+    package_root = Path(__file__).resolve().parents[1] / "lib" / "python" / IMPORT_NAME
+    return {
+        relative.as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in package_root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+        for relative in [path.relative_to(package_root)]
+    }
+
+
+def validate_member_name(name: str, artifact_name: str) -> None:
+    normalized = name.replace("\\", "/")
+    path = PurePosixPath(normalized)
+    if not normalized or path.is_absolute() or ".." in path.parts:
+        fail(f"{artifact_name} contains an unsafe archive member path {name!r}")
+    lower_name = normalized.lower()
+    if lower_name.endswith(".pth") or path.name.lower() in STARTUP_HOOK_NAMES:
+        fail(f"{artifact_name} contains a Python startup hook {name!r}")
+    if lower_name.endswith(NATIVE_OR_EXECUTABLE_SUFFIXES):
+        fail(f"{artifact_name} contains an unexpected executable or native library {name!r}")
+
+
+def validate_archive_names(names: list[str], artifact_name: str) -> None:
+    if len(names) != len(set(names)):
+        fail(f"{artifact_name} contains duplicate archive members")
+    for name in names:
+        validate_member_name(name, artifact_name)
 
 
 def read_expected_readme() -> str:
@@ -91,9 +127,16 @@ def validate_metadata_description(metadata: email.message.Message, expected_read
         fail(f"{artifact_name} long description does not match the source README.md")
 
 
-def validate_wheel(path: Path, expected_version: str, package_files: set[str], expected_readme: str) -> None:
+def validate_wheel(
+    path: Path,
+    expected_version: str,
+    package_files: set[str],
+    package_hashes: dict[str, str],
+    expected_readme: str,
+) -> None:
     with zipfile.ZipFile(path) as archive:
         names = archive.namelist()
+        validate_archive_names(names, path.name)
         metadata_names = [name for name in names if name.endswith(".dist-info/METADATA")]
         if len(metadata_names) != 1:
             fail(f"{path.name} must contain exactly one dist-info METADATA file")
@@ -140,11 +183,17 @@ def validate_wheel(path: Path, expected_version: str, package_files: set[str], e
             fail(f"{path.name} contains repository test files")
 
         dist_info_prefix = metadata_names[0].rsplit("/", 1)[0] + "/"
-        for name in names:
+        for info in archive.infolist():
+            name = info.filename
+            mode = (info.external_attr >> 16) & 0o7777
+            if mode & 0o111:
+                fail(f"{path.name} contains an executable archive member {name!r}")
             if name.startswith(f"{IMPORT_NAME}/"):
                 relative = name[len(IMPORT_NAME) + 1 :]
                 if relative not in package_files:
                     fail(f"{path.name} contains non-allowlisted package file {name!r}")
+                if hashlib.sha256(archive.read(name)).hexdigest() != package_hashes[relative]:
+                    fail(f"{path.name} package file {name!r} differs from the reviewed source")
                 continue
             if name.startswith(dist_info_prefix):
                 relative = name[len(dist_info_prefix) :]
@@ -156,10 +205,11 @@ def validate_wheel(path: Path, expected_version: str, package_files: set[str], e
             fail(f"{path.name} contains non-allowlisted archive member {name!r}")
 
 
-def validate_sdist(path: Path, expected_version: str, expected_readme: str) -> None:
+def validate_sdist(path: Path, expected_version: str, package_hashes: dict[str, str], expected_readme: str) -> None:
     with tarfile.open(path, "r:gz") as archive:
         members = archive.getmembers()
         names = [member.name for member in members]
+        validate_archive_names(names, path.name)
         roots = {name.split("/", 1)[0] for name in names if name}
         if len(roots) != 1:
             fail(f"{path.name} must contain exactly one top-level directory")
@@ -169,11 +219,23 @@ def validate_sdist(path: Path, expected_version: str, expected_readme: str) -> N
             name = member.name
             if name == root or member.isdir():
                 continue
+            if member.issym() or member.islnk():
+                fail(f"{path.name} contains a symbolic or hard link: {name!r}")
+            if member.mode & 0o111 and not (name.startswith(f"{root_prefix}scripts/") and name.endswith(".py")):
+                fail(f"{path.name} contains an executable archive member {name!r}")
             if not name.startswith(root_prefix):
                 fail(f"{path.name} contains member outside its top-level directory: {name!r}")
             relative = name[len(root_prefix) :]
             if relative not in ALLOWED_SDIST_FILES and not relative.startswith(ALLOWED_SDIST_PREFIXES):
                 fail(f"{path.name} contains non-allowlisted archive member {relative!r}")
+            package_prefix = "lib/python/base_cli/"
+            if relative.startswith(package_prefix):
+                package_relative = relative[len(package_prefix) :]
+                payload = archive.extractfile(member)
+                if package_relative not in package_hashes or payload is None:
+                    fail(f"{path.name} contains non-allowlisted package file {relative!r}")
+                if hashlib.sha256(payload.read()).hexdigest() != package_hashes[package_relative]:
+                    fail(f"{path.name} package file {relative!r} differs from the reviewed source")
         required_suffixes = {"pyproject.toml", "README.md", "LICENSE", "VERSION"}
         present_suffixes = {name.rsplit("/", 1)[-1] for name in names}
         missing = required_suffixes - present_suffixes
@@ -220,8 +282,9 @@ def main() -> None:
         fail(f"artifact filenames do not match version {expected_version}")
 
     expected_readme = read_expected_readme()
-    validate_wheel(wheels[0], expected_version, expected_package_files(), expected_readme)
-    validate_sdist(sdists[0], expected_version, expected_readme)
+    package_hashes = expected_package_hashes()
+    validate_wheel(wheels[0], expected_version, set(package_hashes), package_hashes, expected_readme)
+    validate_sdist(sdists[0], expected_version, package_hashes, expected_readme)
     print(f"Validated {PACKAGE_NAME} {expected_version}: wheel, sdist, metadata, package data, and test boundary.")
 
 
