@@ -1,0 +1,12 @@
+# Release-path changes require review from the maintainers responsible for
+# package integrity. The protected-branch ruleset requires an approval from a
+# reviewer other than the last pusher.
+/.github/workflows/package.yml @codeforester @rameshulugar
+/.github/workflows/issue-branch-policy.yml @codeforester @rameshulugar
+/VERSION @codeforester @rameshulugar
+/pyproject.toml @codeforester @rameshulugar
+/requirements/ @codeforester @rameshulugar
+/scripts/validate_* @codeforester @rameshulugar
+/scripts/verify_* @codeforester @rameshulugar
+/scripts/generate_release_metadata.py @codeforester @rameshulugar
+/scripts/release_metadata_helpers.py @codeforester @rameshulugar

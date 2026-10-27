@@ -25,6 +25,20 @@ review, approval from someone other than the last pusher, strict up-to-date
 status checks, and the policy, quality, runtime, and consumer checks listed in
 the repository ruleset. Deletion and non-fast-forward updates are disabled.
 
+Release-path changes are additionally covered by `.github/CODEOWNERS`, including
+the package workflow, `VERSION`, packaging metadata, release locks, and release
+validators. Maintainers must review the complete diff, and the independent
+reviewer must rerun the quality and release gates before a production tag is
+created. The repository ruleset protects `v*` tags from deletion and force
+updates; bypass actors are intentionally empty.
+
+If a maintainer credential is suspected to be compromised, pause publication,
+revoke the affected token or OIDC trust, preserve the workflow run and review
+evidence, and rotate the release version rather than moving an existing tag.
+Restore access only after an independent maintainer has reviewed the ruleset,
+environment approvals, trusted-publisher claims, and the exact artifact
+digests.
+
 ## Validation workflow
 
 Pull requests and pushes to `main` start from a clean artifact destination,
