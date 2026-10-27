@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import yaml
@@ -24,11 +25,18 @@ def test_package_workflow_can_recover_an_immutable_tag_from_default_branch() -> 
     assert '--source-commit "$SOURCE_COMMIT"' in workflow
 
 
-def test_package_workflow_uses_a_published_pypi_publisher_image_tag() -> None:
+def test_package_workflow_uses_the_pinned_pypi_publisher_release() -> None:
     workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
 
-    assert workflow.count("uses: pypa/gh-action-pypi-publish@v1.14.2") == 2
-    assert "pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26" not in workflow
+    assert workflow.count("uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086") == 2
+
+
+def test_package_workflow_pins_every_third_party_action_to_a_full_sha() -> None:
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
+    refs = re.findall(r"^\s*-?\s*uses:\s+[^@\s]+@([^\s#]+)", workflow, flags=re.MULTILINE)
+
+    assert refs
+    assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for ref in refs), refs
 
 
 def test_package_workflow_does_not_replace_published_release_assets() -> None:
