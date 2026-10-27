@@ -54,8 +54,8 @@ def test_package_workflow_does_not_replace_published_release_assets() -> None:
     assert "refusing to replace immutable release assets" in verifier
     assert "gh release download" in workflow
     assert "gh attestation verify" in workflow
-    assert '--source-digest "$GITHUB_SHA"' in workflow
-    assert '--source-ref "$GITHUB_REF"' in workflow
+    assert '--source-digest "$SOURCE_COMMIT"' in workflow
+    assert '--source-ref "$SOURCE_REF"' in workflow
     assert '--source-commit "$source_commit"' in workflow
     assert "--clobber" not in workflow
 
@@ -81,6 +81,7 @@ def test_package_workflow_gates_tag_publication_on_release_documentation() -> No
     assert "PYPI-BYTE-VERIFICATION.json" in workflow
     assert "if: ${{ always() }}" in workflow
     assert "needs: [build, smoke, provenance, publish, attest, verify_pypi]" in workflow
+    assert "needs: [build, smoke, provenance, attest, verify_attestations, publish, verify_pypi]" in workflow
 
 
 def test_package_workflow_gates_writes_on_release_provenance() -> None:
@@ -90,6 +91,24 @@ def test_package_workflow_gates_writes_on_release_provenance() -> None:
     assert "name: Verify reviewed release provenance" in workflow
     assert 'git fetch --no-tags --prune origin "refs/heads/main:refs/remotes/origin/main"' in workflow
     assert "python scripts/validate_release_provenance.py" in workflow
-    assert jobs["publish"]["needs"] == ["build", "smoke", "provenance"]
+    assert jobs["publish"]["needs"] == ["build", "smoke", "provenance", "verify_attestations"]
     assert jobs["attest"]["needs"] == ["build", "smoke", "provenance"]
-    assert jobs["release"]["needs"] == ["build", "smoke", "provenance", "publish", "attest", "verify_pypi"]
+    assert jobs["release"]["needs"] == [
+        "build",
+        "smoke",
+        "provenance",
+        "attest",
+        "verify_attestations",
+        "publish",
+        "verify_pypi",
+    ]
+
+
+def test_package_workflow_verifies_attestations_before_publication() -> None:
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
+    jobs = yaml.safe_load(workflow)["jobs"]
+
+    assert jobs["publish"]["needs"] == ["build", "smoke", "provenance", "verify_attestations"]
+    assert jobs["verify_attestations"]["needs"] == ["build", "smoke", "provenance", "attest"]
+    assert '--source-digest "$SOURCE_COMMIT"' in workflow
+    assert '--source-ref "refs/tags/$RELEASE_TAG"' in workflow

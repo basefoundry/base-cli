@@ -317,7 +317,7 @@ jobs:
 
   publish:
     name: Publish reviewed distribution
-    needs: [build, smoke, provenance]
+    needs: [build, smoke, provenance, verify_attestations]
     if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -381,9 +381,46 @@ jobs:
           subject-checksums: dist/SHA256SUMS
           sbom-path: dist/SBOM.spdx.json
 
+  verify_attestations:
+    name: Verify reviewed release attestations
+    needs: [build, smoke, provenance, attest]
+    if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - name: Download reviewed distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: base-cli-dist-${{ github.run_id }}
+          path: dist
+
+      - name: Verify artifact provenance and SBOM attestations
+        env:
+          SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for asset in dist/*.whl dist/*.tar.gz; do
+            gh attestation verify "$asset" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/package.yml" \
+              --source-digest "$SOURCE_COMMIT" \
+              --source-ref "refs/tags/$RELEASE_TAG"
+            gh attestation verify "$asset" \
+              --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/package.yml" \
+              --source-digest "$SOURCE_COMMIT" \
+              --source-ref "refs/tags/$RELEASE_TAG" \
+              --predicate-type "https://spdx.dev/Document"
+          done
+
   verify_pypi:
     name: Verify published PyPI metadata
-    needs: [build, publish, attest]
+    needs: [build, publish, verify_attestations]
     if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi' && inputs.release_tag != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -429,7 +466,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build, smoke, provenance, publish, attest, verify_pypi]
+    needs: [build, smoke, provenance, attest, verify_attestations, publish, verify_pypi]
     if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || (github.event_name == 'workflow_dispatch' && inputs.publish_target == 'pypi' && inputs.release_tag != '') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -466,6 +503,7 @@ jobs:
           SOURCE_REVISION: ${{ needs.build.outputs.source_commit }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
           SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
+          SOURCE_REF: refs/tags/${{ needs.build.outputs.release_tag }}
         run: |
           set -euo pipefail
           tag="$RELEASE_TAG"
@@ -482,13 +520,13 @@ jobs:
             gh attestation verify "$asset" \
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/package.yml" \
-              --source-digest "$GITHUB_SHA" \
-              --source-ref "$GITHUB_REF"
+              --source-digest "$SOURCE_COMMIT" \
+              --source-ref "$SOURCE_REF"
             gh attestation verify "$asset" \
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/package.yml" \
-              --source-digest "$GITHUB_SHA" \
-              --source-ref "$GITHUB_REF" \
+              --source-digest "$SOURCE_COMMIT" \
+              --source-ref "$SOURCE_REF" \
               --predicate-type "https://spdx.dev/Document"
           done
 
