@@ -758,7 +758,7 @@ base_cli.TelemetryOptions(...)
 
 ### `TelemetrySession`
 **Kind:** class<br>
-**Signature:** `TelemetrySession(span: 'Any', started_monotonic_ns: 'int') -> None`
+**Signature:** `TelemetrySession(span: 'Any', started_monotonic_ns: 'int', context_api: 'Any | None' = None, context_token: 'Any | None' = None) -> None`
 
 **Behavior:** Best-effort state for a single lifecycle span.
 
