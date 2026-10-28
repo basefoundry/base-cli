@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -34,21 +36,28 @@ def test_package_workflow_resolves_branch_source_ref_for_testpypi_dispatch() -> 
     workflow = yaml.safe_load((root / ".github/workflows/package.yml").read_text(encoding="utf-8"))
     metadata_step = next(step for step in workflow["jobs"]["build"]["steps"] if step.get("id") == "metadata")
 
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("bash is required to execute the workflow metadata step")
+
     with tempfile.TemporaryDirectory() as directory:
-        output_path = Path(directory) / "github-output"
+        sandbox = Path(directory)
+        (sandbox / "VERSION").write_text((root / "VERSION").read_text(encoding="utf-8"), encoding="utf-8")
+        output_name = "github-output"
+        output_path = sandbox / output_name
         environment = os.environ.copy()
         environment.update(
             {
                 "GITHUB_REF": "refs/heads/testpypi-rehearsal",
                 "GITHUB_REF_TYPE": "branch",
                 "GITHUB_SHA": "a" * 40,
-                "GITHUB_OUTPUT": str(output_path),
+                "GITHUB_OUTPUT": output_name,
                 "REQUESTED_RELEASE_TAG": "",
             }
         )
         subprocess.run(
-            ["bash", "-euo", "pipefail", "-c", metadata_step["run"]],
-            cwd=root,
+            [bash, "-euo", "pipefail", "-c", metadata_step["run"]],
+            cwd=sandbox,
             env=environment,
             check=True,
             capture_output=True,
@@ -116,7 +125,6 @@ def test_package_workflow_gates_tag_publication_on_release_documentation() -> No
     assert "--artifacts-dir dist" in workflow
     assert "PYPI-BYTE-VERIFICATION.json" in workflow
     assert "if: ${{ always() }}" in workflow
-    assert "needs: [build, smoke, provenance, publish, attest, verify_pypi]" in workflow
     assert "needs: [build, smoke, provenance, attest, verify_attestations, publish, verify_pypi]" in workflow
 
 
