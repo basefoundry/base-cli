@@ -20,17 +20,24 @@ Production releases use a matching annotated tag such as `v0.1.0`, created from
 updates, and tags that do not exactly match `v${VERSION}` are rejected before
 publication. The workflow fetches the complete trusted `main` history so an
 ancestor check fails closed instead of relying on shallow checkout state.
-The active default-branch ruleset also requires one approving pull-request
-review, approval from someone other than the last pusher, strict up-to-date
-status checks, and the policy, quality, runtime, and consumer checks listed in
-the repository ruleset. Deletion and non-fast-forward updates are disabled.
+The default-branch and `v*` tag rulesets are release prerequisites. Before a
+production tag is created, an independent maintainer must verify in the live
+repository settings that the default branch requires one approving pull-request
+review from someone other than the last pusher, strict up-to-date status checks,
+and the policy, quality, runtime, and consumer checks listed in the ruleset.
+The same verification must confirm that tag deletion and non-fast-forward
+updates are disabled and that no unreviewed bypass actor is configured. This
+document describes the required controls; it does not treat a ruleset as active
+until that live readback has been recorded in the release evidence.
 
 Release-path changes are additionally covered by `.github/CODEOWNERS`, including
-the package workflow, `VERSION`, packaging metadata, release locks, and release
-validators. Maintainers must review the complete diff, and the independent
-reviewer must rerun the quality and release gates before a production tag is
-created. The repository ruleset protects `v*` tags from deletion and force
-updates; bypass actors are intentionally empty.
+the package workflows, `VERSION`, the hash-locked release toolchain, the
+artifact/provenance validators, and this release procedure. CODEOWNERS is a
+review-routing control, not enforcement by itself: the protected-branch
+ruleset must require the matching owner review and protect the CODEOWNERS file.
+The independent reviewer must rerun the quality and release gates before a
+production tag is created. The tag ruleset must protect `v*` tags from deletion
+and force updates; bypass actors must be intentionally empty.
 
 If a maintainer credential is suspected to be compromised, pause publication,
 revoke the affected token or OIDC trust, preserve the workflow run and review
@@ -78,8 +85,9 @@ the exact reviewed wheel, sdist, `SHA256SUMS`, `SBOM.spdx.json`, and
 `RELEASE-BOM-ROW.json` downloaded from the build job. GitHub-generated
 comparison notes are supplemented by the
 dated section in `CHANGELOG.md`; the tagged release is rejected when `VERSION`
-or that section does not match the tag. Published tags and release assets are
-immutable. Before creating a release, the workflow verifies that the tag still
+or that section does not match the tag. Once the live `v*` tag ruleset has been
+verified, published tags and release assets are treated as immutable. Before
+creating a release, the workflow verifies that the tag still
 resolves to the reviewed commit, that the wheel and sdist have provenance and
 SBOM attestations for that tag and commit, and that the release metadata binds
 the same version, commit, and assets. If an existing GitHub Release is found,
