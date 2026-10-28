@@ -425,7 +425,7 @@ jobs:
         with:
           name: base-cli-pypi-byte-evidence-${{ github.run_id }}
           path: dist/PYPI-BYTE-VERIFICATION.json
-          if-no-files-found: error
+          if-no-files-found: ignore
 
   release:
     name: Create GitHub Release

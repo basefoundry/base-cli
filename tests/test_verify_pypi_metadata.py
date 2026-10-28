@@ -71,6 +71,21 @@ class PyPIMetadataValidationTests(unittest.TestCase):
             self.assertTrue(any("does not match" in error for error in errors))
             self.assertFalse(evidence["result"])
 
+    def test_preserves_reviewed_hashes_when_pypi_urls_are_malformed(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            wheel = root / "base_cli-1.2.3-py3-none-any.whl"
+            wheel.write_bytes(b"wheel")
+            digest = hashlib.sha256(wheel.read_bytes()).hexdigest()
+            (root / "SHA256SUMS").write_text(f"{digest}  {wheel.name}\n", encoding="utf-8")
+
+            errors, evidence = validate_artifact_hashes({"info": {"version": "1.2.3"}, "urls": {}}, root)
+
+            self.assertTrue(any("no file URL list" in error for error in errors))
+            self.assertEqual(evidence["files"], [{"filename": wheel.name, "pypi_sha256": None, "sha256": digest}])
+            self.assertEqual(evidence["errors"], errors)
+            self.assertFalse(evidence["result"])
+
 
 if __name__ == "__main__":
     unittest.main()

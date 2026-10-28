@@ -4,13 +4,17 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+try:
+    from .release_metadata_helpers import sha256_file
+except ImportError:  # pragma: no cover - direct script execution
+    from release_metadata_helpers import sha256_file
 
 
 def _normalized(value: str) -> str:
@@ -46,26 +50,27 @@ def validate_artifact_hashes(metadata: dict[str, Any], artifacts_dir: Path) -> t
 
     errors: list[str] = []
     artifacts = sorted((*artifacts_dir.glob("*.whl"), *artifacts_dir.glob("*.tar.gz")))
-    observed = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in artifacts}
+    reviewed = {path.name: sha256_file(path) for path in artifacts}
     urls = metadata.get("urls")
-    if not isinstance(urls, list):
-        return ["PyPI response has no file URL list"], {}
     published: dict[str, str] = {}
-    for entry in urls:
-        if not isinstance(entry, dict):
-            errors.append("PyPI file URL entry is not an object")
-            continue
-        filename = entry.get("filename")
-        digest = (entry.get("digests") or {}).get("sha256") if isinstance(entry.get("digests"), dict) else None
-        if not isinstance(filename, str) or not isinstance(digest, str):
-            errors.append("PyPI file URL entry has no filename and SHA-256 digest")
-            continue
-        published[filename] = digest
-    if set(published) != set(observed):
+    if not isinstance(urls, list):
+        errors.append("PyPI response has no file URL list")
+    else:
+        for entry in urls:
+            if not isinstance(entry, dict):
+                errors.append("PyPI file URL entry is not an object")
+                continue
+            filename = entry.get("filename")
+            digest = (entry.get("digests") or {}).get("sha256") if isinstance(entry.get("digests"), dict) else None
+            if not isinstance(filename, str) or not isinstance(digest, str):
+                errors.append("PyPI file URL entry has no filename and SHA-256 digest")
+                continue
+            published[filename] = digest
+    if set(published) != set(reviewed):
         errors.append(
-            f"PyPI files differ from reviewed artifacts: expected {sorted(observed)!r}, observed {sorted(published)!r}"
+            f"PyPI files differ from reviewed artifacts: expected {sorted(reviewed)!r}, observed {sorted(published)!r}"
         )
-    for filename, digest in observed.items():
+    for filename, digest in reviewed.items():
         if published.get(filename) != digest:
             errors.append(f"PyPI SHA-256 for {filename} does not match the reviewed artifact")
 
@@ -78,18 +83,19 @@ def validate_artifact_hashes(metadata: dict[str, Any], artifacts_dir: Path) -> t
             fields = line.split(maxsplit=1)
             if len(fields) == 2:
                 checksums[fields[1]] = fields[0]
-        if checksums != observed:
+        if checksums != reviewed:
             errors.append("reviewed SHA256SUMS does not match the reviewed artifacts")
 
     evidence = {
         "package": "base-cli",
         "version": metadata.get("info", {}).get("version") if isinstance(metadata.get("info"), dict) else None,
         "files": [
-            {"filename": filename, "sha256": observed[filename], "pypi_sha256": published.get(filename)}
-            for filename in sorted(observed)
+            {"filename": filename, "sha256": reviewed[filename], "pypi_sha256": published.get(filename)}
+            for filename in sorted(reviewed)
         ],
-        "sha256sums_verified": checksums == observed,
+        "sha256sums_verified": checksums == reviewed,
         "result": not errors,
+        "errors": errors,
     }
     return errors, evidence
 
