@@ -7,6 +7,7 @@ import argparse
 import email
 import hashlib
 import re
+import stat
 import sys
 import tarfile
 import zipfile
@@ -185,7 +186,12 @@ def validate_wheel(
         dist_info_prefix = metadata_names[0].rsplit("/", 1)[0] + "/"
         for info in archive.infolist():
             name = info.filename
-            mode = (info.external_attr >> 16) & 0o7777
+            mode_bits = info.external_attr >> 16
+            if stat.S_ISLNK(mode_bits):
+                fail(f"{path.name} contains a symbolic link archive member {name!r}")
+            if info.is_dir():
+                continue
+            mode = mode_bits & 0o7777
             if mode & 0o111:
                 fail(f"{path.name} contains an executable archive member {name!r}")
             if name.startswith(f"{IMPORT_NAME}/"):
