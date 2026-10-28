@@ -31,12 +31,18 @@ def test_package_workflow_uses_the_pinned_pypi_publisher_release() -> None:
     assert workflow.count("uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086") == 2
 
 
-def test_package_workflow_pins_every_third_party_action_to_a_full_sha() -> None:
-    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/package.yml").read_text(encoding="utf-8")
-    refs = re.findall(r"^\s*-?\s*uses:\s+[^@\s]+@([^\s#]+)", workflow, flags=re.MULTILINE)
+def test_all_workflows_pin_every_third_party_action_to_a_full_sha() -> None:
+    workflow_dir = Path(__file__).resolve().parents[1] / ".github/workflows"
+    workflows = sorted(workflow_dir.glob("*.yml"))
+    assert workflows
 
-    assert refs
-    assert all(re.fullmatch(r"[0-9a-f]{40}", ref) for ref in refs), refs
+    unpinned: list[tuple[str, str]] = []
+    for workflow_path in workflows:
+        workflow = workflow_path.read_text(encoding="utf-8")
+        refs = re.findall(r"^\s*-?\s*uses:\s+[^@\s]+@([^\s#]+)", workflow, flags=re.MULTILINE)
+        unpinned.extend((workflow_path.name, ref) for ref in refs if not re.fullmatch(r"[0-9a-f]{40}", ref))
+
+    assert unpinned == []
 
 
 def test_package_workflow_does_not_replace_published_release_assets() -> None:
