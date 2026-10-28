@@ -322,7 +322,7 @@ jobs:
 
   publish:
     name: Publish reviewed distribution
-    needs: [build, smoke, provenance, verify_attestations]
+    needs: [build, smoke, provenance, attest, verify_attestations]
     if: ${{ (github.event_name == 'push' && github.ref_type == 'tag') || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
