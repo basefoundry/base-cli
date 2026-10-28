@@ -43,11 +43,11 @@ ALLOWED_SDIST_PREFIXES = (
     "docs/",
     "examples/",
     "compatibility/",
-    "lib/python/base_cli/",
+    f"lib/python/{IMPORT_NAME}/",
     "scripts/",
     "tests/",
     "base_cli.egg-info/",
-    "lib/python/base_cli.egg-info/",
+    f"lib/python/{IMPORT_NAME}.egg-info/",
 )
 
 
@@ -64,24 +64,14 @@ def read_expected_version() -> str:
     return lines[0].strip()
 
 
-def expected_package_files() -> set[str]:
+def expected_package_hashes() -> dict[str, str]:
     package_root = Path(__file__).resolve().parents[1] / "lib" / "python" / IMPORT_NAME
     if not package_root.is_dir():
         fail(f"package source directory does not exist: {package_root}")
     return {
-        path.relative_to(package_root).as_posix()
+        path.relative_to(package_root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
         for path in package_root.rglob("*")
         if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
-    }
-
-
-def expected_package_hashes() -> dict[str, str]:
-    package_root = Path(__file__).resolve().parents[1] / "lib" / "python" / IMPORT_NAME
-    return {
-        relative.as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in package_root.rglob("*")
-        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
-        for relative in [path.relative_to(package_root)]
     }
 
 
@@ -234,7 +224,7 @@ def validate_sdist(path: Path, expected_version: str, package_hashes: dict[str, 
             relative = name[len(root_prefix) :]
             if relative not in ALLOWED_SDIST_FILES and not relative.startswith(ALLOWED_SDIST_PREFIXES):
                 fail(f"{path.name} contains non-allowlisted archive member {relative!r}")
-            package_prefix = "lib/python/base_cli/"
+            package_prefix = f"lib/python/{IMPORT_NAME}/"
             if relative.startswith(package_prefix):
                 package_relative = relative[len(package_prefix) :]
                 payload = archive.extractfile(member)

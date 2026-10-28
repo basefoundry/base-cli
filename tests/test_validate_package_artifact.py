@@ -18,7 +18,7 @@ from scripts.validate_package_artifact import (
 
 def _write_valid_wheel(path: Path, *, include_directory: bool = False, include_symlink: bool = False) -> None:
     package_init = b"from __future__ import annotations\n"
-    metadata = """Metadata-Version: 2.1
+    metadata = b"""Metadata-Version: 2.1
 Name: base-cli
 Version: 0.5.1
 License: Apache-2.0
@@ -29,7 +29,7 @@ Requires-Dist: PyYAML<7,>=6.0; extra == \"yaml\"
 Project-URL: Documentation, https://basefoundry.github.io/base-cli/
 
 README
-""".encode()
+"""
     with zipfile.ZipFile(path, "w") as archive:
         if include_directory:
             directory = zipfile.ZipInfo("base_cli/")
