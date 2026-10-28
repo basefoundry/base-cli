@@ -63,6 +63,9 @@ def test_package_workflow_gates_tag_publication_on_release_documentation() -> No
     assert "python scripts/validate_release_docs.py" in workflow
     assert "scripts/verify_pypi_metadata.py" in workflow
     assert "name: Verify published PyPI metadata" in workflow
+    assert "--artifacts-dir dist" in workflow
+    assert "PYPI-BYTE-VERIFICATION.json" in workflow
+    assert "if: ${{ always() }}" in workflow
     assert "needs: [build, smoke, provenance, publish, attest, verify_pypi]" in workflow
 
 

@@ -11,6 +11,11 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+try:
+    from .release_metadata_helpers import sha256_file
+except ImportError:  # pragma: no cover - direct script execution
+    from release_metadata_helpers import sha256_file
+
 
 def _normalized(value: str) -> str:
     return value.replace("\r\n", "\n").strip()
@@ -40,6 +45,61 @@ def validate_metadata(metadata: dict[str, Any], version: str, readme: str) -> li
     return errors
 
 
+def validate_artifact_hashes(metadata: dict[str, Any], artifacts_dir: Path) -> tuple[list[str], dict[str, Any]]:
+    """Compare PyPI file hashes with the reviewed distribution and SHA256SUMS."""
+
+    errors: list[str] = []
+    artifacts = sorted((*artifacts_dir.glob("*.whl"), *artifacts_dir.glob("*.tar.gz")))
+    reviewed = {path.name: sha256_file(path) for path in artifacts}
+    urls = metadata.get("urls")
+    published: dict[str, str] = {}
+    if not isinstance(urls, list):
+        errors.append("PyPI response has no file URL list")
+    else:
+        for entry in urls:
+            if not isinstance(entry, dict):
+                errors.append("PyPI file URL entry is not an object")
+                continue
+            filename = entry.get("filename")
+            digest = (entry.get("digests") or {}).get("sha256") if isinstance(entry.get("digests"), dict) else None
+            if not isinstance(filename, str) or not isinstance(digest, str):
+                errors.append("PyPI file URL entry has no filename and SHA-256 digest")
+                continue
+            published[filename] = digest
+    if set(published) != set(reviewed):
+        errors.append(
+            f"PyPI files differ from reviewed artifacts: expected {sorted(reviewed)!r}, observed {sorted(published)!r}"
+        )
+    for filename, digest in reviewed.items():
+        if published.get(filename) != digest:
+            errors.append(f"PyPI SHA-256 for {filename} does not match the reviewed artifact")
+
+    checksums_path = artifacts_dir / "SHA256SUMS"
+    checksums: dict[str, str] = {}
+    if not checksums_path.is_file():
+        errors.append("reviewed SHA256SUMS is missing")
+    else:
+        for line in checksums_path.read_text(encoding="utf-8").splitlines():
+            fields = line.split(maxsplit=1)
+            if len(fields) == 2:
+                checksums[fields[1]] = fields[0]
+        if checksums != reviewed:
+            errors.append("reviewed SHA256SUMS does not match the reviewed artifacts")
+
+    evidence = {
+        "package": "base-cli",
+        "version": metadata.get("info", {}).get("version") if isinstance(metadata.get("info"), dict) else None,
+        "files": [
+            {"filename": filename, "sha256": reviewed[filename], "pypi_sha256": published.get(filename)}
+            for filename in sorted(reviewed)
+        ],
+        "sha256sums_verified": checksums == reviewed,
+        "result": not errors,
+        "errors": errors,
+    }
+    return errors, evidence
+
+
 def _fetch(url: str, attempts: int, delay: float) -> dict[str, Any]:
     last_error: Exception | None = None
     for attempt in range(1, attempts + 1):
@@ -62,9 +122,17 @@ def main() -> None:
     parser.add_argument("--readme", type=Path, default=Path("README.md"))
     parser.add_argument("--attempts", type=int, default=12)
     parser.add_argument("--delay", type=float, default=5.0)
+    parser.add_argument("--artifacts-dir", type=Path)
+    parser.add_argument("--evidence-output", type=Path)
     args = parser.parse_args()
     metadata = _fetch(f"https://pypi.org/pypi/base-cli/{args.version}/json", args.attempts, args.delay)
     errors = validate_metadata(metadata, args.version, args.readme.read_text(encoding="utf-8"))
+    evidence: dict[str, Any] | None = None
+    if args.artifacts_dir is not None:
+        artifact_errors, evidence = validate_artifact_hashes(metadata, args.artifacts_dir)
+        errors.extend(artifact_errors)
+    if args.evidence_output is not None and evidence is not None:
+        args.evidence_output.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if errors:
         for error in errors:
             print(f"PyPI metadata validation failed: {error}")
