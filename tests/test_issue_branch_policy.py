@@ -1,15 +1,24 @@
 from __future__ import annotations
 
 import os
+import shutil
 import stat
 import subprocess
 import tempfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 
 def test_dependabot_policy_rejects_an_unverified_collaborator_head_commit() -> None:
+    if os.name == "nt":
+        pytest.skip("the policy under test is a Bash workflow and is validated on POSIX runners")
+    if shutil.which("bash") is None:
+        pytest.skip("bash is required to execute the workflow policy")
+    if shutil.which("jq") is None:
+        pytest.skip("jq is required by the workflow policy")
+
     root = Path(__file__).resolve().parents[1]
     workflow = yaml.safe_load((root / ".github/workflows/issue-branch-policy.yml").read_text(encoding="utf-8"))
     policy_run = workflow["jobs"]["policy"]["steps"][0]["run"]
@@ -52,7 +61,7 @@ esac
         environment = os.environ.copy()
         environment.update(
             {
-                "PATH": f"{fake_bin}:{environment['PATH']}",
+                "PATH": os.pathsep.join((str(fake_bin), environment["PATH"])),
                 "GITHUB_REPOSITORY": "basefoundry/base-cli",
                 "GITHUB_SERVER_URL": "https://github.com",
                 "GITHUB_RUN_ID": "123",
