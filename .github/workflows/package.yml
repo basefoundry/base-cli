@@ -73,6 +73,7 @@ jobs:
       version: ${{ steps.metadata.outputs.version }}
       source_commit: ${{ steps.metadata.outputs.source_commit }}
       release_tag: ${{ steps.metadata.outputs.release_tag }}
+      source_ref: ${{ steps.metadata.outputs.source_ref }}
       source_ref_type: ${{ steps.metadata.outputs.source_ref_type }}
     steps:
       - name: Check out source
@@ -93,19 +94,23 @@ jobs:
         run: |
           version="$(tr -d '\\r\\n' < VERSION)"
           release_tag="$REQUESTED_RELEASE_TAG"
+          source_ref="$GITHUB_REF"
           if [[ -n "$release_tag" ]]; then
             source_ref_type=tag
             source_commit="$(git rev-parse --verify "refs/tags/$release_tag^{}")"
+            source_ref="refs/tags/$release_tag"
           else
             source_ref_type="$GITHUB_REF_TYPE"
             source_commit="$GITHUB_SHA"
             if [[ "$source_ref_type" == tag ]]; then
               release_tag="$GITHUB_REF_NAME"
+              source_ref="refs/tags/$release_tag"
             fi
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "source_commit=$source_commit" >> "$GITHUB_OUTPUT"
           echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
           echo "source_ref_type=$source_ref_type" >> "$GITHUB_OUTPUT"
 
       - name: Validate release ref
@@ -400,7 +405,7 @@ jobs:
       - name: Verify artifact provenance and SBOM attestations
         env:
           SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
-          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+          SOURCE_REF: ${{ needs.build.outputs.source_ref }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -409,12 +414,12 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/package.yml" \
               --source-digest "$SOURCE_COMMIT" \
-              --source-ref "refs/tags/$RELEASE_TAG"
+              --source-ref "$SOURCE_REF"
             gh attestation verify "$asset" \
               --repo "$GITHUB_REPOSITORY" \
               --signer-workflow "github.com/$GITHUB_REPOSITORY/.github/workflows/package.yml" \
               --source-digest "$SOURCE_COMMIT" \
-              --source-ref "refs/tags/$RELEASE_TAG" \
+              --source-ref "$SOURCE_REF" \
               --predicate-type "https://spdx.dev/Document"
           done
 
@@ -503,7 +508,7 @@ jobs:
           SOURCE_REVISION: ${{ needs.build.outputs.source_commit }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
           SOURCE_COMMIT: ${{ needs.build.outputs.source_commit }}
-          SOURCE_REF: refs/tags/${{ needs.build.outputs.release_tag }}
+          SOURCE_REF: ${{ needs.build.outputs.source_ref }}
         run: |
           set -euo pipefail
           tag="$RELEASE_TAG"

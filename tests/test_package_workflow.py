@@ -19,6 +19,7 @@ def test_package_workflow_can_recover_an_immutable_tag_from_default_branch() -> 
     assert "release_tag:" in workflow
     assert "ref: ${{ inputs.release_tag || github.ref }}" in workflow
     assert "source_commit: ${{ steps.metadata.outputs.source_commit }}" in workflow
+    assert "source_ref: ${{ steps.metadata.outputs.source_ref }}" in workflow
     assert "SOURCE_COMMIT: ${{ steps.metadata.outputs.source_commit }}" in workflow
     assert 'git archive "$SOURCE_COMMIT"' in workflow
     assert "Manual PyPI publication requires the release_tag input." in workflow
@@ -111,4 +112,6 @@ def test_package_workflow_verifies_attestations_before_publication() -> None:
     assert jobs["publish"]["needs"] == ["build", "smoke", "provenance", "verify_attestations"]
     assert jobs["verify_attestations"]["needs"] == ["build", "smoke", "provenance", "attest"]
     assert '--source-digest "$SOURCE_COMMIT"' in workflow
-    assert '--source-ref "refs/tags/$RELEASE_TAG"' in workflow
+    assert 'SOURCE_REF: ${{ needs.build.outputs.source_ref }}' in workflow
+    assert '--source-ref "$SOURCE_REF"' in workflow
+    assert '--source-ref "refs/tags/$RELEASE_TAG"' not in workflow
